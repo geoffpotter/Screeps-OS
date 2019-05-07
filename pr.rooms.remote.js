@@ -19,7 +19,7 @@ class remoteRoom extends baseRoom {
         
     }
     run() {
-
+        super.run();
         
 
         this.setupPiles();

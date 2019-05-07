@@ -20,6 +20,9 @@ class thread {
         if(!process) {//!process instanceof processClass) {
             throw new Error("Invalid process class!! " + process);
         }
+        if (!process[method]) {
+            throw new Error(process.name + " has no method " + method);
+        }
         this.process = process;
         this.method = method;
         this.targetQueue = targetQueue;

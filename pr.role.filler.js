@@ -24,7 +24,7 @@ class filler extends worker {
             new global.TaskOptIn([global.Task.PICKUPENERGYCONT, global.Task.PICKUP], 50, false),
         ];
         this.enabledWorkTasks = [
-            new global.TaskOptIn(global.Task.FILLSPAWNS, 50, false),
+            new global.TaskOptIn(global.Task.FILLSPAWNS, 20, false),
         ];
         
         this.creepClass = "filler";

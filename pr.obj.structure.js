@@ -74,7 +74,7 @@ class structureProc extends processClass {
             this.pickupContTask.amount = 0;
             this.pickupControllerTask.amount = 0;
             this.pickupSpawnTask.amount = 0;
-            if (spawn.length == 0 && controller.length == 0) {
+            if (!spawn.length && !controller.length) {
                 this.pickupContTask.amount = energyInCont;
                 //logger.log(struct, JSON.stringify(this.pickupContTask))
                 //this.taskManager.setTask(this, this.pickupContTask);

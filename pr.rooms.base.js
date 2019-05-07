@@ -51,6 +51,14 @@ class baseRoom extends processClass {
             ];
     }
     
+    run() {
+        logger.log(this.name, "baseRoom RUn", this.data.flagName, Game.flags[this.data.flagName]);
+        //kill ourselves if our flag is gone.
+        if (!Game.flags[this.data.flagName]) {
+            this.kernel.killProcess(this);
+        }
+    }
+
     taskCreate() {
         let room = Game.rooms[this.data.roomName];
         if (room && room.controller && room.controller.my && !this.praiseTask) {
@@ -132,7 +140,7 @@ class baseRoom extends processClass {
             let proc = this.kernel.getProcess(procName);
             if (!proc) {
                 proc = new structureClass(procName, data);
-                this.kernel.startProcess(proc);
+                this.kernel.startProcess(proc, this);
             }
         }
     }
@@ -149,7 +157,7 @@ class baseRoom extends processClass {
                     let proc = this.kernel.getProcess(procName);
                     if (!proc) {
                         proc = new pileClass(procName, data);
-                        this.kernel.startProcess(proc);
+                        this.kernel.startProcess(proc, this);
                     }
                 }
             }
@@ -167,7 +175,7 @@ class baseRoom extends processClass {
             let proc = this.kernel.getProcess(procName);
             if (!proc) {
                 proc = new spawnClass(procName, data);
-                this.kernel.startProcess(proc);
+                this.kernel.startProcess(proc, this);
             }
         }
     }
@@ -183,7 +191,7 @@ class baseRoom extends processClass {
             let proc = this.kernel.getProcess(procName);
             if (!proc) {
                 proc = new towerClass(procName, data);
-                this.kernel.startProcess(proc);
+                this.kernel.startProcess(proc, this);
             }
         }
     }
@@ -207,7 +215,7 @@ class baseRoom extends processClass {
                 let proc = this.kernel.getProcess(procName);
                 if (!proc) {
                     proc = new sourceClass(procName, data);
-                    this.kernel.startProcess(proc);
+                    this.kernel.startProcess(proc, this);
                 }
             }
         }
@@ -231,11 +239,8 @@ class baseRoom extends processClass {
                 let proc = this.kernel.getProcess(procName);
                 if (!proc) {
                     proc = new minerClass(procName, data);
-                    this.kernel.startProcess(proc);
+                    this.kernel.startProcess(proc, this);
                 }
-                
-                
-                
                 index++;
             }
         }
@@ -251,8 +256,9 @@ class baseRoom extends processClass {
         let proc = this.kernel.getProcess(procName);
         if (!proc) {
             proc = new workerClass(procName, data);
-            this.kernel.startProcess(proc);
+            this.kernel.startProcess(proc, this);
         }
+        proc.data = data;
     }
     
     setupBuilders() {
@@ -272,8 +278,9 @@ class baseRoom extends processClass {
         let proc = this.kernel.getProcess(procName);
         if (!proc) {
             proc = new builderClass(procName, data);
-            this.kernel.startProcess(proc);
+            this.kernel.startProcess(proc, this);
         }
+        proc.data = data;
     }
     
     setupUpgraders() {
@@ -287,8 +294,9 @@ class baseRoom extends processClass {
         let proc = this.kernel.getProcess(procName);
         if (!proc) {
             proc = new upgraderClass(procName, data);
-            this.kernel.startProcess(proc);
+            this.kernel.startProcess(proc, this);
         }
+        proc.data = data;
     }
     
     setupTransporters() {
@@ -307,19 +315,26 @@ class baseRoom extends processClass {
         let proc = this.kernel.getProcess(procName);
         if (!proc) {
             proc = new transporterClass(procName, data);
-            this.kernel.startProcess(proc);
+            this.kernel.startProcess(proc, this);
         }
+        proc.data = data;
     }
     
     setupFillers() {
         let rolePos = new RoomPosition(this.flagX, this.flagY+4, this.data.roomName);
         let procName = "fillers-"+this.data.roomName;
-        let data = {roomName:this.data.roomName, pos:rolePos};
+        let room = Game.rooms[this.data.roomName];
+        let partsNeeded = room.energyCapacityAvailable / 100
+        let requiredParts = {
+            CARRY:(1 + partsNeeded)
+        };
+        let data = {roomName:this.data.roomName, pos:rolePos, requiredParts:requiredParts};
         let proc = this.kernel.getProcess(procName);
         if (!proc) {
             proc = new fillerClass(procName, data);
-            this.kernel.startProcess(proc);
+            this.kernel.startProcess(proc, this);
         }
+        proc.data = data;
     }
     
     

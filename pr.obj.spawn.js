@@ -56,7 +56,10 @@ class spawnProc extends processClass {
     
     doSpawning() {
         let spawn = Game.getObjectById(this.data.spawnId);
-        //logger.log("tryna spawn")
+        if (!spawn) {
+            return threadClass.DONE;
+        }
+    //logger.log("tryna spawn")
         if (!spawn.spawning) {
             
             this.req = this.spawnFromQueue(spawn);
@@ -75,7 +78,7 @@ class spawnProc extends processClass {
             let classObj = global.creepClasses[req.creepClass];
             if (classObj) {
                 let roomIntel = this.intel.getRoomIntel(spawn.room.name);
-                let energyToUse = (roomIntel.emergencyMode && req.role =="worker") ? spawn.room.energyAvailable : spawn.room.energyCapacityAvailable;
+                let energyToUse = (Object.keys(Game.creeps).length < 10) ? spawn.room.energyAvailable : spawn.room.energyCapacityAvailable;
                 //let energyToUse = spawn.room.energyAvailable
                 let body = classObj.getBody(energyToUse);
                 let name = `${req.proc}-${req.role}-${req.creepClass}-${req.index}`;

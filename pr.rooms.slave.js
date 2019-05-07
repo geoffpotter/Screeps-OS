@@ -18,6 +18,7 @@ class slaveRoom extends baseRoom {
         super.init();
     }
     run() {
+        super.run();
         this.setupSpawns();
         this.setupTowers();
         this.setupPiles();

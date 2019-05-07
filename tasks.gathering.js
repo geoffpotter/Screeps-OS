@@ -9,7 +9,7 @@
 
 var logger = require("screeps.logger");
 logger = new logger("tasks.gathering");
-//logger.enabled = false;
+logger.enabled = false;
 
 var Task = require("tasks.base");
 

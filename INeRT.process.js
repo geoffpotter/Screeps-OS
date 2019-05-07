@@ -9,7 +9,7 @@
 
 let logger = require("screeps.logger");
 logger = new logger("INeRT.process");
-logger.enabled = false;
+//logger.enabled = false;
 logger.color = COLOR_GREY;
 
 let stat = require("util.stat");
@@ -23,6 +23,8 @@ class process {
         this.name = name;
         this.data = data;
         this.cpuUsed = new stat();
+        this.killed = false;
+        this.parentProc = false; //set in kernel->startProcess
     }
     
     set memory(value) {

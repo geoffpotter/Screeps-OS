@@ -238,7 +238,7 @@ class taskManager extends processClass {
             //     logger.log(creep, JSON.stringify(t));
             //     logger.log(nameMatches , wl , inRange , sizeOk , filterOk , dataMatches)
             // }
-            return (inHomeRange || inCreepRange);
+            return (inHomeRange);// || inCreepRange);
         })
         let task = false;
         if(optIn.useBiggestTask) {

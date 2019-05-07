@@ -81,7 +81,7 @@ class empire extends processClass {
             let data = {siteId:site.id};
             if (!proc) {
                 proc = new constSiteClass(procName, data);
-                this.kernel.startProcess(proc);
+                this.kernel.startProcess(proc, this);
             }
             proc.data = data;
         }
@@ -98,7 +98,7 @@ class empire extends processClass {
                 let data = {structureId:structure.id};
                 if (!proc) {
                     proc = new extensionClass(procName, data);
-                    this.kernel.startProcess(proc);
+                    this.kernel.startProcess(proc, this);
                 }
                 proc.data = data;
             } else {
@@ -107,7 +107,7 @@ class empire extends processClass {
                 let data = {structureId:structure.id};
                 if (!proc) {
                     proc = new structureClass(procName, data);
-                    this.kernel.startProcess(proc);
+                    this.kernel.startProcess(proc, this);
                 }
                 proc.data = data;
             }
@@ -136,49 +136,43 @@ class empire extends processClass {
             let flag = roomFlags[f];
             let procName = "spawnRoom-" + flag.pos.roomName;
             let data = {roomName:flag.pos.roomName, flagName:flag.name};
-            if (!this.spawnRooms[flag.pos.roomName]) {
-                let proc = new spawnRoomClass(procName, data);
-                this.kernel.startProcess(proc);
-                this.spawnRooms[flag.pos.roomName] = proc;
-                //this.childProcess(procName, "spawnRoom", this.kernel.pri("EMPIRE"), {roomName:flag.pos.roomName, flagName:flag.name});
-                logger.log('created spawn room', this.spawnRooms[flag.pos.roomName])
+            let proc = this.kernel.getProcess(procName);
+            if (!proc) {
+                proc = new spawnRoomClass(procName, data);
+                this.kernel.startProcess(proc, this);
             }
+            proc.data = data;
         }
     }
     
     setupSlaveRooms() {
-        if (!this.slaves) {
-            this.slaves = {};
-        }
         let roomFlags = global.utils.allFlagsByColor(COLOR_WHITE, COLOR_GREY);
         for(let f in roomFlags) {
             let flag = roomFlags[f];
             let procName = "slave-" + flag.pos.roomName;
             let data = {roomName:flag.pos.roomName, flagName:flag.name};
-            if (!this.slaves[flag.pos.roomName]) {
-                let proc = new slaveRoomClass(procName, data);
-                this.kernel.startProcess(proc);
-                this.slaves[flag.pos.roomName] = proc;
-                //this.slaves[flag.pos.roomName] = this.childProcess(procName, "slaveRoom", this.kernel.pri("EMPIRE"), {roomName:flag.pos.roomName, flagName:flag.name});
+            let proc = this.kernel.getProcess(procName);
+            if (!proc) {
+                proc = new slaveRoomClass(procName, data);
+                this.kernel.startProcess(proc, this);
             }
+            proc.data = data;
         }
     }
     
     setupRemoteMiningRooms() {
-        if (!this.remoteMiningRooms) {
-            this.remoteMiningRooms = {};
-        }
+
         let remoteMiningFlags = global.utils.allFlagsByColor(COLOR_WHITE, COLOR_YELLOW);
         for(let f in remoteMiningFlags) {
             let flag = remoteMiningFlags[f];
             let procName = "remote-" + flag.pos.roomName;
-            let data = {roomName:flag.pos.roomName, flagName:flag.name}
-            if (!this.remoteMiningRooms[flag.pos.roomName]) {
-                let proc = new remoteRoomClass(procName, data);
-                this.kernel.startProcess(proc);
-                this.remoteMiningRooms[flag.pos.roomName] = proc;
-                //this.remoteMiningRooms[flag.pos.roomName] = this.childProcess(procName, "remoteRoom", this.kernel.pri("EMPIRE"), {roomName:flag.pos.roomName, flagName:flag.name});
+            let data = {roomName:flag.pos.roomName, flagName:flag.name};
+            let proc = this.kernel.getProcess(procName);
+            if (!proc) {
+                proc = new remoteRoomClass(procName, data);
+                this.kernel.startProcess(proc, this);
             }
+            proc.data = data;
         }
     }
     
@@ -192,8 +186,9 @@ class empire extends processClass {
             let data = {roomName:rolePos.roomName, pos:rolePos, flagName:flag.name};
             if (!proc) {
                 proc = new claimerClass(procName, data);
-                this.kernel.startProcess(proc);
+                this.kernel.startProcess(proc, this);
             }
+            proc.data = data;
             //this.childProcess("claimer-"+rolePos.roomName, "claimer", this.kernel.pri("CREEP"), {roomName:rolePos.roomName, pos:rolePos, flagName:flag.name});
         }
     }

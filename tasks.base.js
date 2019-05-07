@@ -44,6 +44,9 @@ class Task {
         if (!this.displayThisTask /*&& creep === false*/) {
             return false;
         }
+        if (this.amount == 0) {
+             return false;
+        }
         let creepMode = creep == false;
         let pos = creep ? creep.pos : this.pos;
         let t = creep ? this.name : this.name + " " + this.amount + " " + this.amountAssigned;

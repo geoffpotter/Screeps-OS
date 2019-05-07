@@ -69,7 +69,7 @@ class minerClass extends baseCreepClass {
         super();
         this.name = "miner";
         this.requiredBody = [WORK, WORK, CARRY, MOVE];
-        this.extendedBody = [WORK, WORK];
+        this.extendedBody = [WORK, WORK, MOVE];
         
         this.maxBodies = 4;
     }
@@ -79,7 +79,7 @@ class remoteMinerClass extends baseCreepClass {
         super();
         this.name = "remoteMiner";
         this.requiredBody = [WORK, WORK, CARRY, MOVE];
-        this.extendedBody = [WORK, WORK, MOVE];
+        this.extendedBody = [WORK, WORK, MOVE, MOVE];
         
         
         this.maxBodies = 4;
@@ -90,8 +90,11 @@ class builderClass extends baseCreepClass {
     constructor() {
         super();
         this.name = "builder";
-        this.requiredBody = [WORK, WORK, CARRY, MOVE];
-        this.extendedBody = [WORK, WORK, CARRY, MOVE];
+        // this.requiredBody = [WORK, WORK, CARRY, MOVE];
+        // this.extendedBody = [WORK, WORK, CARRY, MOVE];
+        
+        this.requiredBody = [WORK, CARRY, MOVE];
+        this.extendedBody = [WORK, CARRY, MOVE];
     }
 }
 

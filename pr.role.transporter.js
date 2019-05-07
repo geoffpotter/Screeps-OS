@@ -20,15 +20,22 @@ class transporter extends worker {
         this.allowRefils = false;
         let defaultRange = 300;
         this.enabledEnergyTasks = [
-            new global.TaskOptIn(global.Task.PICKUP, defaultRange, true),
-            new global.TaskOptIn(global.Task.PICKUPENERGYCONT, defaultRange, true),
+            new global.TaskOptIn(global.Task.PICKUP, 20, true),
+            new global.TaskOptIn(global.Task.PICKUPENERGYCONT, 20, true),
+            new global.TaskOptIn(global.Task.PICKUP, defaultRange, false),
+            new global.TaskOptIn(global.Task.PICKUPENERGYCONT, defaultRange, false),
         ];
         this.enabledWorkTasks = [
             
+            new global.TaskOptIn(global.Task.FEEDSPAWNS, 20, false),
+            new global.TaskOptIn(global.Task.FILLSPAWNS, 20, false),
+            new global.TaskOptIn(global.Task.FEEDUPGRADERS, 20, false),
+            new global.TaskOptIn(global.Task.DELIVERENERGY, 20, true),
+            
             new global.TaskOptIn(global.Task.FEEDSPAWNS, defaultRange, false),
+            new global.TaskOptIn(global.Task.FILLSPAWNS, defaultRange, false),
             new global.TaskOptIn(global.Task.FEEDUPGRADERS, defaultRange, false),
             new global.TaskOptIn(global.Task.DELIVERENERGY, defaultRange, true),
-            new global.TaskOptIn(global.Task.FILLSPAWNS, defaultRange, false),
         ];
         
         this.creepClass = "transporter";

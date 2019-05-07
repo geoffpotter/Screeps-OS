@@ -70,7 +70,7 @@ module.exports = {
             opts.allowHostile = true;
             
             //opts.hostileLocation = "false";
-            opts.keepFromHostiles = 5;
+            opts.keepFromHostiles = 4;
             traveler.travelTo(creep, dest, opts);
         
             

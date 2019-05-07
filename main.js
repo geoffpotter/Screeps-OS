@@ -3,6 +3,7 @@ logger = new logger("main");
 //_.each(Game.creeps, (c) => c.suicide());
 // _.each(Game.creeps, (c) => c.memory.task = false)
 //return;
+
 //Memory.rooms ={} 
 //util classe
 //Game.Memory = {};
@@ -49,7 +50,7 @@ let mainLoop = function () {
 };
 
 if (Object.keys(Game.rooms)[0] !="sim") {
-    mainLoop = wrapLoop(mainLoop);
+//    mainLoop = wrapLoop(mainLoop);
 }
 module.exports.loop = mainLoop;
 

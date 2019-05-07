@@ -24,14 +24,14 @@ let threadClass = require("INeRT.thread");
     //constructor(taskNames, maxRange = 50, minAmount = false, useBiggestTask = false, searchData = false) {
 
 class baseRole extends processClass {
-    constructor(name, priority, data = {}, parentName = false) { // class constructor
-        super(name, priority, data, parentName);
-        this.creeps = [];
+    // constructor(name, priority, data = {}, parentName = false) { // class constructor
+    //     super(name, priority, data, parentName);
+    //     this.creeps = [];
         
 
-    }
-    
+    // }
     initThreads() {
+    
         return [
             this.createThread("initTick", "init"),
             this.createThread("handleSpawning", "empire"),
@@ -167,8 +167,9 @@ class baseRole extends processClass {
                 delete this.creepTasks[creepName];
                 continue;
             }
-            if (creep.spawning)
+            if (creep.spawning) {
                 continue;
+            }
             //fuckin do it already
             //logger.log(creep, "doing thing", task)
             this.doTask(creep, task);

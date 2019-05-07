@@ -20,6 +20,7 @@ class spawnRoomProc extends baseRoom {
 
     }
     run() {
+        super.run();
         this.setupBasicProcs();
         this.setupCreeps();
         

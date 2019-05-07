@@ -65,9 +65,12 @@ class kernel {
         this.cpuBucketRecoverTicks = 0;
     }
     
-    startProcess(process) {
+    startProcess(process, parentProcess) {
         if (!process instanceof processClass) {
             throw new Error("invalid process:" + process);
+        }
+        if (!parentProcess instanceof processClass) {
+            throw new Error("invalid process:" + parentProcess);
         }
         
         if (this.procTable[process.name]) {
@@ -76,6 +79,8 @@ class kernel {
             throw new Error("process already running:" + process.name);
         }
         
+        process.parentProcess = parentProcess;
+
         this.procTable[process.name] = process;
         
         process.kernel = this;
@@ -102,15 +107,29 @@ class kernel {
     }
     
     killProcess(process) {
+        //just set a flag for now, since this may get called somewhere 
+        //  that it's hard to stop execution of a parent function
+        // then we'll try to use this flag to keep other threads/parent functions from wasting too much cpu
+        process.killed = true;
+    }
+    destroyProcess(process) {
         if (!this.procTable[process.name]) {
             throw new Error("trying to kill non running process:", process.name);
         }
+        //kill all threads
         for(let t in process.threads) {
             let thread = process.threads[t];
             this.queues.removeThread(thread);
         }
+        //destroy child procs
+        let childProcs = _.filter(this.procTable, (p) => p.parentProcess == process);
+        for(let c in childProcs) {
+            let childProc = childProcs[c];
+            this.destroyProcess(childProc);
+        }
         delete this.procTable[process.name];
         delete this.memory.procMem[process.name];
+        process.killed = true;
     }
     
     getProcess(name) {
@@ -137,29 +156,34 @@ class kernel {
         this.cpuBucketRecoverTicks = 0;
         this.cpuAtStart = Game.cpu.getUsed();
         
-        this.cpuDefcon = Math.floor(Game.cpu.bucket / 1000);
-        switch(this.cpuDefcon) {
-            case 10:
-            case 9:
-                this.cpuLimit = Game.cpu.tickLimit;
-                break;
-            case 8:
-            case 7:
-            case 6:
-                this.cpuLimit = Game.cpu.limit * 2;
-                break;
-            case 5:
-            case 4:
-                this.cpuLimit = Game.cpu.limit * 0.8;
-                break;
-            case 3:
-            case 2:
-            case 1:
-                this.cpuLimit = Game.cpu.limit * 0.5;
-                break;
-                break;
-            case 0:
-                this.cpuBucketRecoverTicks = 20;
+        this.cpuDefcon = 10;
+        if (!this.inSimMode()) {
+            this.cpuDefcon = Math.floor(Game.cpu.bucket / 1000);
+            switch(this.cpuDefcon) {
+                case 10:
+                case 9:
+                    this.cpuLimit = Game.cpu.tickLimit;
+                    break;
+                case 8:
+                case 7:
+                case 6:
+                    this.cpuLimit = Game.cpu.limit * 2;
+                    break;
+                case 5:
+                case 4:
+                    this.cpuLimit = Game.cpu.limit * 0.8;
+                    break;
+                case 3:
+                case 2:
+                case 1:
+                    this.cpuLimit = Game.cpu.limit * 0.5;
+                    break;
+                    break;
+                case 0:
+                    this.cpuBucketRecoverTicks = 20;
+            }
+        } else {
+            this.cpuLimit = 100000;
         }
         this.threadCpu = 0;
         let threadsRun = 0;
@@ -184,6 +208,7 @@ class kernel {
         //run threads
         let thread = false;
         //while we've got threads to run, run em
+        //logger.log("Starting kernel run")
         while(thread = this.queues.getNextThread()) {
             let cpuStart = Game.cpu.getUsed();
             
@@ -279,9 +304,9 @@ class kernel {
                 let thread = proc.threads[t];
                 //logger.log(proc.name, thread.method);
             }
-            if (proc.threads.length == 0) {
-                logger.log(proc.name, "proc has no running threads, killing");
-                this.killProcess(proc);
+            if (proc.threads.length == 0 || proc.killed) {
+                logger.log(proc.name, proc.killed ? "proc killed, removin" : "proc has no running threads, killing");
+                this.destroyProcess(proc);
             }
         }
     }
@@ -340,6 +365,10 @@ class kernel {
                 delete Memory.creeps[name];
             }
         }
+    }
+    
+    inSimMode() {
+        return Object.keys(Game.rooms)[0] ==="sim"
     }
 }
 

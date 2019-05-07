@@ -98,6 +98,10 @@ class fillSpawns extends Task{
     }
     preformTask(creep) {
         let building = Game.getObjectById(this.data.spawnId);
+        if (!building) {
+            return true;
+        }
+        
         //moveto returns true when in range
         if(global.creepActions.moveTo(creep, building)) {
             let ret = creep.transfer(building, RESOURCE_ENERGY);
@@ -148,7 +152,7 @@ class repair extends Task{
         
         let building = Game.getObjectById(this.data.structureId);
         if (!building) {
-            logger.log(creep, "bad job!!------------", JSON.stringify(this), building, this.data.structureId);
+            logger.log(creep, "bad job!!------------", building, this.data.structureId);
             return true;
         }
         //moveto returns true when in range

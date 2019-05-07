@@ -31,7 +31,7 @@ class upgrader extends worker {
         
         this.creepClass = "builder";
         this.creepRole = "upgrader";
-        this.spawnPriority = 10;
+        this.spawnPriority = 6;
         this.requiredParts = {
             WORK:20
         };

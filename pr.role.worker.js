@@ -26,13 +26,17 @@ class workerProc extends baseRole {
     
     init() {
         super.init();
-        let defaultRange = 150;
+        let defaultRange = 75;
         this.enabledEnergyTasks = [
             new global.TaskOptIn([global.Task.PICKUP, global.Task.PICKUPATCONTROLLER, global.Task.PICKUPENERGYCONT], 10, false),
             new global.TaskOptIn([global.Task.PICKUP, global.Task.PICKUPATCONTROLLER, global.Task.PICKUPENERGYCONT], defaultRange, false),
             new global.TaskOptIn(global.Task.MINING, defaultRange, false),
         ];
         this.enabledWorkTasks = [
+            new global.TaskOptIn(global.Task.FILLTOWERS, 25, false),
+            new global.TaskOptIn(global.Task.FEEDSPAWNS, 25, false),
+            new global.TaskOptIn(global.Task.FILLSPAWNS, 25, false),
+            new global.TaskOptIn([global.Task.BUILD, global.Task.REPAIR], 25, false),
             new global.TaskOptIn(global.Task.FILLTOWERS, defaultRange, false),
             new global.TaskOptIn(global.Task.FEEDSPAWNS, defaultRange, false),
             new global.TaskOptIn(global.Task.FILLSPAWNS, defaultRange, false),

@@ -20,11 +20,15 @@ class builder extends worker {
         //return;
         let defaultRange = 150;
         this.enabledEnergyTasks = [
+            new global.TaskOptIn(global.Task.PICKUP, 25, false),
+            new global.TaskOptIn(global.Task.PICKUPENERGYCONT, 25, false),
             new global.TaskOptIn(global.Task.PICKUP, defaultRange, false),
             new global.TaskOptIn(global.Task.PICKUPENERGYCONT, defaultRange, false),
             new global.TaskOptIn(global.Task.MINING, defaultRange, false),
         ];
-        this.enabledWorkTasks = [
+        this.enabledWorkTasks = [            
+            new global.TaskOptIn([global.Task.BUILD, global.Task.REPAIR], 25, false),
+            new global.TaskOptIn(global.Task.FILLSPAWNS, 25, false),
             new global.TaskOptIn([global.Task.BUILD, global.Task.REPAIR], defaultRange * 3, false),
             new global.TaskOptIn(global.Task.FILLSPAWNS, defaultRange, false),
             new global.TaskOptIn(global.Task.FILLTOWERS, defaultRange, false),

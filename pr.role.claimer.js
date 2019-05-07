@@ -31,6 +31,13 @@ class claimer extends baseRole {
         this.totalNeededParts = 1;
         this.totalParts = 0;
     }
+    initThreads() {
+        return [
+            this.createThread("initTick", "init"),
+            this.createThread("run", "creepAct"),
+                        
+        ];
+    }
     initTick() {
         super.initTick();
         this.requiredParts = {
@@ -39,17 +46,25 @@ class claimer extends baseRole {
     }
     run() {
 
-        
+        logger.log("running claim creeps")
         //handle working flag and refil task
         for(let c in this.creeps) {
             let creep = this.creeps[c];
             if (creep.spawning)
                 return;
             let flag = Game.flags[this.data.flagName];
+            if (!flag) {
+                //flag is gone, die
+                return threadClass.DONE;
+            }
             logger.log(creep.name, "movin to", flag);
-            if (global.creepActions.moveTo(creep, flag)) {
-                creep.claimController(creep.room.controller);
+            let moveRes = global.creepActions.moveTo(creep, flag);
+            logger.log(creep.name, "move res", moveRes);
+            if (moveRes) {
+                let claimRes = creep.claimController(creep.room.controller);
+                logger.log(creep.name, "claim res", claimRes);
                 flag.remove();
+                return threadClass.DONE;
             }
         }
         
