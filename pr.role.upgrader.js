@@ -35,6 +35,7 @@ class upgrader extends worker {
         this.requiredParts = {
             WORK:20
         };
+        this.priorityIncresePerCreep = 11;
     }
     
 }

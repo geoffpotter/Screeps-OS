@@ -74,7 +74,7 @@ class baseRole extends processClass {
         this.totalNeededParts = 0;
         this.totalParts = 0;
         
-        this.priorityIncresePerCreep = 1;
+        this.priorityIncresePerCreep = 10;
     }
     
     initTick() {

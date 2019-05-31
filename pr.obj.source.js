@@ -16,6 +16,8 @@ let threadClass = require("INeRT.thread");
 
 class sourceProc extends processClass {
     init() {
+        this.jobManager = this.kernel.getProcess("jobManager");
+
 		this.taskManager = this.kernel.getProcess('taskManager');
         let dataPOS = new RoomPosition(this.data.pos.x, this.data.pos.y, this.data.pos.roomName);
         let sourceId = `${this.data.pos.x}-${this.data.pos.y}-${this.data.pos.roomName}`
@@ -31,6 +33,12 @@ class sourceProc extends processClass {
             this.createThread("taskUpdate", "taskUpdate"),
             ];
     }
+
+    jobCreate() {
+        //(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY)
+        this.mineJob = jobManager.createJob;
+    }
+
     taskUpdate() {
         let source = Game.getObjectById(this.data.sourceId);
         if (Game.time % 10 == 0) {

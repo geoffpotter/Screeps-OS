@@ -28,7 +28,7 @@ class workerProc extends baseRole {
         super.init();
         let defaultRange = 75;
         this.enabledEnergyTasks = [
-            new global.TaskOptIn([global.Task.PICKUP, global.Task.PICKUPATCONTROLLER, global.Task.PICKUPENERGYCONT], 10, false),
+            //new global.TaskOptIn([global.Task.PICKUP, global.Task.PICKUPATCONTROLLER, global.Task.PICKUPENERGYCONT], 10, false),
             new global.TaskOptIn([global.Task.PICKUP, global.Task.PICKUPATCONTROLLER, global.Task.PICKUPENERGYCONT], defaultRange, false),
             new global.TaskOptIn(global.Task.MINING, defaultRange, false),
         ];

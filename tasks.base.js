@@ -40,6 +40,7 @@ class Task {
     }
     
     displayTask(creep = false) {
+        return;
         //logger.log(this.name, "display?", this.displayThisTask)
         if (!this.displayThisTask /*&& creep === false*/) {
             return false;

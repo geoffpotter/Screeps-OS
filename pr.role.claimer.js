@@ -24,7 +24,7 @@ class claimer extends baseRole {
         
         this.creepClass = "claimer";
         this.creepRole = "claimer";
-        this.spawnPriority = 2;
+        this.spawnPriority = 3;
         this.requiredParts = {
             CLAIM:1
         };

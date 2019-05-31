@@ -60,7 +60,7 @@ class stats extends processClass {
          for(let q in this.kernel.queues.queueNames) {
              let queueName = this.kernel.queues.queueNames[q];
              let queue = this.kernel.queues.getQueue(queueName);
-             //logger.log("wtf", queueName, queue)
+             logger.log("queue CPU use", queueName, queue.cpuUsed)
              _.set(this.stats, "INeRT.cpu.byQueue." + queueName, queue.cpuUsed);
          }
          

@@ -21,6 +21,7 @@ let empireProcClass = require("pr.empire");
 let intelProcClass = require("pr.empire.intel");
 let creepManagerProcClass = require("pr.empire.creepManager");
 let taskManagerProcClass = require("pr.empire.taskManager");
+let jobManagerProcClass = require("pr.empire.jobManager");
 
 class initProc extends processClass {
     initThreads() {
@@ -39,6 +40,9 @@ class initProc extends processClass {
         let taskManager = new taskManagerProcClass("taskManager");
         this.kernel.startProcess(taskManager);
         
+        let jobManager = new jobManagerProcClass("jobManager");
+        this.kernel.startProcess(jobManager);
+
         let intel = new intelProcClass("intel");
         this.kernel.startProcess(intel);
         

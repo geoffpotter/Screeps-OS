@@ -11,7 +11,7 @@ logger.color = COLOR_PURPLE;
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
-var job = require("jobs.base");
+var Job = require("jobs.base");
 
 var jobTypes = require("jobs.all");
 
@@ -33,7 +33,49 @@ class jobManager extends processClass {
     }
 
     getJobById(jobId) {
+        if (!this.jobsById[jobId]) {
+            return false;
+        }
         return this.jobsById[jobId];
+    }
+
+    createJob(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY) {
+        //(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY)
+        let job = new Job(parentProc, targetId, pos, jobType, resourceType);
+
+        return job;
+    }
+
+    registerJob(job) {
+        //should prolly do some sort of validation..
+
+        if (!this.jobsById[job.id]) {
+            //job doesn't exist, add it
+            this.jobsById[job.id] = job;
+            
+            //by type
+            if (!this.jobsByType[job.jobType]) {
+                this.jobsByType[job.jobType] = [];
+            }
+            this.jobsByType[job.jobType].push(job);
+
+            //by resource
+            if (!this.jobsByResource[job.resourceType]) {
+                this.jobsByResource[job.resourceType] = [];
+            }
+            this.jobsByResource[job.resourceType].push(job);
+
+            //by room
+            if (!this.jobsByRoom[job.roomName]) {
+                this.jobsByRoom[job.roomName] = [];
+            }
+            this.jobsByRoom[job.roomName] = job;
+
+
+        } else {
+            //job already there.. why are you calling me bro?
+            logger.log("registering existing job!", job.id);
+        }
     }
 }
 

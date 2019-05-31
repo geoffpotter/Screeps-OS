@@ -20,10 +20,11 @@ class transporter extends worker {
         this.allowRefils = false;
         let defaultRange = 300;
         this.enabledEnergyTasks = [
-            new global.TaskOptIn(global.Task.PICKUP, 20, true),
-            new global.TaskOptIn(global.Task.PICKUPENERGYCONT, 20, true),
-            new global.TaskOptIn(global.Task.PICKUP, defaultRange, false),
-            new global.TaskOptIn(global.Task.PICKUPENERGYCONT, defaultRange, false),
+            new global.TaskOptIn([global.Task.PICKUP, global.Task.PICKUPENERGYCONT], defaultRange, true),
+            // new global.TaskOptIn(global.Task.PICKUP, 20, true),
+            // new global.TaskOptIn(global.Task.PICKUPENERGYCONT, 20, true),
+            // new global.TaskOptIn(global.Task.PICKUP, defaultRange, true),
+            // new global.TaskOptIn(global.Task.PICKUPENERGYCONT, defaultRange, true),
         ];
         this.enabledWorkTasks = [
             
@@ -44,7 +45,7 @@ class transporter extends worker {
         this.requiredParts = {
             CARRY:10
         };
-        this.priorityIncresePerCreep = 3;
+        this.priorityIncresePerCreep = 10;
     }
 }
 

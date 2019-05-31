@@ -185,7 +185,12 @@ class creepManager extends processClass {
         let cpu = Game.cpu.getUsed();
         //logger.log("creep queue", JSON.stringify(this.allReqs));
         let safeReqs = _.filter(this.allReqs, (r) => r.pos.getDefcon() < 2)
-        let reqs = _.sortBy(safeReqs, (r) => r.priority + (r.pos.getRangeTo(spawn) / 50));
+        let reqs = _.sortBy(safeReqs, (r) => r.effectivePriority = (r.priority + (r.pos.toWorldPosition().getRangeTo(spawn.pos.toWorldPosition())/15)));
+        logger.log("Spawn queue for", spawn, spawn.room)
+        for(let i in reqs) {
+            let req = reqs[i];
+            console.log(i, req.role, req.effectivePriority, "for", req.proc);
+        }
         logger.log("sort time", Game.cpu.getUsed() - cpu);
         if (reqs.length > 0) {
             let req = reqs[0];

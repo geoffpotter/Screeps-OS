@@ -63,6 +63,8 @@ class kernel {
         this.cpuLimit = false;
         this.cpuDefcon = 0;
         this.cpuBucketRecoverTicks = 0;
+
+        global.kernel = this;
     }
     
     startProcess(process, parentProcess) {
@@ -197,7 +199,7 @@ class kernel {
         
         
         //do init tick
-        this.queues.initTick();
+        this.queues.initTick(this);
         
         
         this.queues.displayQueueThreads();
@@ -208,7 +210,7 @@ class kernel {
         //run threads
         let thread = false;
         //while we've got threads to run, run em
-        //logger.log("Starting kernel run")
+        logger.log("Starting kernel run")
         while(thread = this.queues.getNextThread()) {
             let cpuStart = Game.cpu.getUsed();
             
@@ -219,7 +221,7 @@ class kernel {
             }
             //run thread
             let ret = thread.run(this);
-            //logger.log("after runnin", thread, JSON.stringify(Memory))
+            //logger.log("after runnin", thread, thread.targetQueue)
             
             let cpuUsed = Game.cpu.getUsed() - cpuStart;
             

@@ -41,6 +41,9 @@ class spawnProc extends processClass {
         this.spawnQueue = [];
         
         let spawn = Game.getObjectById(this.data.spawnId);
+        if (!spawn) {
+            return threadClass.DONE;
+        }
         this.spawnTask.amount = spawn.energyCapacity - spawn.energy;
         
         

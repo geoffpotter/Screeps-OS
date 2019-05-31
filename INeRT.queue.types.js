@@ -10,7 +10,7 @@
 
 let logger = require("screeps.logger");
 logger = new logger("INeRT.queue.types");
-logger.enabled = false;
+//logger.enabled = false;
 logger.color = COLOR_GREEN;
 
 let queue = require("INeRT.queue.base");
@@ -20,6 +20,8 @@ class INeRTQueues {
     constructor() { // class constructor
         this.queueNames = [
             "init",
+            "jobCreate",
+            "jobFind",
             "taskCreate",
             "taskFind",
             "military",
@@ -28,6 +30,7 @@ class INeRTQueues {
             "struct",
             "creepAct",
             "creepMove",
+            "jobUpdate",
             "taskUpdate",
             "work"
         ];
@@ -37,9 +40,9 @@ class INeRTQueues {
             let que = new queue(name);
             this.queueMap[name] = que;
         }
-        this.queueMap["creepAct"].cpuLimit = 10;
+        //this.queueMap["creepAct"].cpuLimit = 10;
         //this.queueMap["creepAct"].runEveryX = 2;
-        this.queueMap["taskUpdate"].runEveryX = 3;
+        //this.queueMap["taskUpdate"].runEveryX = 3;
     }
     
     getQueue(name) {
@@ -91,32 +94,35 @@ class INeRTQueues {
         return thread;
     }
     
-    initTick() {
-        this.queueMap["creepAct"].cpuLimit = 10;
+    initTick(kernel) {
+        //this.getQueue("creepAct").cpuLimit = 10;
         //this.queueMap["creepAct"].runEveryX = 2;
-        this.queueMap["taskUpdate"].runEveryX = 3;
-        switch(this.cpuDefcon) {
+        //this.queueMap["taskUpdate"].runEveryX = 3;
+        logger.log("setting cpu settings by defcon", kernel.cpuDefcon)
+        switch(kernel.cpuDefcon) {
             case 10:
             case 9:
                 this.getQueue("taskUpdate").runEveryX = 2;
-                this.getQueue("creepAct").cpuLimit = Game.cpu.limit * 0.8;
+                this.getQueue("creepAct").cpuLimit = Game.cpu.tickLimit * 0.8;
                 break;
             case 8:
             case 7:
             case 6:
                 this.getQueue("taskUpdate").runEveryX = 3;
-                this.getQueue("creepAct").cpuLimit = Game.cpu.limit * 0.5;
+                this.getQueue("creepAct").cpuLimit = Game.cpu.limit * 0.7;
                 break;
             case 5:
             case 4:
             case 3:
                 this.getQueue("taskUpdate").runEveryX = 5;
+                this.getQueue("creepAct").runEveryX = 2;
                 this.getQueue("creepAct").cpuLimit = Game.cpu.limit * 0.2;
                 break;
             case 2:
             case 1:
             case 0:
                 this.getQueue("taskUpdate").runEveryX = 10;
+                this.getQueue("creepAct").runEveryX = 3;
                 this.getQueue("creepAct").cpuLimit = Game.cpu.limit * 0.1;
                 break;
         }

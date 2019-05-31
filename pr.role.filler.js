@@ -20,8 +20,8 @@ class filler extends worker {
         this.allowRefils = false;
 
         this.enabledEnergyTasks = [
-            new global.TaskOptIn([global.Task.PICKUPENERGYSPAWN], 50, false),
-            new global.TaskOptIn([global.Task.PICKUPENERGYCONT, global.Task.PICKUP], 50, false),
+            new global.TaskOptIn([global.Task.PICKUPENERGYSPAWN], 20, false),
+            new global.TaskOptIn([global.Task.PICKUPENERGYCONT, global.Task.PICKUP], 10, false),
         ];
         this.enabledWorkTasks = [
             new global.TaskOptIn(global.Task.FILLSPAWNS, 20, false),

@@ -14,7 +14,8 @@ let stat = require("util.stat");
 //actions
 let pickup = "📤";
 let dropoff = "📥";
-let feed = "🍴";
+let feed = "👨‍🍳"; 
+let eat = "🍴";
 
 //places/things
 let controller = "⛪";
@@ -23,6 +24,7 @@ let terminal = "📈";
 let container = "🔋";
 let spawns = "🏠";
 let creep = "💃";
+
 
 class jobTypes {
         // general tasks
@@ -35,43 +37,25 @@ class jobTypes {
 
         //resource tasks
         static get PICKUP() { return pickup };
-        static get PICKUP_CONTROLLER() { return pickup + controller };
         static get PICKUP_STORAGE() { return pickup + storage };
         static get PICKUP_TERMINAL() { return pickup + terminal };
         static get PICKUP_CONTAINER() { return pickup + container };
         static get PICKUP_SPAWN() { return pickup + spawns };
         static get PICKUP_CREEP() { return pickup + creep };
 
-        static get DROPOFF() { return pickup };
-        static get DROPOFF_CONTROLLER() { return pickup + controller };
-        static get DROPOFF_STORAGE() { return pickup + storage };
-        static get DROPOFF_TERMINAL() { return pickup + terminal };
-        static get DROPOFF_CONTAINER() { return pickup + container };
-        static get DROPOFF_SPAWN() { return pickup + spawns };
-        static get DROPOFF_CREEP() { return pickup + creep };
+        static get DROPOFF() { return dropoff };
+        static get DROPOFF_STORAGE() { return dropoff + storage };
+        static get DROPOFF_TERMINAL() { return dropoff + terminal };
+        static get DROPOFF_CONTAINER() { return dropoff + container };
+        static get DROPOFF_SPAWN() { return dropoff + spawns };
+        static get DROPOFF_CREEP() { return dropoff + creep };
         
+        //feed/eat
         static get FEED_CONTROLLER() { return feed + controller };
-        static get FEED_SPAWN() { return pickup + spawns };
-/*
-        static get MINING() { return "⛏" }
-        static get PICKUP() { return "🆙" }
-        static get PICKUPATCONTROLLER() { return "🆙⛪" }
-        static get PICKUPENERGYCONT() { return "📦" }
-        static get PICKUPENERGYSTORAGE() { return "📦🛄" }
-        static get PICKUPENERGYSPAWN() { return "📦🏠" }
-        static get PICKUPENERGYCONTROLLER() { return "📦⛪" }
-        
-        static get FILLSPAWNS() { return "🏠" }
-        static get PRAISE() { return "🙌" }
-        static get FEEDUPGRADERS() { return "🍴⛪" }
-        static get FEEDSPAWNS() { return "🍴🏠" }
-        static get DUMPINSTORAGE() { return "🛄" }
-        static get BUILD() { return "🔨️" }
-        static get REPAIR() { return "🔧" }
-        static get DELIVERENERGY() { return "🔋" }
-        static get FILLTOWERS() { return "🗼" }
-        static get DROP() { return "🚯" }
-*/
+        static get FEED_SPAWN() { return feed + spawns };
+
+        static get EAT_CONTROLLER() { return eat + controller };
+        static get EAT_SPAWN() { return eat + spawns };
 
 
 }
@@ -84,50 +68,50 @@ class jobAssignment {
         this.priority = 100;
         this.inPosition = false;
     }
+    fromMem(mem) {
+        for(let f in mem) {
+            this[f] = mem[f];
+        }
+    }
 }
 
 
 //  add some helper functions to creep.prototype
 /**
  * Gets all this creeps jobs
- * @returns {Job[]}
+ * @returns {Job}
  */
-Creep.prototype.getJobs = function() {
-    let jobs = {};
-    let jobIds = Object.keys(this.memory.assignments);
-    for(let j in jobIds) {
-        let jobId = jobIds[j];
-        let job = global.jobManager.getJobById(jobId);
-        if (job) {
-            jobs[jobId] = job;
-        } else {
-            logger.log(this.name, "assigned job doesn't exist, removing:", jobId);
-            delete this.memory.jobs[j];
-        }
-        
-    }
-    return jobs;
-}
-Creep.prototype.getAssignments = function() {
+Creep.prototype.getJob = function() {
+    let assignment = this.getAssignment();
     
+    global.jobManager.getJob(assignment.jobId)
 }
-Creep.prototype.addJob = function(job, priority) {
-    if (!this.memory.assignments) {
-        this.memory.assignments = {};
+
+/**
+ * gets the creeps assignment object
+ * @return {Creep}
+ */
+Creep.prototype.getAssignment = function() {
+    let assignment = new JobAssignment(null, null);
+    assignment.fromMem(this.memory.assignment);
+    return assignment;
+}
+
+Creep.prototype.setJob = function(job, priority) {
+    if (!this.memory.assignment) {
+        this.memory.assignment = false;
     }
     let assignment = new JobAssignment(this.id, job.id);
     assignment.priority = priority;
-    if (this.memory.assignments[job.id]) {
-        throw new Error("Adding Job " + job.id + " Creep is already assigned to it:" + this.name)
-    } else {
-        this.memory.assignments[job.id] = true;
-    }
+
+    this.memory.assignment = assignment;
+    return assignment;
 }
 
 
 Creep.prototype.removeJob = function(job) {
-    if (this.memory.assignments[job.id]) {
-        delete this.memory.assignments[job.id];
+    if (this.memory.assignment && this.memory.assignment.jobId == job.id) {
+        delete this.memory.assignment;
     } else {
         throw new Error(this.name + " Removing Job that Creep isn't assigned too" + job.id)
     }
@@ -139,13 +123,13 @@ Creep.prototype.removeJob = function(job) {
 
 
 class baseJob {
-    constructor() { // class constructor
-        this.targetId = false;
-        this.parentProcName = false;
-        this.jobType = false;
-        this.resourceType = false;
-        this.pos = false;
-        this.roomName = false;
+    constructor(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY) { // class constructor
+        this.targetId = targetId;
+        this.parentProcName = parentProc.name;
+        this.jobType = jobType;
+        this.resourceType = resourceType;
+        this.pos = pos;
+        this.roomName = pos.roomName;
         this.amount = false;
         this.assignments = {};
         /*

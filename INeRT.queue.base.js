@@ -9,7 +9,7 @@
 
 let logger = require("screeps.logger");
 logger = new logger("INeRT.queue.base");
-logger.enabled = false;
+//logger.enabled = false;
 logger.color = COLOR_GREY;
 
 let stat = require("util.stat");
@@ -63,6 +63,9 @@ class queue {
     }
     
     getNextThread() {
+        if (this.name == "creepAct") {
+            logger.log(this.name, "getting thread", this.cpuLimit, this.runEveryX, this.cpuTickBucket)
+        }
         if (this.cpuLimit !== false && this.cpuLimit <= this.cpuTickBucket) {
             //over cpu limit, pretend we're done
             logger.log(this.name, "OVER QUEUE CPU LIMIT", this.cpuTickBucket, this.cpuLimit)
