@@ -316,7 +316,7 @@ class baseRole extends processClass {
     
     displayRole() {
         //logger.log(this.name, this.pos);
-        global.utils.drawText(this.creepRole + " " + this.totalParts + " " + this.totalNeededParts, this.pos);
+        //global.utils.drawText(this.creepRole + " " + this.totalParts + " " + this.totalNeededParts, this.pos);
     }
     
 }

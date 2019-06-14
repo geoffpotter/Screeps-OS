@@ -13,6 +13,7 @@ logger = new logger("pr.obj.source");
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
+let {Job, JobTypes, JobAssignment} = require("jobs.base");
 
 class sourceProc extends processClass {
     init() {
@@ -24,26 +25,42 @@ class sourceProc extends processClass {
         this.task = this.taskManager.createTask(this, global.Task.MINING, global.Task.TYPE_GETENERGY, dataPOS, {"sourceId":sourceId, "energy":1500});
         this.cont = false;
         this.openSpots = 5;
-        this.refreshSpotsAndContainers();
+        //this.refreshSpotsAndContainers();
         this.taskManager.setTask(this, this.task)
     }
     
     initThreads() {
         return [
             this.createThread("taskUpdate", "taskUpdate"),
+            this.createThread("jobCreate", "jobCreate"),
+            this.createThread("refreshSpotsAndContainers", "work")
             ];
     }
 
     jobCreate() {
         //(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY)
-        this.mineJob = jobManager.createJob;
+        this.mineJob = this.jobManager.createJob(this, this.data.sourceId, this.data.pos, JobTypes.MINE);
+
+        this.jobManager.registerJob(this.mineJob);
+
+        let updateThread = this.createThread("jobUpdate", "jobUpdate");
+        this.kernel.startThread(updateThread);
+        return threadClass.DONE;
+    }
+
+    jobUpdate() {
+        let source = Game.getObjectById(this.data.sourceId);
+        this.mineJob.targetId = this.data.sourceId;
+        if (source) {
+            this.mineJob.amount = source.energy == 0 ? 0 : this.openSpots;
+        } else {
+            this.mineJob.amount = this.openSpots;
+        }
     }
 
     taskUpdate() {
         let source = Game.getObjectById(this.data.sourceId);
-        if (Game.time % 10 == 0) {
-            this.refreshSpotsAndContainers();
-        }
+
         //logger.log("---------------")
         //logger.log(this.data.pos.roomName, source, this.data.sourceId)
         if (this.data.sourceId) {
@@ -69,6 +86,8 @@ class sourceProc extends processClass {
             let spaces = source.pos.getSurroundingClearSpaces();
             this.openSpots = spaces.length;
             this.task.data.sourceId = source.id;
+
+            return 10;//sleep for 10 ticks
         }
     }
 

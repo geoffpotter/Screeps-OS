@@ -11,7 +11,7 @@ logger.color = COLOR_PURPLE;
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
-var Job = require("jobs.base");
+let {Job, JobTypes, JobAssignment} = require("jobs.base");
 
 var jobTypes = require("jobs.all");
 
@@ -27,9 +27,18 @@ class jobManager extends processClass {
     
     initThreads() {
         return [
-            //this.createThread("cullAssignments", "work"),
-            //this.createThread("cullTasks", "work"),
+            this.createThread("work", "work"),
             ];
+    }
+
+    work() {
+        //worker thread to keep the process alive
+
+        //make jobs display themselves
+        for(let jobId in this.jobsById) {
+            let job = this.jobsById[jobId];
+            job.displayJob();
+        }
     }
 
     getJobById(jobId) {
@@ -41,7 +50,8 @@ class jobManager extends processClass {
 
     createJob(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY) {
         //(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY)
-        let job = new Job(parentProc, targetId, pos, jobType, resourceType);
+        let job = new Job();
+        job.init(parentProc, targetId, pos, jobType, resourceType);
 
         return job;
     }

@@ -6,12 +6,16 @@ var logger = require("screeps.logger");
 logger = new logger("jobs.all");
 
 var general = require("jobs.general");
+var gather = require("jobs.gather");
+var work = require("jobs.work");
 //var work = require("tasks.work");
 
 let all = {};
 
 let groups = [
-    general
+    general,
+    gather,
+    work
 ];
 
 for(let i in groups) {

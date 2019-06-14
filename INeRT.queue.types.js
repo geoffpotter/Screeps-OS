@@ -10,7 +10,7 @@
 
 let logger = require("screeps.logger");
 logger = new logger("INeRT.queue.types");
-//logger.enabled = false;
+logger.enabled = false;
 logger.color = COLOR_GREEN;
 
 let queue = require("INeRT.queue.base");

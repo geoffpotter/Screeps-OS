@@ -97,15 +97,8 @@ Creep.prototype.getAssignment = function() {
     return assignment;
 }
 
-Creep.prototype.setJob = function(job, priority) {
-    if (!this.memory.assignment) {
-        this.memory.assignment = false;
-    }
-    let assignment = new JobAssignment(this.id, job.id);
-    assignment.priority = priority;
-
-    this.memory.assignment = assignment;
-    return assignment;
+Creep.prototype.setJob = function(job) {
+    job.assignCreep(this);
 }
 
 
@@ -123,7 +116,7 @@ Creep.prototype.removeJob = function(job) {
 
 
 class baseJob {
-    constructor(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY) { // class constructor
+    init(parentProc, targetId, pos, jobType, resourceType = RESOURCE_ENERGY) { // class constructor
         this.targetId = targetId;
         this.parentProcName = parentProc.name;
         this.jobType = jobType;
@@ -142,15 +135,19 @@ class baseJob {
         
         this.displayTask = false;
     }
+
+
     
     get id() {
         return `${this.type}-${this.resourceType}-${this.pos.x}-${this.pos.y}-${this.pos.roomName}`; 
     }
 
     get amountAssigned() {
-        return _.reduce(this.assignments, (sum, a) => {
+        let amt = _.reduce(this.assignments, (sum, a) => {
             sum + a.amount;
-        })
+        });
+
+        return amt ? amt : 0; 
     }
     
     get workLeft() {
@@ -163,33 +160,63 @@ class baseJob {
     }
     
     getTarget() {
-        let target =  Game.getObjectById(this.targetId);
+        let target = Game.getObjectById(this.targetId);
         if(target)
             return target;
         return false;
     }
 
-    displayTask(creep = false) {
-        //logger.log(this.name, "display?", this.displayThisTask)
-        if (!this.displayThisTask /*&& creep === false*/) {
+    getCreepPriority(creep) {
+        return this.constructor.getCreepPriority(creep);
+    }
+
+    displayJob(creep = false) {
+        logger.log(this.jobType, "display?", this.displayTask,  this.jobType + " " + this.amount + " " + this.amountAssigned)
+        if (!this.displayTask /*&& creep === false*/) {
             //return false;
         }
         if (this.amount == 0) {
              return false;
         }
-        let creepMode = creep == false;
-        let pos = creep ? creep.pos : this.pos;
-        let t = creep ? this.name : this.name + " " + this.amount + " " + this.amountAssigned;
+        let creepMode = creep !== false;
+        let pos = creepMode ? creep.pos : this.pos;
+        let t = creepMode ? this.jobType : this.jobType + " " + this.amount + " " + this.amountAssigned;
 
         global.utils.drawText(t, pos);
     }
     
-    assignCreep(creep, priority) {
-
-        let assignment = new JobAssignment(creep.id);
-        assignment.priority = priority;
+    assignCreep(creep) {
+        logger.log("assigning", creep, "to", this.id);
+        let assignment = new JobAssignment(creep.id, this.id);
+        assignment.priority = this.getCreepPriority(creep);
+        assignment.amount = this.getAssignmentAmount(creep);
+        return assignment;
     }
 
+    /******************************************************************************
+     * virtual methods
+     * 
+     * these will generally need to be overriden by the task class to provide task specific implementations
+     * 
+     */
+
+
+    /**
+     * Get the priority that should be used for this creeps assignment, or 0 if it shouldn't be assigned to this job type
+     * @param {Creep} creep 
+     * 
+     * @returns {number} the priority to use for this creep/job pair, or 0 of this creep shouldn't do this job type
+     */
+    static getCreepPriority(creep) {
+        throw new Error(this + ".getCreepPriority - Not Implemented");
+    }
+
+    /**
+     * Get the amount for the assignment for this creep
+     * @param {Creep} creep 
+     * 
+     * @returns {number} the amount for this creep/job
+     */
     getAssignmentAmount(creep) {
         logger.log(this.name, "has no assignCreep implementation!");
         throw new Error(this.name + "has no assignCreep implementation!");
@@ -215,10 +242,6 @@ class baseJob {
         throw new Error(this.name + "has no preformJob implementation!");
     }
     
-
-
-
- 
 }
 
 module.exports = {

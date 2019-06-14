@@ -9,7 +9,7 @@
 
 let logger = require("screeps.logger");
 logger = new logger("INeRT.process");
-//logger.enabled = false;
+logger.enabled = false;
 logger.color = COLOR_GREY;
 
 let stat = require("util.stat");
