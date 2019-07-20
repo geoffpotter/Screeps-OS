@@ -14,9 +14,10 @@ require("proto.roomPosition");
 require("proto.RoomObject");
 const profiler = require('screeps.profiler');
 global.profiler = profiler;
-global.utils = require("util.global");
-global.creepClasses = require("util.creepClasses");
-global.creepActions = require("util.creepActions");
+global.utils = {
+	"array": require("util.array"),
+	"visual": require("util.visual")
+}
 
 //profiler.registerObject(global.utils, "utils")
 // logger.log(JSON.stringify(global.creepClasses));
@@ -50,7 +51,7 @@ let mainLoop = function () {
 };
 
 if (Object.keys(Game.rooms)[0] !="sim") {
-//    mainLoop = wrapLoop(mainLoop);
+    mainLoop = wrapLoop(mainLoop);
 }
 module.exports.loop = mainLoop;
 
@@ -85,7 +86,7 @@ function wrapLoop(fn) {
 		// + maintain full functionality including Memory watcher and console
 		
 		// this implementation uses the official way of saving Memory
-		let mem = JSON.stringify(Memory)
+		//let mem = JSON.stringify(Memory)
 		//logger.log("saving mem", mem)
 		//logger.log("stored mem", JSON.stringify(global.Memory))
         //RawMemory.set(mem);
