@@ -19,6 +19,7 @@ let statsProcClass = require("pr.stats");
 
 let empireProcClass = require("pr.empire");
 let intelProcClass = require("pr.empire.intel");
+let pStarProcClass = require("pr.pStar");
 
 
 class initProc extends processClass {
@@ -39,6 +40,9 @@ class initProc extends processClass {
         let statsProc = new statsProcClass("stats");
         this.kernel.startProcess(statsProc);
         
+        let pStarProc = new pStarProcClass("pStar");
+        this.kernel.startProcess(pStarProc);
+
         //global.empire = this.kernel.startProcess("empire", "empire", this.kernel.pri("EMPIRE"), false, false, true);
         
         return threadClass.DONE;

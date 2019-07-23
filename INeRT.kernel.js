@@ -64,6 +64,8 @@ class kernel {
         this.cpuDefcon = 0;
         this.cpuBucketRecoverTicks = 0;
 
+        this.profile = false;
+
         global.kernel = this;
     }
     
@@ -95,17 +97,17 @@ class kernel {
             logger.log(process.name, "starting init thread", thread)
             this.startThread(thread);
         }
-        
-        //profiler.registerObject(process, process.name);
-        if (!this.wrappedProcs) {
-            this.wrappedProcs = {};
+        if (this.profile) {
+            //profiler.registerObject(process, process.name);
+            if (!this.wrappedProcs) {
+                this.wrappedProcs = {};
+            }
+            if (!this.wrappedProcs[process.constructor.name]) {
+                logger.log("wrapping proc" + process.constructor.name)
+                profiler.registerClass(process.__proto__, process.constructor.name);
+                this.wrappedProcs[process.constructor.name] = 1;
+            }
         }
-        if (!this.wrappedProcs[process.constructor.name]) {
-            logger.log(process.constructor.name)
-            profiler.registerClass(process.__proto__, process.constructor.name);
-            this.wrappedProcs[process.constructor.name] = 1;
-        }
-        
     }
     
     killProcess(process) {
@@ -192,7 +194,7 @@ class kernel {
         
         //handle memory
         let memoryCPUUsed = 0;
-        let memoryCPUStart = this.cpuAtStart;
+        let memoryCPUStart = Game.cpu.getUsed();
         
         this.initMemory();
         memoryCPUUsed += Game.cpu.getUsed() - memoryCPUStart;
@@ -275,7 +277,7 @@ class kernel {
         this.totalCpuUsed = Game.cpu.getUsed() - this.cpuAtStart;
         this.cpuUsed.current = this.totalCpuUsed;
         this.overhead.current = this.totalCpuUsed - this.threadCpu;
-        this.memOverhead.current = memoryCPUUsed;
+        this.memOverhead.current = memoryCPUUsed + this.cpuAtStart;
         
 
         
@@ -292,6 +294,8 @@ class kernel {
         
         this.time++;
         this.lastTick = Game.time;
+        
+        logger.log(Game.cpu.getUsed() - this.cpuAtStart);
     }
     
     

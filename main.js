@@ -1,5 +1,7 @@
 var logger = require("screeps.logger");
 logger = new logger("main");
+
+
 //_.each(Game.creeps, (c) => c.suicide());
 // _.each(Game.creeps, (c) => c.memory.task = false)
 //return;
@@ -12,8 +14,8 @@ logger = new logger("main");
 require("proto.creep");
 require("proto.roomPosition");
 require("proto.RoomObject");
-const profiler = require('screeps.profiler');
-global.profiler = profiler;
+//const profiler = require('screeps.profiler');
+//global.profiler = profiler;
 global.utils = {
 	"array": require("util.array"),
 	"visual": require("util.visual")
@@ -37,21 +39,28 @@ kernel.startProcess(initProc);
 // let testProcClass = require("inert.tests");
 // let testProc = new testProcClass("testin");
 // kernel.startProcess(testProc);
-profiler.registerClass(kernel.__proto__, "kernel");
+//profiler.registerClass(kernel.__proto__, "kernel");
 //profiler.registerClass(kernelClass, 'kernel');
 
 //profiler.enable();
 
 let mainLoop = function () {
-    profiler.wrap(function() {
-        logger.log("----------------------- tick start -------------------------------------");
-        kernel.run();
-        logger.log("----------------------- tick end -------------------------------------");
-    });
+	logger.log("----------------------- tick start -------------------------------------", Game.cpu.getUsed());
+	kernel.run();
+	logger.log("creep count:", Object.keys(Game.creeps).length)
+	logger.log("----------------------- tick end -------------------------------------", Game.cpu.getUsed());
+    
 };
-
+// let mainLoop2 = function () {
+//     profiler.wrap(function() {
+//         logger.log("----------------------- tick start -------------------------------------");
+//         kernel.run();
+//         logger.log("total cpu used:", Game.cpu.getUsed())
+//         logger.log("----------------------- tick end -------------------------------------");
+//     });
+// };
 if (Object.keys(Game.rooms)[0] !="sim") {
-    mainLoop = wrapLoop(mainLoop);
+    //mainLoop = wrapLoop(mainLoop);
 }
 module.exports.loop = mainLoop;
 

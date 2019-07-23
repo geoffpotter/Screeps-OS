@@ -9,21 +9,30 @@
 
 var logger = require("screeps.logger");
 logger = new logger("pr.empire.intel");
-logger.enabled = false;
+//logger.enabled = false;
 
 //let process = require("pos2.process");
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
 
+let pstarClass = require("pr.pStar");
+
 class intelProc extends processClass {
     init() {
         if (!Memory.rooms) {
             Memory.rooms = {};
         }
+
+        /** @type {pstarClass} */
+        this.pStar = false;
     }
     
     initTick() {
+        if (!this.pStar) {
+            this.pStar = this.kernel.getProcess("pStar");
+        }
+
         for(let roomName in Game.rooms) {
             let room = Game.rooms[roomName];
             //if (!room.memory.lastUpdate || room.memory.lastUpdate <= (Game.time - 10)) {
@@ -77,6 +86,7 @@ class intelProc extends processClass {
             this.updateEnemyCreeps(intel, room);
             this.updateDefcon(intel, room);
             this.updateStructures(intel, room);
+            this.pStar.addRoomExitNodes(room);
         }
         
         
@@ -86,16 +96,27 @@ class intelProc extends processClass {
         Memory.rooms[roomName].intel = intel;
     }
     
+    
+
     updateSources(intel, roomName, room) {
         //stash info about the sources in the room
-        if (room && !intel.sources || (!intel.sourcesSeen && room)) {
+        if (room ) { // && !intel.sources || (!intel.sourcesSeen && room)) {
             logger.log("loading sources");
             //if we have a room, load the sources. 
             let sources = room.find(FIND_SOURCES);
             let index = 0;
             let sourceData = [];
+            let Node = this.pStar.nodeClass();
             for(let s in sources) {
                 let source = sources[s];
+
+                //add sources to pStar 
+                let node = new Node(source.pos, Node.STATIC_RESOURCE);
+                logger.log("struct", this.pStar.hasNode(node), node.id)
+                if (!this.pStar.hasNode(node)) {
+                    this.pStar.addNode(node);
+                }
+
                 let data = {
                     id:source.id,
                     pos:source.pos
@@ -134,6 +155,7 @@ class intelProc extends processClass {
         intel.structures.walls = [];
         intel.structures.ramparts = [];
         let structs = room.find(FIND_STRUCTURES);
+        let Node = this.pStar.nodeClass();
         for(let s in structs) {
             let struct = structs[s];
             
@@ -141,6 +163,9 @@ class intelProc extends processClass {
                 id: struct.id,
                 pos: struct.pos
             }
+            
+            let type = Node.BUILDING;
+
             switch(struct.structureType) {
                 case STRUCTURE_SPAWN:
                         intel.structures.spawns.push(structData);
@@ -168,7 +193,32 @@ class intelProc extends processClass {
                         intel.structures.ramparts.push(structData);
                     break;
                 default:
+                    type = false;
                     break;
+            }
+
+            //make node for structure and add to pStar
+            
+            
+            
+            if (struct.structureType == STRUCTURE_SPAWN) {
+                //spawns are bases for now
+                type = Node.BASE;
+            } else if (struct.structureType == STRUCTURE_CONTROLLER) {
+                //spawns are bases for now
+                if (struct.my) {
+                    type = Node.CONTROLLER_OWNED;
+                } else if (struct.reservation && struct.reservation.username == Game.spawns[Object.keys(Game.spawns)[0]]) {
+                    type = Node.CONTROLLER_RESERVED;
+                }
+                
+            }
+            if (type) {
+                let node = new Node(struct.pos, type);
+                logger.log("struct", this.pStar.hasNode(node), node.id)
+                if (!this.pStar.hasNode(node)) {
+                    this.pStar.addNode(node);
+                }
             }
         }
         

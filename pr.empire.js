@@ -16,6 +16,7 @@ let threadClass = require("INeRT.thread");
 
 let intelClass = require("pr.empire.intel");
 
+let scoutClass = require("pr.role.scout");
 
 let stat = require("util.stat");
 
@@ -38,6 +39,12 @@ class empire extends processClass {
     
     
     run() {
+        //logger.log(this.kernel, this.kernel.getProcess)
+        let scoutProc = this.kernel.getProcess("scout")
+        if (!scoutProc) {
+            scoutProc = new scoutClass("scout");
+            this.kernel.startProcess(scoutProc);
+        }
         
         if (Game.gcl.progress == 0) { //Guessing this won't acutally work..
             this.gclProgress = new stat();
