@@ -5,10 +5,146 @@
 var logger = require("screeps.logger");
 logger = new logger("util.arrays");
 
+class IndexingCollection {
+    constructor(idField = "id", groupByFields = []) {
+
+        this.idField = idField;
+        this.groupByFields = groupByFields;
+        //Main storage of all things
+        this.thingsById = {};
+        //groups.[field path/name].[field value].[thing-IDs]
+        this.groups = {};
+        for(let f in groupByFields) {
+            let field = groupByFields[f];
+            this.groups[field] = {};
+        }
+
+    }
+
+    add(theThing) {
+        let id = _.get(theThing, this.idField);
+        if (this.thingsById[id]) {
+            logger.log("before:", Object.keys(this.thingsById).length)
+            this.remove(theThing);
+            logger.log(Object.keys(this.thingsById).length)
+        }
+        //new thing!
+        this.thingsById[id] = theThing;
+        for(let f in this.groupByFields) {
+            let fieldPath = this.groupByFields[f];
+            let value = _.get(theThing, fieldPath);
+            if (!this.groups[fieldPath][value]) {
+                this.groups[fieldPath][value] = [];
+            }
+            this.groups[fieldPath][value].push(id);
+        }
+
+        //used to disallow adding existing items, now will update item by removing, then adding
+        // } else {
+        //     //it's already here.. why are you calling this?
+        //     throw new Error("Thing already in collection! -> " + id);
+        // }
+    }
+
+    remove(theThing) {
+        let id = _.get(theThing, this.idField);
+        if (!this.thingsById[id]) {
+            //can't remove what's not there
+            throw new Error("Thing not in collection! -> " + id);
+            
+        } else {
+            //remove from id lookup and groups
+            delete this.thingsById[id];
+
+            for(let f in this.groupByFields) {
+                let fieldPath = this.groupByFields[f];
+                let value = _.get(theThing, fieldPath);
+                //logger.log("removing", theThing.id, "from", fieldPath, "value", value);
+                if (this.groups[fieldPath][value]) {
+                    //logger.log("before remove", JSON.stringify(this.groups[fieldPath][value]))
+                    this.groups[fieldPath][value] = _.remove(this.groups[fieldPath][value], (thisId) => id != thisId);
+                    //logger.log("after remove", JSON.stringify(this.groups[fieldPath][value]))
+                } else {
+                    throw new Error("Object for removal isn't in all groupings.. I broke something, I'm sorry.");
+                }
+            }
+            
+        }
+    }
+
+    has(aThing) {
+        let id = _.get(aThing, this.idField);
+        return !!this.thingsById[id];
+    }
+    getAll() {
+        return _.values(this.thingsById);
+    }
+    getById(id) {
+        if(!this.thingsById[id]) {
+            return false;
+        }
+        return this.thingsById[id];
+    }
+    getGroupWithValue(fieldPath, value) {
+        let group = this.getGroup(fieldPath);
+        if (!group[value]) {
+            return false;
+        }
+        return group[value];
+    }
+    getGroup(fieldPath) {
+        if (this.groupByFields.indexOf(fieldPath) == -1) {
+            throw new Error("there's no grouping by this field:", fieldPath);
+        }
+        return this.groups[fieldPath];
+    }
+
+    serialize() {
+        let arr = [];
+        //add the id field, then groups, then a false, then the things
+        arr.push(this.idField);
+        arr = arr.concat(this.groupByFields);
+        arr.push(false);
+        
+        let all = this.getAll();
+        for(let i in all) {
+            let thing = all[i];
+            let serialized = thing.serialize();
+            arr.push(serialized);
+        }
+       
+        return arr.join("∪");
+    }
+    static deserialize(str, thingClass) {
+        let arr = str.split("∪");
+        let idField = arr.shift();
+        let groups = [];
+        let group = true;
+        while(group != "false") {
+            group = arr.shift();
+            if (group != "false")
+                groups.push(group);
+        }
+        
+        
+        let inst = new IndexingCollection(idField, groups);
+        for(let i in arr) {
+            let itemObj = arr[i];
+            let item = thingClass.deserialize(itemObj);
+            inst.add(item);
+        }
+        return inst;
+    }
+}
+
+
+
 
 
 
 module.exports = {
+    IndexingCollection,
+
     arrayContainsLoc: function(array, pos, debug) {
         for(var i in array) {
             var apos = array[i];

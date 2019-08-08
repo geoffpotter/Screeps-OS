@@ -98,7 +98,7 @@ class kernel {
             this.startThread(thread);
         }
         if (this.profile) {
-            //profiler.registerObject(process, process.name);
+            profiler.registerObject(process, process.name);
             if (!this.wrappedProcs) {
                 this.wrappedProcs = {};
             }

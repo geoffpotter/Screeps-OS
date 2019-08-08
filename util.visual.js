@@ -9,6 +9,18 @@ logger = new logger("util.visual");
 
 
 module.exports = {
+    hexColor: function(number) {
+        let h = Number(number).toString(16);
+        if (h.length==1) h = "0" + h;
+        return h;
+    },
+    rgbColor: function(r, g, b) {
+        let red = this.hexColor(r);
+        let green = this.hexColor(g);
+        let blue = this.hexColor(b);
+        return red + green + blue;
+    },
+
    /**
      * draw a circle at position
      * @param pos
@@ -65,17 +77,23 @@ module.exports = {
      * @returns {string}
      */
 
-    drawPath: function(path, color) {
+    drawPath: function(path, color, styleOverride = false) {
         if (!color) {
             color = "orange"
         }
-    
+        let style = {color: color, lineStyle: "dashed"};
+        if (!!styleOverride) {
+            for(let field in styleOverride) {
+                style[field] = styleOverride[field];
+            }
+        }
+
         let lastPosition = path[0];
         this.circle(lastPosition, color);
         for (let position of path) {
             if (position.roomName === lastPosition.roomName) {
                 new RoomVisual(position.roomName)
-                    .line(position, lastPosition, {color: color, lineStyle: "dashed"});
+                    .line(position, lastPosition, style);
          
             }
             lastPosition = position;
@@ -86,6 +104,23 @@ module.exports = {
         //logger.enabled = true;
         var yS = basePos.y;
         var lines = text.split("\n");
+        for(var i in lines) {
+            var s = lines[i];
+            viz.text(s, basePos.x, yS + i*1, {align:"left"});
+        }
+        //logger.log(this.roomName, status);
+        
+    
+    },
+    drawTextLines: function(textArr, basePos) {
+        var viz = new RoomVisual(basePos.roomName);
+        //logger.enabled = true;
+        var yS = basePos.y;
+        var lines = textArr;
+        if (!_.isArray(textArr)) {
+            lines = textArr.split("\n");
+        }
+        
         for(var i in lines) {
             var s = lines[i];
             viz.text(s, basePos.x, yS + i*1, {align:"left"});

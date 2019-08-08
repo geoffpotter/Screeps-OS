@@ -20,6 +20,7 @@ class INeRTQueues {
     constructor() { // class constructor
         this.queueNames = [
             "init",
+            
             "jobCreate",
             "jobFind",
             "taskCreate",
@@ -32,6 +33,9 @@ class INeRTQueues {
             "creepMove",
             "jobUpdate",
             "taskUpdate",
+            "pathing",
+            "nodes",
+            "edges",
             "work"
         ];
         this.queueMap = {};

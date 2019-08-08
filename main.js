@@ -1,27 +1,30 @@
 var logger = require("screeps.logger");
 logger = new logger("main");
 
-
 //_.each(Game.creeps, (c) => c.suicide());
 // _.each(Game.creeps, (c) => c.memory.task = false)
 //return;
 
+//_.each(Game.flags, (f) => f.remove());
+
 //Memory.rooms ={} 
 //util classe
-//Game.Memory = {};
-//return false;
+// RawMemory.set("");
+//  return;
 //prototype overrides
 require("proto.creep");
 require("proto.roomPosition");
 require("proto.RoomObject");
-//const profiler = require('screeps.profiler');
-//global.profiler = profiler;
-global.utils = {
-	"array": require("util.array"),
-	"visual": require("util.visual")
-}
+const profiler = require('screeps.profiler');
+global.profiler = profiler;
+global.utils = {};
+global.utils.array = require("util.array");
+global.utils.visual = require("util.visual");
+global.utils.map = require("util.map");
+global.utils.pStar = require("util.pStar")
 
-//profiler.registerObject(global.utils, "utils")
+
+profiler.registerObject(global.utils, "utils")
 // logger.log(JSON.stringify(global.creepClasses));
 // return;
 
@@ -40,7 +43,7 @@ kernel.startProcess(initProc);
 // let testProc = new testProcClass("testin");
 // kernel.startProcess(testProc);
 //profiler.registerClass(kernel.__proto__, "kernel");
-//profiler.registerClass(kernelClass, 'kernel');
+profiler.registerClass(kernelClass, 'kernel');
 
 //profiler.enable();
 

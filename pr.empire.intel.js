@@ -110,8 +110,9 @@ class intelProc extends processClass {
             for(let s in sources) {
                 let source = sources[s];
 
-                //add sources to pStar 
-                let node = new Node(source.pos, Node.STATIC_RESOURCE);
+                // //add sources to pStar 
+                let pos = source.pos.getSurroundingClearSpaces()[0];
+                let node = new Node(pos, Node.STATIC_RESOURCE);
                 logger.log("struct", this.pStar.hasNode(node), node.id)
                 if (!this.pStar.hasNode(node)) {
                     this.pStar.addNode(node);
@@ -214,7 +215,11 @@ class intelProc extends processClass {
                 
             }
             if (type) {
-                let node = new Node(struct.pos, type);
+                let pos = struct.pos;
+                if (!pos.isClearSpace()) {
+                    pos = pos.getSurroundingClearSpaces()[0];//use first available open spot for structs
+                }
+                let node = new Node(pos, type);
                 logger.log("struct", this.pStar.hasNode(node), node.id)
                 if (!this.pStar.hasNode(node)) {
                     this.pStar.addNode(node);

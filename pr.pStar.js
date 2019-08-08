@@ -9,276 +9,39 @@
 
 var logger = require("screeps.logger");
 logger = new logger("pr.pStar");
-
+logger.color = COLOR_PURPLE;
 
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
+let Node = global.utils.pStar.Node;
 
-class indexingCollection {
-    constructor(idField = "id", groupByFields = []) {
-
-        this.idField = idField;
-        this.groupByFields = groupByFields;
-        //Main storage of all things
-        this.thingsById = {};
-        //groups.[field path/name].[field value].[thing-IDs]
-        this.groups = {};
-        for(let f in groupByFields) {
-            let field = groupByFields[f];
-            this.groups[field] = {};
-        }
-
+class nodeProc extends processClass {
+    init() {
+        this.pStar = this.kernel.getProcess("pStar");
+        this.node = this.pStar.getNodeById(this.data.nodeId);
     }
 
-    add(theThing) {
-        let id = _.get(theThing, this.idField);
-        if (!this.thingsById[id]) {
-            //new thing!
-            this.thingsById[id] = theThing;
-            for(let f in this.groupByFields) {
-                let fieldPath = this.groupByFields[f];
-                let value = _.get(theThing, fieldPath);
-                if (!this.groups[fieldPath][value]) {
-                    this.groups[fieldPath][value] = [];
-                }
-                this.groups[fieldPath][value].push(id);
-            }
-        } else {
-            //it's already here.. why are you calling this?
-            throw new Error("Thing already in collection! -> " + id);
-        }
+    initThreads() {
+        let updateThread = this.createThread("updateNode", "nodes");
+        updateThread.suspend = 0 + Math.floor(Math.random() * 10);
+        return [
+            updateThread,
+            this.createThread("displayNode", "nodes")
+        ];
     }
 
-    remove(theThing) {
-        let id = _.get(theThing, this.idField);
-        if (!this.thingsById[id]) {
-            //can't remove what's not there
-            throw new Error("Thing already in collection! -> " + id);
-            
-        } else {
-            //remove from id lookup and groups
-            delete this.thingsById[id];
-
-            for(let f in this.groupByFields) {
-                let fieldPath = this.groupByFields[f];
-                let value = _.get(theThing, fieldPath);
-                if (this.groups[fieldPath][value]) {
-                    _.remove(this.groups[fieldPath][value], id);
-                } else {
-                    throw new Error("Object for removal isn't in all groupings.. I broke something, I'm sorry.");
-                }
-            }
-            
-        }
-    }
-
-    has(aThing) {
-        let id = _.get(aThing, this.idField);
-        return !!this.thingsById[id];
-    }
-    getAll() {
-        return _.values(this.thingsById);
-    }
-    getById(id) {
-        if(!this.thingsById[id]) {
-            return false;
-        }
-        return this.thingsById[id];
-    }
-    getGroupWithValue(fieldPath, value) {
-        let group = this.getGroup(fieldPath);
-        if (!group[value]) {
-            return false;
-        }
-        return group[value];
-    }
-    getGroup(fieldPath) {
-        if (this.groupByFields.indexOf(fieldPath) == -1) {
-            throw new Error("there's no grouping by this field:", fieldPath);
-        }
-        return this.groups[fieldPath];
-    }
-}
-
-
-class Node {
-    static get BASE() { return "🏠" }
-    static get CONTROLLER_OWNED() { return "💡" }
-    static get CONTROLLER_RESERVED() { return "🕯️" }
-    static get STATIC_RESOURCE() { return "🔌" }
-    static get BUILDING() { return "🏢" }
-    static get ROOM_EXIT() { return "💨" }
-    static get INTERSECTION() { return "🚦" }
-
-    
-    static get TYPES() { return [
-        Node.BASE,
-        Node.CONTROLLER_OWNED,
-        Node.CONTROLLER_RESERVED,
-        Node.STATIC_RESOURCE,
-        Node.BUILDING,
-        Node.ROOM_EXIT,
-        Node.INTERSECTION
-    ] }
-
-
-    get id() {
-        return `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`;
-    }
-    constructor(pos, type) {
-        if (Node.TYPES.indexOf(type) == -1) {
-            throw new Error("invalid node type:", type);
-        }
-        this.pos = pos;
-        this.type = type;
-
-        //map of destinationNodeId => edgeObj
-        this.edges = {};
-    }
-
-    /**
-     * 
-     * @param {Node} destinationNode 
-     */
-    addEdge(destinationNode, path, cost) {
-        this.edges[destinationNode.id] = new Edge(destinationNode.id, path, cost);
-    }
-
-    removeEdge(destinationNode) {
-        delete this.edges[destinationNode.id];
+    updateNode() {
+        //not totaly sure what this will do.. oh fuck, update a* routing!
+        //logger.log("updating node", this.data.nodeId);
+        
+        return;
     }
 
     displayNode() {
-        global.utils.visual.drawText(this.type, this.pos);
-        for(let destinationNodeId in this.edges) {
-            let edge = this.edges[destinationNodeId];
-            let path = edge.path;
-            //logger.log('-------')
-            //logger.log(JSON.stringify(path));
-            if (!path || path.length == 0) {
-                logger.log('no path');
-                //new RoomVisual(this.pos.roomName)
-                //    .line(this.pos, {color: color, lineStyle: "dashed"});
-                continue;
-            }
-            global.utils.visual.drawPath(path, COLOR_RED);
-        }
+        this.node.displayNode();
     }
 }
-
-class Edge {
-    constructor(destinationNodeId, path, cost) {
-        this.destinationNodeId = destinationNodeId;
-        this.path = path;
-        this.cost = cost;
-    }
-}
-
-class pStar {
-    constructor() {
-        this.nodes = new indexingCollection("id", ["pos.roomName", "type"]);
-        
-    }
-
-    hasNode(node) {
-        if (!(node instanceof Node)) {
-            throw new Error("Adding invalid Node:", node);
-        }
-        return this.nodes.has(node);
-    }
-
-    addNode(node) {
-        if (!(node instanceof Node)) {
-            throw new Error("Adding invalid Node:", node);
-        }
-        this.nodes.add(node);
-        this.addNodeEdges(node);
-    }
-
-    getNode(nodeId) {
-        return this.nodes.getById(nodeId);
-    }
-
-    /**
-     * 
-     * @param {Node} node 
-     */
-    addNodeEdges(node) {
-        switch(node.type) {
-            case Node.ROOM_EXIT:
-                
-                //for every other room exit, if the global range is < 3 or 4 or whatever, connect them.
-                //point is to connect room exit nodes on either side of a room exit
-                /**
-                 * @type {[Node]}
-                 */
-                let roomExitNodes = this.nodes.getGroupWithValue("type", Node.ROOM_EXIT);
-                //logger.log("finding exits for", JSON.stringify(node));
-                //logger.log(JSON.stringify(roomExitNodes));
-                let thisNodePos = new RoomPosition(node.pos.x, node.pos.y, node.pos.roomName);
-                let thisNodeWPos = thisNodePos.toWorldPosition();
-                let ourNodes = _.filter(roomExitNodes, (nodeId) => {
-                    if (nodeId == node.id) {
-                        return false;
-                    }
-                    let n = this.getNode(nodeId);
-                    //logger.log("???", JSON.stringify(n));
-                    let nodePos = new RoomPosition(n.pos.x, n.pos.y, n.pos.roomName);
-                    let d = thisNodeWPos.getRangeTo(nodePos);
-                    //logger.log(d)
-                    if (d < 4) {
-                        return true;
-                    }
-                    return false;
-                });
-                //logger.log(node.pos.roomName, "matching nodes", ourNodes)
-                _.each(ourNodes, (nodeId) => {
-                    let n = this.getNode(nodeId);
-                    let nodePos = new RoomPosition(n.pos.x, n.pos.y, n.pos.roomName);
-
-                    let path = PathFinder.search(node.pos, {pos: nodePos, range: 0}, {maxRooms: 16});
-                    //logger.log("-----------------", nodePos, node.pos)
-                    //logger.log(JSON.stringify(path))
-                    let cost = path.cost;
-                    //global.no();
-                    node.addEdge(n, path.path, cost);
-                    n.addEdge(node, path.path.reverse, cost);
-                    logger.log("Adding room node connection!", node.pos.roomName, n.pos.roomName);
-                })
-                
-            default:
-                let allNodes = this.nodes.getGroupWithValue("pos.roomName", node.pos.roomName);
-                for(let n in allNodes) {
-                    let otherNodeId = allNodes[n];
-                    let otherNode = this.nodes.getById(otherNodeId);
-                    if (node.id == otherNode.id || (node.type == Node.ROOM_EXIT && otherNode.type == Node.ROOM_EXIT)) {
-                        //likely best to not connect new nodes to themselves
-                        continue;
-                    }
-                    node.addEdge(otherNode);
-                    otherNode.addEdge(node);
-                }
-                break;
-        }
-    }
-
-    removeNode(node) {
-        if (!(node instanceof Node)) {
-            throw new Error("Adding invalid Node:", node);
-        }
-        this.nodes.remove(node);
-    }
-
-    displayNodes() {
-        let allNodes = this.nodes.getAll();
-        for(let n in allNodes) {
-            let node = allNodes[n];
-            node.displayNode();
-        }
-    }
-}
-
 
 class pStarProc extends processClass {
     /**
@@ -288,35 +51,66 @@ class pStarProc extends processClass {
         return Node;
     }
     init() {
-        this.pStar = new pStar();
+        //deserialize
+        // if (Game.time % 10 == 0)
+            Memory.pStarCache = "";
+        if (Memory.pStarCache) {
+            let start = Game.cpu.getUsed();
+            global.utils.pStar.inst = global.utils.pStar.class.deserialize(Memory.pStarCache);
+            let used = Game.cpu.getUsed() - start;
+            logger.log("pStar deserialize.  CPU:", used, "Size:", Memory.pStarCache.length);
+            logger.log("wtf",JSON.stringify(global.utils.pStar.inst));
+        }
     }
     initThreads() {
         return [
-            this.createThread("work", "work"),
-            this.createThread("displayNodes", "work")
+            this.createThread("refineEdges", "edges"),
+            this.createThread("displayEdges", "edges"),
+            this.createThread("pStarSave", "work")
         ];
     }
-    work() {
-        logger.log(this.name, "init")
-        
-        
-        
+
+    pStarSave() {
+        //serialize
+        let start = Game.cpu.getUsed();
+        Memory.pStarCache = global.utils.pStar.inst.serialize();
+        let used = Game.cpu.getUsed() - start;
+        logger.log("pStar serialize.  CPU:", used, "Size:", Memory.pStarCache.length)
+        //logger.log(Memory.pStarCache)
+
+        //this.init();
     }
 
-    displayNodes() {
-        this.pStar.displayNodes();
+    refineEdges() {
+        
+        logger.log(this.name, "work")
+        global.utils.pStar.inst.refineEdges();
     }
 
+
+    displayEdges() {
+        global.utils.pStar.inst.displayNodes();
+    }
+
+    getNodeById(nodeId) {
+        return global.utils.pStar.inst.nodes.getById(nodeId);
+    }
     hasNode(node) {
-        return this.pStar.hasNode(node);
+        return global.utils.pStar.inst.hasNode(node);
     }
 
     addNode(node) {
-        this.pStar.addNode(node);
+        global.utils.pStar.inst.addNode(node);
+        //create process for node
+        let nodeProcessName = "node-" + node.id;
+        if (!this.kernel.getProcess(nodeProcessName)) {
+            let proc = new nodeProc(nodeProcessName, {nodeId: node.id});
+            this.kernel.startProcess(proc);
+        }
     }
 
     removeNode(node) {
-        this.pStar.removeNode(node);
+        global.utils.pStar.inst.removeNode(node);
     }
 
     addRoomExitNodes(room) {

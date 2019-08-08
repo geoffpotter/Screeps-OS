@@ -42,7 +42,9 @@ RoomPosition.prototype.getSurroundingClearSpaces = function() {
     return clearSpots;
 }
 RoomPosition.prototype.isClearSpace = function() {
-    
+    if (!Game.rooms[this.roomName]) {
+		return true;
+	}
     let allTheShit = this.look();
     let isClearSpace = true;
     //logger.log('---')
@@ -53,13 +55,13 @@ RoomPosition.prototype.isClearSpace = function() {
         if (shit.type == "terrain" && shit.terrain == "wall") {
             isClearSpace = false;
         }
-        if (shit.type == "structure" && shit.structure.structureType == "constructedwall") {
+        if (shit.type == "structure" && ["rampart", "container"].indexOf(shit.structure.structureType) == -1 ) {
             isClearSpace = false;
         }
         if (shit.type == "source") {
             isClearSpace = false;
         }
-        if (!isClearSpace === false) {
+        if (isClearSpace === false) {
             break;
         }
         //logger.log(isClearSpace, "the shit:", shit.type, shit.terrain);
@@ -107,6 +109,50 @@ class WorldPosition
 	    
 	    //logger.log(JSON.stringify(pos), JSON.stringify(pos))
 		return this.getRangeToXY(pos.x, pos.y);
+	}
+
+	moveInDir(dir) {
+		dir = Number(dir)
+		//logger.log('h', JSON.stringify(dir), JSON.stringify(global.utils.map.directionToDxDy(dir)));
+		let dx, dy = 0;
+		switch (dir) {
+            case TOP:
+				[dx, dy] = [0, -1];
+				break;
+            case TOP_RIGHT:
+                [dx, dy] = [1, -1];
+				break;
+            case RIGHT:
+                [dx, dy] = [1, 0];
+				break;
+            case BOTTOM_RIGHT:
+                [dx, dy] = [1, 1];
+				break;
+            case BOTTOM:
+                [dx, dy] = [0, 1];
+				break;
+            case BOTTOM_LEFT:
+                [dx, dy] = [-1, 1];
+				break;
+            case LEFT:
+                [dx, dy] = [-1, 0];
+				break;
+            case TOP_LEFT:
+                [dx, dy] = [-1, -1];
+				break;
+            default:
+                [dx, dy] = [false, false];
+				break;
+		}
+		// if (dx === false && dy === false) {
+		// 	logger.log("invalid direction!!", dir);
+		// }
+		// logger.log('1', this.x, dx)
+		let newX = this.x + dx;
+		//logger.log('2', this.y, dy)
+		let newY = this.y + dy;
+		//logger.log('3', newX, newY)
+		return new WorldPosition(newX, newY);
 	}
 
 	/**
@@ -289,5 +335,6 @@ RoomPosition.prototype.toWorldPosition = function() {
 	return this._wpos;
 }
 
+global.WorldPosition = WorldPosition;
 module.exports = WorldPosition;
 
