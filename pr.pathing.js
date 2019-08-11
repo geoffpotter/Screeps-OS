@@ -28,6 +28,8 @@ class pathingProc extends processClass {
         // } else {
         //     this.paths = new global.utils.array.IndexingCollection();
         // }
+
+        this.nodeMap = {};
     }
     initThreads() {
         return [this.createThread("run", "init")];
@@ -55,7 +57,20 @@ class pathingProc extends processClass {
         //} else {
         //    deserialized.displayNodes();
         //}
-        
+    
+        /** @type {Node} */
+        let src = this.nodeMap["Flag8"];
+        let dest = this.nodeMap["Flag7"];
+        start = Game.cpu.getUsed();
+        let pathResult = src.findNodePathTo(dest);
+        let used = Game.cpu.getUsed() - start;
+        logger.log(JSON.stringify(pathResult), "cpu used", used)
+
+        //normal path
+        start = Game.cpu.getUsed();
+        let path = PathFinder.search(src.pos, dest.pos);
+        used = Game.cpu.getUsed() - start;
+        logger.log(JSON.stringify(path), "cpu used", used)
         
     }
 
@@ -66,7 +81,7 @@ class pathingProc extends processClass {
             logger.log("adding base flag", sNode.id);
             global.utils.pStar.inst.addNode(sNode);
         }
-
+        this.nodeMap["Flag1"] = sNode;
         let otherFlags = [];
         let num = 2;
         while(Game.flags["Flag" + num]) {
@@ -77,10 +92,11 @@ class pathingProc extends processClass {
         for(let i in otherFlags) {
             let otherFlag = otherFlags[i];
             let node = new Node(otherFlag.pos, Node.STATIC_RESOURCE);
-            if (this.kernel.time%2==0 && !global.utils.pStar.inst.hasNode(node)) {
+            if (this.kernel.time%1==0 && !global.utils.pStar.inst.hasNode(node)) {
                 logger.log("adding other flag", node.id);
                 global.utils.pStar.inst.addNode(node);
-                return;
+                this.nodeMap[otherFlag.name] = node;
+                //return;
             }
             
         }

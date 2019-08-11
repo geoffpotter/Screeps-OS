@@ -153,6 +153,151 @@ class CachedPath {
 
 
     }
+    /**
+     * 
+     * @param {Creep} creep 
+     * @param {global.utils.pStar.Node} destNode
+     * 
+     * @returns {boolean} true if we've reached the destination, false if we're still moving.
+     */
+    moveOnPath(creep, destNode, goal) {
+        let pathInfo = creep.memory.pStarPath || {
+            stuck: 0,
+            lp: creep.pos,
+            lpp: creep.pos,
+            done: false,
+            onPath: false,
+            onPathKinda: false,
+        }
+        
+        if (creep.pos.isEqualTo(destNode.pos)) { //creep is already there, do nothing;
+            pathInfo.done = true;
+            creep.memory.pStarPath = pathInfo;
+            logger.log(creep.name, "already at destination.  be smarter.")
+            return pathInfo;
+        }
+        
+        logger.log(creep.name, "moving to", destNode.id);
+        
+        let path = _.clone(this.getPath());
+        //if the destination if our orgin, follow the path backwards.
+        logger.log(destNode.id, this.orgin, this.goal);
+        if (destNode.pos.isEqualTo(this.orgin)) {
+            logger.log("reversing path")
+           path = path.reverse();
+        }
+        for(let i in path) {
+            let pos = path[i];
+            let i2 = 1 + Number.parseInt(i);
+            
+            if (i2 > path.length) {
+                break;
+            }
+            let nextPos = path[i2];//i is a string, cuz js
+            
+            if (!nextPos) {
+                //we're out of positions.. 
+                pathInfo.done = true;
+                creep.memory.pStarPath = pathInfo;
+                logger.log(creep.name, "creep off path.. ya broke something, ya jerk")
+            }
+
+            //if we're in range to the node, and this node is closer than the next, consider ourseleves here on the path.
+            //logger.log(creep.pos.toWorldPosition().inRangeTo(pos, 1), creep.pos.toWorldPosition().getRangeTo(pos), creep.pos.toWorldPosition().getRangeTo(nextPos))
+            //logger.log(pos, nextPos);
+            let onPath = creep.pos.isEqualTo(pos);//exactly this creeps pos
+            let closeToPath = (creep.pos.toWorldPosition().inRangeTo(pos, 1) //creep is in range
+                                  && creep.pos.toWorldPosition().getRangeTo(pos) <= creep.pos.toWorldPosition().getRangeTo(nextPos)); //next node isn't closer
+            
+            // if (creep.name == "scout2" && i < 5) {
+            //     logger.log(creep.pos, pos, nextPos)
+            //     logger.log(creep.pos.toWorldPosition().inRangeTo(pos, 1), creep.pos.toWorldPosition().getRangeTo(pos), creep.pos.toWorldPosition().getRangeTo(nextPos))
+            //     //logger.log(onPath, closeToPath)
+            // }
+            if (onPath || closeToPath) { //we are on the path, and have our current and next path pos.  handle shit, then move.
+                pathInfo.onPath = onPath;
+                pathInfo.closeToPath = closeToPath;
+                
+                //calculate stuck
+                if (creep.pos.isEqualTo(pathInfo.lp)) { //creep hasn't moved, increment stuck
+                    pathInfo.stuck++;
+                } else {
+                    //creep moved, clear stuck
+                    pathInfo.stuck = 0;
+                }
+                //store last creep position
+                pathInfo.lp = creep.pos;
+
+                let startPosToUse = pos; //use the matching pos from the path to get the direction, IE: follow the path dir, don't move to next path pos.
+                if (pathInfo.stuck > 2) {
+                    nextPosToUse = creep.pos; //use the creeps pos if we're stuck, ie: move onto the path
+                }
+                //store the pos we're moving to.
+                pathInfo.lpp = nextPos;
+
+                //we're done if the point we're moving too is our destination.
+                logger.log("done?", destNode, destNode.pos, creep.pos)
+                pathInfo.done = creep.pos.inRangeTo(destNode.pos, 1) || (goal && creep.pos.inRangeTo(goal.pos, goal.range));
+
+                let moveDir = startPosToUse.getDirectionTo(nextPos);
+                logger.log(i, i2, path[i2])
+                logger.log(i,"creep at pos", creep.pos, "considered at", startPosToUse, "moving to", nextPos, startPosToUse.getDirectionTo(nextPos), pos.getDirectionTo(nextPos));
+                let blockingObject = nextPos.isBlocked();
+                if (blockingObject) {
+                    logger.log(creep.name, "path blocked, trying to sidestep");
+                    let try1 = (moveDir - 3)%8+1;
+                    let try2 = (moveDir + 1)%8+1;
+                    //turn nextPos into two new POSs in try1 and try2 directions
+                    let try1Pos = nextPos.toWorldPosition().moveInDir(try1).toRoomPosition();
+                    let try2Pos = nextPos.toWorldPosition().moveInDir(try2).toRoomPosition();
+                    logger.log(moveDir, try1, try2);
+
+                    let try1BlockingObj = try1Pos.isBlocked();
+                    let try2BlockingObj = try2Pos.isBlocked();
+                    global.utils.visual.circle(try1Pos, try1BlockingObj ? "red" : "green");
+                    global.utils.visual.circle(try2Pos, try2BlockingObj ? "red" : "green");
+                    
+                    if (!try1BlockingObj) {
+                        nextPos = try1Pos;
+                    } else if (!try2BlockingObj) {
+                        nextPos = try2Pos;
+                    } else {
+                        logger.log(creep.name, "no easy walkable paths, if creeps are blocking, swap places with one");
+                        if (blockingObject.type == "creep") {
+                            //orig path blocked by creep, swap creeps
+                            let otherCreep = blockingObject.creep;
+                            otherCreep.move(otherCreep.pos.getDirectionTo(creep.pos));//move other creep to our pos and set their location to nextPos
+                            nextPos = otherCreep.pos;
+                            logger.log(creep.name, "blocked, switching with", otherCreep.name);
+                        } else if (try1BlockingObj.type == "creep") {
+                            //orig path blocked by creep, swap creeps
+                            let otherCreep = try1BlockingObj.creep;
+                            otherCreep.move(otherCreep.pos.getDirectionTo(creep.pos));//move other creep to our pos and set their location to nextPos
+                            nextPos = otherCreep.pos;
+                            logger.log(creep.name, "blocked, switching with", otherCreep.name);
+                        } else if (try2BlockingObj.type == "creep") {
+                            //orig path blocked by creep, swap creeps
+                            let otherCreep = try2BlockingObj.creep;
+                            otherCreep.move(otherCreep.pos.getDirectionTo(creep.pos));//move other creep to our pos and set their location to nextPos
+                            nextPos = otherCreep.pos;
+                            logger.log(creep.name, "blocked, switching with", otherCreep.name);
+                        }
+                    }
+                    logger.log(creep.name, "moving on path", nextPos, startPosToUse.getDirectionTo(nextPos))
+                    moveDir = startPosToUse.getDirectionTo(nextPos);
+                }
+                let ret = creep.move(moveDir);
+                break;
+            }
+            
+        }
+        if (!pathInfo.onPath && !pathInfo.closeToPath){
+            logger.log(creep.name, "not on path!", JSON.stringify(pathInfo))
+        }
+        creep.memory.pStarPath = pathInfo;
+        return pathInfo;
+        
+    }
 
     serialize() {
         //logger.log(JSON.stringify(this.path))

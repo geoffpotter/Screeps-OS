@@ -64,7 +64,7 @@ class kernel {
         this.cpuDefcon = 0;
         this.cpuBucketRecoverTicks = 0;
 
-        this.profile = false;
+        this.profile = true;
 
         global.kernel = this;
     }

@@ -1,14 +1,15 @@
 
-
 var logger = require("screeps.logger");
-logger = new logger("pr.pStar");
+logger = new logger("util.pStar");
 logger.color = COLOR_PURPLE;
 
 
+
 class DestinationInfo {
-    constructor(orginNode, goalNode, cost) {
+    constructor(orginNode, goalNode, nextNode, cost) {
         this.orgin = orginNode;
         this.goal = goalNode;
+        this.nextNode = nextNode;
         this.travelCost = cost;
     }
 
@@ -16,6 +17,18 @@ class DestinationInfo {
         return this.orgin.id + "_" + this.goal.id;
     }
 }
+
+// class DestinationInfo {
+//     constructor(orginNode, goalNode, cost) {
+//         this.orgin = orginNode;
+//         this.goal = goalNode;
+//         this.travelCost = cost;
+//     }
+
+//     get id() {
+//         return this.orgin.id + "_" + this.goal.id;
+//     }
+// }
 
 class Node {
     static get BASE() { return "🏠" }
@@ -54,6 +67,30 @@ class Node {
 
         
     }
+
+    toJSON() {
+        return this.serialize();
+    }
+    /**
+     * A map of destNode.id => DestinationInfo 
+     */
+    get destinationsMap() {
+        if (!this._destMap) {
+            let pStar = global.utils.pStar.inst;
+            let destIds = pStar.distances.getGroupWithValue("orgin.id", this.id); //list if ids
+            this._destMap = {};
+            for(let d in destIds) {
+                let destId = destIds[d];
+                let dest = pStar.distances.getById(destId);
+                this._destMap[dest.goal.id] = dest;
+            }
+        }
+
+        let d = this._destMap;
+        this._destMap = false;
+        
+        return d;
+    }
     get destinations() {
         let pStar = global.utils.pStar.inst;
         let destIds = pStar.distances.getGroupWithValue("orgin.id", this.id); //list if ids
@@ -81,7 +118,7 @@ class Node {
             let edgeId = edges[e];
             let edge = pStar.edges.getById(edgeId);
             
-            logger.log("processing edge:", JSON.stringify(edge))
+            //logger.log("processing edge:", JSON.stringify(edge))
             let otherNode = pStar.nodes.getById(edge.node1Id == this.id ? edge.node2Id : edge.node1Id);
             edgeNodes[otherNode.id] = otherNode;
         }
@@ -102,7 +139,7 @@ class Node {
         return false;
     }
     refineNode() {
-        logger.log("refining node:", this.id);
+        //logger.log("refining node:", this.id);
         let neighbors = this.edgeNodes;
         for(let n in neighbors) {
             let neighbor = neighbors[n];
@@ -116,14 +153,14 @@ class Node {
      * @param {Node} otherNode 
      */
     updatePathingWithNode(otherNode) {
-        logger.log(this.id, 'update pathing with node:', otherNode.id);
+        //logger.log(this.id, 'update pathing with node:', otherNode.id);
         
         let pStar = global.utils.pStar.inst;
 
         /** @type {Edge} */
         let edge = this.getNodeEdge(otherNode);
-        logger.log("edge cost:", edge.cost, JSON.stringify(edge));
-        let destInfo = new DestinationInfo(this, otherNode, edge.cost);
+        //logger.log("edge cost:", edge.cost, JSON.stringify(edge));
+        let destInfo = new DestinationInfo(this, otherNode, otherNode, edge.cost);
         this.addDestination(destInfo);
 
         //for all the distances for otherNode, add same destination with cost increased by edge len
@@ -132,9 +169,9 @@ class Node {
             /** @type {DestinationInfo} */
             let otherDest = otherDests[i];
             
-            logger.log("check neighbor node", otherDest.goal.id, this.id, otherDest.travelCost);
+            //logger.log("check neighbor node", otherDest.goal.id, this.id, otherDest.travelCost);
             if (otherDest.goal.id == this.id || otherDest.goal.id == otherNode.id || otherDest.orgin.id == this.id) {
-                logger.log("skipping")
+                //logger.log("skipping")
                 continue;
             }
             //let edge = this.getNodeEdge(otherDest.goal);
@@ -146,11 +183,9 @@ class Node {
 
 
             
-            let destInfo = new DestinationInfo(this, otherDest.goal, totalCost);
-            let currentCost = pStar.distances.getById(destInfo.id).travelCost;
-            if (currentCost)
-                destInfo.travelCost = currentCost;
-            logger.log("costs", currentCost, totalCost)
+            let destInfo = new DestinationInfo(this, otherDest.goal, otherNode, totalCost);
+            
+            //logger.log("costs", currentCost, totalCost)
             //logger.log("checking for", destInfo.id, pStar.distances.has(destInfo))
             this.addDestination(destInfo);
         
@@ -165,21 +200,31 @@ class Node {
      */
     addDestination(destInfo) {
         let pStar = global.utils.pStar.inst;
+        let betterPath = false;
         if (pStar.distances.has(destInfo)) {
-            let currentCost = pStar.distances.getById(destInfo.id);
-            if (currentCost != destInfo.travelCost) {
+            let currentCost = pStar.distances.getById(destInfo.id).travelCost;
+            if (currentCost > destInfo.travelCost) {
+
+
+                logger.log("Better path found!, invalidating nodes", currentCost, destInfo.travelCost)
                 //cost update, invalidate both nodes
                 destInfo.orgin.invalidateNode();
                 destInfo.goal.invalidateNode();
+                pStar.distances.remove(destInfo);
+                betterPath = true;
             }
-            pStar.distances.remove(destInfo);
+            
         } else {
             //we're adding a destination, invalidate both nodes
             destInfo.orgin.invalidateNode();
             destInfo.goal.invalidateNode();
+            betterPath = true; //any path is better than none yo!
         }
-        //logger.log("adding dest", destInfo.id, pStar.distances.has(destInfo));
-        pStar.distances.add(destInfo)
+        if (betterPath) {
+            logger.log("adding dest", destInfo.id, pStar.distances.has(destInfo));
+            pStar.distances.add(destInfo);
+        }
+        
     }
 
     invalidateNode(depthToGo=2) {
@@ -193,6 +238,110 @@ class Node {
             //neighbor.invalidateNode(depthToGo--);
         }
     }
+
+
+    /********************Pathfinding stuff  *****************/
+    getDistanceTo(destNode) {
+        if (destNode.id == this.id) {
+            return 0;
+        }
+        let dest = this.destinationsMap[destNode.id];
+        if (!dest) {
+            return false;
+        }
+        let dist = dest.travelCost;
+        return dist;
+    }
+    findClosestNeighborToDestination(destNode) {
+        let start = Game.cpu.getUsed();
+        let log = (...args) => {
+            let usedNow = Game.cpu.getUsed();
+            let used = usedNow - start;
+            logger.log("cpu used:", used, ...args);
+            start = usedNow;
+        }
+
+        //get the dest:
+        let destInfo = this.destinationsMap[destNode.id];
+        if (!destInfo) {
+            return false; //no path stored, return false for now
+        }
+        let nextNode = destInfo.nextNode;
+
+        log("got node")
+        return nextNode;
+    }
+    findClosestNeighborToDestination_old(destNode) {
+        let start = Game.cpu.getUsed();
+        let log = (...args) => {
+            let usedNow = Game.cpu.getUsed();
+            let used = usedNow - start;
+            logger.log("cpu used:", used, ...args);
+            start = usedNow;
+        }
+        let neighbors = this.edgeNodes;
+        log("1")
+        let dists = [];
+        for(let n in neighbors) {
+            let neighbor = neighbors[n];
+            dists.push({node:neighbor, dist:neighbor.getDistanceTo(destNode)})
+        }
+        //logger.log("num neighbors", neighbors.length)
+        // let dists = _.map(neighbors, (n) => {
+        //     //logger.log("here??", n)
+        //     return {node: n, dist:n.getDistanceTo(destNode)};
+        // });
+        log('2')
+        //dists = _.filter(dists, (d) => d.dist == false);
+        //logger.log("dists", JSON.stringify(dists));
+        if (dists.length == 0) {
+            return false; //no neighbors even know how to get there.. prolly gotta wait for updates
+        }
+        let sorted = _.sortBy(dists, ["dist"]);
+        log('3')
+        //logger.log("sorted", JSON.stringify(sorted))
+        return sorted[0].node;
+    }
+    findNodePathTo(destNode) {
+        //logger.log("getting path to:", destNode.id, "destMap:", JSON.stringify(this.destinationsMap))
+        if (!this.destinationsMap[destNode.id]) {
+            //no path saved
+            return {
+                path:[],
+                incomplete:true,
+                cost: false,
+                hops: 0
+            }
+        }
+
+        let currentNode = this;
+        let path = [this];
+        let hops = 0;
+        let hopsLimit = 10000;
+        let incomplete = false;
+        while(currentNode.id != destNode.id) {
+            let nextNode = currentNode.findClosestNeighborToDestination(destNode);
+            logger.log("next closest node:", currentNode.id, nextNode ? nextNode.id : "no node!!");
+            path.push(nextNode);
+            if (!nextNode) {
+                throw new Error("I can't find no path mofo:" + this.id + " to " + destNode.id);
+            }
+            currentNode = nextNode;
+            
+            if (hops > hopsLimit) {
+                incomplete = true;
+                break;
+            }
+            hops++;
+        }
+        return {
+            path,
+            incomplete,
+            cost: this.destinationsMap[destNode.id].travelCost,
+            hops
+        }
+    }
+
     displayNode() {
         global.utils.visual.drawText(this.type, this.pos);
 
@@ -204,7 +353,7 @@ class Node {
             //logger.log(dest.id, dest.travelCost)
             debug.push(dest.id + " > " + dest.travelCost);
         }
-        global.utils.visual.drawTextLines(debug, this.pos);
+        //global.utils.visual.drawTextLines(debug, this.pos);
     }
 
     serialize() {
@@ -342,9 +491,9 @@ class pStar {
 
 
         this.nodeTicksValid = 100;
-        this.maxNodeUpdatesPerTick = 1;
+        this.maxNodeUpdatesPerTick = 100;
         this.edgeTicksValid = 500;
-        this.maxEdgeUpdatesPerTick = 1;
+        this.maxEdgeUpdatesPerTick = 100;
     }
 
     addEdge(node1, node2) {
@@ -360,7 +509,7 @@ class pStar {
         for(let n in nodes) {
             let node = nodes[n];
             if (node.lastUpdated == false || (Game.time - node.lastUpdated) >= this.nodeTicksValid) {
-                logger.log("node",JSON.stringify(node))
+                //logger.log("node",JSON.stringify(node))
                 node.refineNode();
                 nodesRefined++;
             }
@@ -372,9 +521,6 @@ class pStar {
     }
 
     refineEdges() {
-        if (Game.time%10!=0) {
-            return;
-        }
         let edges = _.shuffle(this.edges.getAll());
         let edgesRefined = 0;
         for(let e in edges) {
@@ -472,7 +618,7 @@ class pStar {
                     return dists[e.n.id+"-"+e.o.id]
                 });
                 logger.log(JSON.stringify(edges))
-                let maxConns = 1;
+                let maxConns = 3;
                 for(let i=0;i<edges.length&&i<maxConns;i++) {
                     let o = edges[i];
                     this.addEdge(o.n, o.o);
@@ -505,6 +651,176 @@ class pStar {
         logger.log("Rooms Covered:", Object.keys(this.nodes.getGroup("pos.roomName")).length)
 
     }
+
+    /**
+     *    Pathing
+     */
+    /**
+     * 
+     * @param {Creep} creep 
+     * @param {*} goal 
+     * @param {*} opts 
+     */
+    moveTo(creep, goal, opts) {
+        
+        //creep.memory.nextNode = false;
+        if (!creep.memory.nextNode) {
+            let startNode = this.findClosestNode(creep.pos);
+            let destNode = this.findClosestNode(goal.pos);
+            //logger.log(creep.name, "starting node", startNode.id);
+            
+            //if the creep is as close or closer to the goal as the first node is, might as well walk. 
+            //logger.log(creep.pos.toWorldPosition().getRangeTo(goal.pos), (creep.pos.toWorldPosition().getRangeTo(startNode.pos) + goal.pos.toWorldPosition().getRangeTo(startNode.pos)));
+
+            let betterToWalk = false;
+            if (startNode.id == destNode.id) {
+                betterToWalk = creep.pos.toWorldPosition().getRangeTo(goal.pos) <= startNode.pos.toWorldPosition().getRangeTo(goal.pos);
+                //logger.log(creep.name, startNode.id, creep.pos.toWorldPosition().getRangeTo(goal.pos), startNode.pos.toWorldPosition().getRangeTo(goal.pos), betterToWalk);
+            }
+            
+            if (startNode && !betterToWalk) {
+                creep.memory.nextNode = startNode.id;
+                creep.memory.destNode = destNode.id;
+
+                // let nextNodeInPath = startNode.findClosestNeighborToDestination(destNode);
+                // let edge = new Edge(startNode, nextNodeInPath);
+                // edge = this.edges.getById(edge.id);
+                // creep.memory.edgeId = edge.id;
+            } else {
+                //can't find a start node, use creep.moveTo
+                creep.moveTo(goal.pos, {range: goal.range, visualizePathStyle:{}})
+                return;
+            }
+        }
+        //creep.memory.nextNode should be filled
+        /** @type {Node} */
+        let nextNode = this.getNode(creep.memory.nextNode);
+        /** @type {Node} */
+        let destNode = this.getNode(creep.memory.destNode);
+
+        if (!nextNode || !destNode) {
+            creep.say("bad path")
+            logger.log("-----------------ERROR bad next/dest node----------------");
+            logger.log(creep.memory.nextNode, creep.memory.destNode);
+                    creep.memory.nextNode = false;
+                    creep.memory.destNode = false;
+                    creep.memory.cachedPath = false;
+                    creep.memory.edgeId = false;
+            return;
+        }
+
+        logger.log(creep.name, "moving to next node", creep.memory.nextNode, creep.memory.destNode, JSON.stringify(nextNode.pos));
+        if (creep.pos.inRangeTo(nextNode, 1)) {
+            if (destNode.id == nextNode.id) { //last node in path
+                creep.memory.nextNode = false;
+                creep.memory.destNode = false;
+                creep.memory.cachedPath = false;
+                creep.memory.edgeId = false;
+                logger.log(creep.name, "at dest node", destNode.id);
+
+                return;
+            } else {
+                let nextNodeInPath = nextNode.findClosestNeighborToDestination(destNode);
+                if (!nextNodeInPath) {
+                    creep.say("no path")
+                    logger.log('---------------ERROR no path-----------------')
+                    logger.log(nextNode.id, destNode.id);
+                    creep.memory.nextNode = false;
+                    creep.memory.destNode = false;
+                    creep.memory.cachedPath = false;
+                    creep.memory.edgeId = false;
+                    return;
+                }
+                logger.log(creep.name, "reached a node", nextNode.id, ", next node in path:", nextNodeInPath.id)
+                creep.memory.nextNode = nextNodeInPath.id;
+                nextNode = nextNodeInPath;
+                //grab the creep edge
+                let edge = new Edge(nextNode, nextNodeInPath);
+                edge = this.edges.getById(edge.id);
+                creep.memory.edgeId = edge.id;
+                //logger.log("edge path", JSON.stringify(edge));
+                
+            }
+            //set nextNode to the next closest node in the network.
+            
+            
+        }
+        if (creep.memory.edgeId) {
+
+            /** @type {Edge} */
+            let edge = this.edges.getById(creep.memory.edgeId);
+            if (!edge) {
+                logger.log("--------------ERROR creeps edge doesn't exist!-------------");
+                creep.memory.nextNode = false;
+                    creep.memory.destNode = false;
+                    creep.memory.cachedPath = false;
+                    creep.memory.edgeId = false;
+                return;
+            }
+            logger.log(creep.name, "moving by edge", edge.path);
+            edge.path.moveOnPath(creep, nextNode, goal);
+            logger.log(creep.name, "moved", creep.memory.pStarPath.done)
+            // if (creep.memory.pStarPath.done) {
+            //     //this leg complete, move to next node
+            //     creep.memory.nextNode = false;
+            //         creep.memory.destNode = false;
+            //         creep.memory.cachedPath = false;
+            //         creep.memory.edgeId = false;
+            // }
+            
+        } else {
+            let ret = creep.moveTo(nextNode.pos, {range: 0, visualizePathStyle:{stroke:"#f0f"}})
+            logger.log("no cached path", ret);
+        }
+        
+    
+        
+    }
+
+    /**
+     * Find the node closest to a room position(by range), only searches in same and adjecent rooms.
+     * @param {RoomPosition} pos 
+     * @returns {Node|boolean} The closest node, or false
+     */
+    findClosestNode(pos) {
+        let closestNode = false;
+        let roomsToCheck = [pos.roomName];
+        
+        let exits = Game.map.describeExits(pos.roomName);
+        for(let dir in exits) {
+            let exitRoomName = exits[dir];
+            roomsToCheck.push(exitRoomName);
+        }
+
+        let nodes = [];
+        for (let r in roomsToCheck) {
+            let roomName = roomsToCheck[r];
+            //logger.log(roomName, JSON.stringify(this.nodes.getGroup("pos.roomName")))
+            let roomNodes = this.nodes.getGroupWithValue("pos.roomName", roomName);
+            //logger.log(JSON.stringify(roomNodes))
+            if (roomNodes) {
+                nodes = nodes.concat(roomNodes);
+            }
+        }
+        //logger.log(JSON.stringify(nodes))
+        let nodesByCost = {};
+        _.each(nodes, (nodeId) => {
+            let node = this.getNode(nodeId);
+            //logger.log(nodeId, JSON.stringify(node))
+            let totalCost = pos.toWorldPosition().getRangeTo(node.pos);
+            nodesByCost[totalCost] = node;
+        });
+        //logger.log(JSON.stringify(nodesByCost));
+        if (Object.keys(nodesByCost).length) {
+            let cheapestCost = Object.keys(nodesByCost).sort(function(a, b) {return a - b})[0];
+            logger.log("cheapest cost", cheapestCost, JSON.stringify(nodesByCost[cheapestCost]), Object.keys(nodesByCost).sort(function(a, b) {return a - b}))
+            closestNode = nodesByCost[cheapestCost];
+        }
+        return closestNode;
+    }
+
+
+
 
 
     serialize() {
@@ -539,6 +855,10 @@ class pStar {
     }
 }
 
+
+global.profiler.registerClass(Node,"Node");
+global.profiler.registerClass(Edge,"Edge");
+global.profiler.registerClass(pStar,"pStar");
 
 
 let inst = new pStar();

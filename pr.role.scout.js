@@ -53,7 +53,9 @@ class scout extends processClass {
         }
         
         //run scouts
+        
         for(let creepName in creeps) {
+            let start = Game.cpu.getUsed();
             let creep = creeps[creepName];
             
             if (creep.room.name == creep.memory.targetRoom) {
@@ -69,7 +71,18 @@ class scout extends processClass {
             }
             creep.memory.targetRoom = targetRoom;
             
-            creep.moveTo( new RoomPosition(25, 25, targetRoom), {range: 24, visualizePathStyle:{}} )
+            let roomCenter = new RoomPosition(25, 25, targetRoom);
+            let i = creepName.substr(5);
+            logger.log(creep.name, i, (i%2==0))
+            if (i%2==0) {
+                logger.log(creep.name, "using pStar")
+                global.utils.pStar.inst.moveTo(creep, {pos: roomCenter, range: 24});
+            } else {
+                creep.moveTo( roomCenter, {range: 24, visualizePathStyle:{stroke:"#f00"}} )
+            }
+            let used = Game.cpu.getUsed() - start;
+            logger.log(creep.name, "moved using", used, "cpu");
+            creep.say((i%2==0 ? "pStar" : "moveTo") + " " + used);
             
         }
     }

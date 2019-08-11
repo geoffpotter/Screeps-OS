@@ -64,6 +64,7 @@ class pStarProc extends processClass {
     }
     initThreads() {
         return [
+            this.createThread("refineNodes", "nodes"),
             this.createThread("refineEdges", "edges"),
             this.createThread("displayEdges", "edges"),
             this.createThread("pStarSave", "work")
@@ -81,9 +82,14 @@ class pStarProc extends processClass {
         //this.init();
     }
 
+    refineNodes() {
+        logger.log(this.name, "refine nodes");
+        global.utils.pStar.inst.refineNodes();
+    }
+
     refineEdges() {
         
-        logger.log(this.name, "work")
+        logger.log(this.name, "refine edges")
         global.utils.pStar.inst.refineEdges();
     }
 

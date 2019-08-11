@@ -69,6 +69,37 @@ RoomPosition.prototype.isClearSpace = function() {
     
     return isClearSpace;
 }
+RoomPosition.prototype.isBlocked = function() {
+	if (!Game.rooms[this.roomName]) {
+		return true;
+	}
+    let allTheShit = this.look();
+    let isClearSpace = false;
+    //logger.log('---')
+    for(let i in allTheShit) {
+        let shit = allTheShit[i];
+        //logger.log("the shit:", shit.type, shit.terrain);
+        
+        if (shit.type == "terrain" && shit.terrain == "wall") {
+            isClearSpace = shit;
+        }
+        if (shit.type == "structure" && ["rampart", "container"].indexOf(shit.structure.structureType) == -1 ) {
+            isClearSpace = shit;
+        }
+        if (shit.type == "source") {
+            isClearSpace = shit;
+		}
+		if (shit.type == "creep") {
+			isClearSpace = shit;
+		}
+        if (isClearSpace !== false) {
+            break;
+        }
+        //logger.log(isClearSpace, "the shit:", shit.type, shit.terrain);
+    }
+    
+    return isClearSpace;
+}
 
 
 
@@ -164,6 +195,9 @@ class WorldPosition
 	}
 	
 	inRangeTo(point, range) {
+		if (point instanceof RoomPosition) {
+			point = point.toWorldPosition();
+		}
 		return this.inRangeToXY(point.x, point.y, range);
 	}
 	

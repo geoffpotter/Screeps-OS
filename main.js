@@ -45,23 +45,23 @@ kernel.startProcess(initProc);
 //profiler.registerClass(kernel.__proto__, "kernel");
 profiler.registerClass(kernelClass, 'kernel');
 
-//profiler.enable();
+profiler.enable();
 
+// let mainLoop = function () {
+// 	logger.log("----------------------- tick start -------------------------------------", Game.cpu.getUsed());
+// 	kernel.run();
+// 	logger.log("creep count:", Object.keys(Game.creeps).length)
+// 	logger.log("----------------------- tick end -------------------------------------", Game.cpu.getUsed());
+    
+// };
 let mainLoop = function () {
-	logger.log("----------------------- tick start -------------------------------------", Game.cpu.getUsed());
+    profiler.wrap(function() {
+    logger.log("----------------------- tick start -------------------------------------", Game.cpu.getUsed());
 	kernel.run();
 	logger.log("creep count:", Object.keys(Game.creeps).length)
 	logger.log("----------------------- tick end -------------------------------------", Game.cpu.getUsed());
-    
+    });
 };
-// let mainLoop2 = function () {
-//     profiler.wrap(function() {
-//         logger.log("----------------------- tick start -------------------------------------");
-//         kernel.run();
-//         logger.log("total cpu used:", Game.cpu.getUsed())
-//         logger.log("----------------------- tick end -------------------------------------");
-//     });
-// };
 if (Object.keys(Game.rooms)[0] !="sim") {
     //mainLoop = wrapLoop(mainLoop);
 }
