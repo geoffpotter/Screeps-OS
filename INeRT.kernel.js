@@ -347,6 +347,8 @@ class kernel {
             Memory.INeRT = this.getBlankMemory();
         }
         this.memory = Memory.INeRT;
+
+        Memory;
     }
     
     commitMemory() {

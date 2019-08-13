@@ -1,6 +1,9 @@
 var logger = require("screeps.logger");
 logger = new logger("main");
 
+// logger.log(Game.cpu.bucket);
+// return;
+
 //_.each(Game.creeps, (c) => c.suicide());
 // _.each(Game.creeps, (c) => c.memory.task = false)
 //return;
@@ -24,7 +27,7 @@ global.utils.map = require("util.map");
 global.utils.pStar = require("util.pStar")
 
 
-profiler.registerObject(global.utils, "utils")
+//profiler.registerObject(global.utils, "utils")
 // logger.log(JSON.stringify(global.creepClasses));
 // return;
 
@@ -58,7 +61,9 @@ let mainLoop = function () {
     profiler.wrap(function() {
     logger.log("----------------------- tick start -------------------------------------", Game.cpu.getUsed());
 	kernel.run();
-	logger.log("creep count:", Object.keys(Game.creeps).length)
+	logger.log("creep count:", Object.keys(Game.creeps).length);
+	let heap = Game.cpu.getHeapStatistics();
+	logger.log(JSON.stringify(heap))
 	logger.log("----------------------- tick end -------------------------------------", Game.cpu.getUsed());
     });
 };

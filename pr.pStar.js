@@ -9,7 +9,7 @@
 
 var logger = require("screeps.logger");
 logger = new logger("pr.pStar");
-logger.color = COLOR_PURPLE;
+logger.color = COLOR_ORANGE;
 
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
@@ -22,19 +22,18 @@ class nodeProc extends processClass {
         this.node = this.pStar.getNodeById(this.data.nodeId);
     }
 
-    initThreads() {
+    initThreads() {logger.log("node proc init")
         let updateThread = this.createThread("updateNode", "nodes");
-        updateThread.suspend = 0 + Math.floor(Math.random() * 10);
+        //updateThread.suspend = 0 + Math.floor(Math.random() * 10);
         return [
             updateThread,
-            this.createThread("displayNode", "nodes")
+            this.createThread("displayNode", "work")
         ];
     }
 
     updateNode() {
-        //not totaly sure what this will do.. oh fuck, update a* routing!
         //logger.log("updating node", this.data.nodeId);
-        
+        this.node.refineNode();
         return;
     }
 
@@ -53,21 +52,35 @@ class pStarProc extends processClass {
     init() {
         //deserialize
         // if (Game.time % 10 == 0)
-            Memory.pStarCache = "";
+            //Memory.pStarCache = "";
         if (Memory.pStarCache) {
             let start = Game.cpu.getUsed();
             global.utils.pStar.inst = global.utils.pStar.class.deserialize(Memory.pStarCache);
             let used = Game.cpu.getUsed() - start;
             logger.log("pStar deserialize.  CPU:", used, "Size:", Memory.pStarCache.length);
             logger.log("wtf",JSON.stringify(global.utils.pStar.inst));
+
+            //start a proc for each node
+            let allNodes = global.utils.pStar.inst.nodes.getAll();
+            logger.log("starting node procs")
+            for(let n in allNodes) {
+                let node = allNodes[n];
+                let nodeProcessName = "node-" + node.id;
+                if (!this.kernel.getProcess(nodeProcessName)) {
+                    logger.log("starting proc", nodeProcessName)
+                    let proc = new nodeProc(nodeProcessName, {nodeId: node.id});
+                    this.kernel.startProcess(proc);
+                }
+            }
+            //global.no()
         }
     }
     initThreads() {
         return [
-            this.createThread("refineNodes", "nodes"),
+            //this.createThread("refineNodes", "nodes"),
             this.createThread("refineEdges", "edges"),
-            this.createThread("displayEdges", "edges"),
-            this.createThread("pStarSave", "work")
+            //this.createThread("displayEdges", "work"),
+            this.createThread("pStarSave", "pathing")
         ];
     }
 
@@ -78,7 +91,8 @@ class pStarProc extends processClass {
         let used = Game.cpu.getUsed() - start;
         logger.log("pStar serialize.  CPU:", used, "Size:", Memory.pStarCache.length)
         //logger.log(Memory.pStarCache)
-
+        //sleep after saving.  
+        return 10;
         //this.init();
     }
 

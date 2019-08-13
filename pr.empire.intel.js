@@ -100,7 +100,7 @@ class intelProc extends processClass {
 
     updateSources(intel, roomName, room) {
         //stash info about the sources in the room
-        if (room ) { // && !intel.sources || (!intel.sourcesSeen && room)) {
+        if (room && (!intel.sources || (!intel.sourcesSeen && room) || (Game.time - intel.sourcesSeen) > 1000) ) {
             logger.log("loading sources");
             //if we have a room, load the sources. 
             let sources = room.find(FIND_SOURCES);
@@ -112,6 +112,7 @@ class intelProc extends processClass {
 
                 // //add sources to pStar 
                 let pos = source.pos.getSurroundingClearSpaces()[0];
+                logger.log("adding source", pos, source, source.pos, source.room, source.pos.getSurroundingClearSpaces())
                 let node = new Node(pos, Node.STATIC_RESOURCE);
                 logger.log("struct", this.pStar.hasNode(node), node.id)
                 if (!this.pStar.hasNode(node)) {
@@ -125,7 +126,7 @@ class intelProc extends processClass {
                 sourceData.push(data);
             }
             intel.sources = sourceData;
-            intel.sourcesSeen = true;
+            intel.sourcesSeen = Game.time;
         
         } else if(!intel.sourcesSeen && !intel.flagsUsed) {
             //never had visiblity, check for flags

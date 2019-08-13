@@ -29,7 +29,8 @@ RoomPosition.prototype.getSurroundingSpaces = function() {
 }
 RoomPosition.prototype.getSurroundingClearSpaces = function() {
     let spots = this.getSurroundingSpaces();
-    let clearSpots = [];
+	let clearSpots = [];
+	//logger.log('getClearSpots', this)
     for(let s in spots) {
         let spot = spots[s];
         if (spot.isClearSpace()) {
@@ -47,15 +48,16 @@ RoomPosition.prototype.isClearSpace = function() {
 	}
     let allTheShit = this.look();
     let isClearSpace = true;
-    //logger.log('---')
+	//logger.log('---', this);
+	let shit = false;
     for(let i in allTheShit) {
-        let shit = allTheShit[i];
+        shit = allTheShit[i];
         //logger.log("the shit:", shit.type, shit.terrain);
         
         if (shit.type == "terrain" && shit.terrain == "wall") {
             isClearSpace = false;
         }
-        if (shit.type == "structure" && ["rampart", "container"].indexOf(shit.structure.structureType) == -1 ) {
+        if (shit.type == "structure" && ["rampart", "container", "road"].indexOf(shit.structure.structureType) == -1 ) {
             isClearSpace = false;
         }
         if (shit.type == "source") {
@@ -64,9 +66,9 @@ RoomPosition.prototype.isClearSpace = function() {
         if (isClearSpace === false) {
             break;
         }
-        //logger.log(isClearSpace, "the shit:", shit.type, shit.terrain);
+        
     }
-    
+    //logger.log(isClearSpace ? "clear" : "not clear", "the shit:", shit.type, JSON.stringify(shit));
     return isClearSpace;
 }
 RoomPosition.prototype.isBlocked = function() {

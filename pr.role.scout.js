@@ -9,7 +9,7 @@
 
 var logger = require("screeps.logger");
 logger = new logger("pr.role.scout");
-
+//logger.enabled = false;
 
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
@@ -36,10 +36,10 @@ class scout extends processClass {
         
         let spawn = Game.spawns['Spawn1'];
         let creeps = Game.creeps;
-        let numScouts = 10;
-        //logger.log(creeps, numScouts)
+        let numScouts = 100;
+        logger.log("spawnin", Object.keys(creeps).length, numScouts)
         if (Object.keys(creeps).length < numScouts) {
-            //logger.log("not enough scouts", spawn.spawning, spawn.room.energyAvailable)
+            logger.log("not enough scouts", spawn.spawning, spawn.room.energyAvailable)
             if (!spawn.spawning && spawn.room.energyAvailable >= 50) {
                 logger.log("spawnin scout")
                 let i = 0;
@@ -58,31 +58,38 @@ class scout extends processClass {
             let start = Game.cpu.getUsed();
             let creep = creeps[creepName];
             
-            if (creep.room.name == creep.memory.targetRoom) {
+            if (creep.room.name == creep.memory.targetRoom && (new RoomPosition(25, 25, creep.memory.targetRoom)).getRangeTo(creep.pos) < 23) {
                 creep.memory.targetRoom = false;
             }
             
             let targetRoom = creep.memory.targetRoom;
             if (!targetRoom) {
-                let exits = Game.map.describeExits(creep.room.name);
+                // if (creep.pos.roomName == "W19N2") {
+                //     targetRoom = "W19N3";
+                // } else {
+                //     targetRoom = "W19N2";
+                // }
+                let homeRoom = Game.rooms["E3S3"];
+                let exits = Game.map.describeExits(homeRoom ? homeRoom.name : creep.room.name);
                 let randomExit = _.sample(exits);
-                logger.log(creep, exits, randomExit);
+                //logger.log(creep, exits, randomExit);
                 targetRoom = randomExit;
             }
             creep.memory.targetRoom = targetRoom;
             
             let roomCenter = new RoomPosition(25, 25, targetRoom);
             let i = creepName.substr(5);
-            logger.log(creep.name, i, (i%2==0))
-            if (i%2==0) {
-                logger.log(creep.name, "using pStar")
-                global.utils.pStar.inst.moveTo(creep, {pos: roomCenter, range: 24});
-            } else {
-                creep.moveTo( roomCenter, {range: 24, visualizePathStyle:{stroke:"#f00"}} )
-            }
+            let ret;
+            //logger.log(creep.name, i, (i%2==0))
+
+                //logger.log(creep.name, "using pStar")
+            ret = global.utils.pStar.inst.moveTo(creep, {pos: roomCenter, range: 20});
+
             let used = Game.cpu.getUsed() - start;
-            logger.log(creep.name, "moved using", used, "cpu");
-            creep.say((i%2==0 ? "pStar" : "moveTo") + " " + used);
+            //logger.log(JSON.stringify(ret))
+            logger.log(creep.name, "moved using", used, "cpu", (!ret || ret.walking) ? "moveTo" : "pStar");
+            //logger.log(creep.name, "moved using", used, "cpu", i%2==0 ? "pstar" : "moveTo");
+            //creep.say((i%2==0 ? "pStar" : "moveTo") + " " + used);
             
         }
     }
