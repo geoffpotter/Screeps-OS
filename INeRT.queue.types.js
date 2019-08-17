@@ -108,6 +108,9 @@ class INeRTQueues {
             case 0:
             case 1:
             case 2:
+                    this.getQueue("nodes").cpuLimit = Game.cpu.limit * 0.05;
+                    this.getQueue("edges").cpuLimit = Game.cpu.limit * 0.05;
+
                     this.getQueue("taskUpdate").runEveryX = 10;
                     //this.getQueue("creepAct").runEveryX = 3;
                     this.getQueue("creepAct").cpuLimit = Game.cpu.limit * 0.1;
@@ -115,7 +118,7 @@ class INeRTQueues {
             case 3:
             case 4:
             case 5:
-                    this.getQueue("nodes").cpuLimit = Game.cpu.limit * 0.2;
+                    this.getQueue("nodes").cpuLimit = Game.cpu.limit * 0.1;
                     this.getQueue("edges").cpuLimit = Game.cpu.limit * 0.2;
 
                     this.getQueue("taskUpdate").runEveryX = 5;
@@ -125,7 +128,7 @@ class INeRTQueues {
             case 6:
             case 7:
             case 8:
-                    this.getQueue("nodes").cpuLimit = Game.cpu.limit * 0.4;
+                    this.getQueue("nodes").cpuLimit = Game.cpu.limit * 0.3;
                     this.getQueue("edges").cpuLimit = Game.cpu.limit * 0.4;
 
                     this.getQueue("taskUpdate").runEveryX = 2;

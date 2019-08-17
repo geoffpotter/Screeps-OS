@@ -9,7 +9,7 @@
 
 var logger = require("screeps.logger");
 logger = new logger("pr.role.scout");
-//logger.enabled = false;
+logger.enabled = false;
 
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
@@ -60,18 +60,17 @@ class scout extends processClass {
             
             if (creep.room.name == creep.memory.targetRoom && (new RoomPosition(25, 25, creep.memory.targetRoom)).getRangeTo(creep.pos) < 23) {
                 creep.memory.targetRoom = false;
-            }
+            } 
             
             let targetRoom = creep.memory.targetRoom;
             if (!targetRoom) {
-                // if (creep.pos.roomName == "W19N2") {
-                //     targetRoom = "W19N3";
-                // } else {
-                //     targetRoom = "W19N2";
-                // }
-                let homeRoom = Game.rooms["E3S3"];
+
+                let homeRoom = Game.rooms["E3N13"];
                 let exits = Game.map.describeExits(homeRoom ? homeRoom.name : creep.room.name);
                 let randomExit = _.sample(exits);
+                if (randomExit == creep.room.name) {
+                    randomExit = homeRoom.name
+                }
                 //logger.log(creep, exits, randomExit);
                 targetRoom = randomExit;
             }
@@ -87,7 +86,7 @@ class scout extends processClass {
 
             let used = Game.cpu.getUsed() - start;
             //logger.log(JSON.stringify(ret))
-            logger.log(creep.name, "moved using", used, "cpu", (!ret || ret.walking) ? "moveTo" : "pStar");
+            logger.log(creep.name, "moved using", used, "cpu", ret.method);
             //logger.log(creep.name, "moved using", used, "cpu", i%2==0 ? "pstar" : "moveTo");
             //creep.say((i%2==0 ? "pStar" : "moveTo") + " " + used);
             

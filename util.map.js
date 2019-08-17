@@ -13,8 +13,8 @@ logger = new logger("util.map");
 class CachedPath {
     /**
      * 
-     * @param {RoomPosition|RoomObject} orgin 
-     * @param {RoomPosition|RoomObject} goal 
+     * @param {RoomPosition} orgin 
+     * @param {RoomPosition} goal 
      * @param {Object} opts 
      */
     constructor(orgin, goal, opts={}) {
@@ -23,13 +23,6 @@ class CachedPath {
         this.orgin = orgin;
         this.goal = goal;
         this.opts = opts;
-
-        if (this.orgin.pos) {
-            this.orgin = this.orgin.pos;
-        }
-        if (this.goal.pos) {
-            this.goal = this.goal.pos;
-        }
 
         //validate orgin
         if (!this.orgin || !(this.orgin.x >= 0) || !(this.orgin.y >= 0) || !this.orgin.roomName) {
@@ -62,9 +55,9 @@ class CachedPath {
         /*
         control vars
         */
-       this.pathCost = false;
-       this._cachedPath = false;
-       this._cachedDist = false;
+       this.pathCost = 99;
+       this._cachedPath = 0;
+       this._cachedDist = 99;
     }
 
     get id() {
@@ -84,6 +77,19 @@ class CachedPath {
         }
     }
 
+    /**
+     * given either origin or goal, return the other
+     * @param {RoomPosition} pos 
+     */
+    getOtherPos(pos) {
+        if (this.orgin.isEqualTo(pos)) {
+            return this.orgin;
+        } else if (this.goal.isEqualTo(pos)) {
+            return this.goal;
+        } else {
+            return false;
+        }
+    }
 
 
     getPath() {
@@ -163,9 +169,13 @@ class CachedPath {
      * @returns {boolean} true if we've reached the destination, false if we're still moving.
      */
     moveOnPath(creep, destNode, goal) {
+
+        let destTolarance = 2;
+
         //creep.memory._cachedPath = false;
         let pathInfo = creep.memory._cachedPath || {
             stuck: 0,
+            s: false,//starting position, if this is set, moveTo this pos until closeToPath
             lp: creep.pos,
             lpp: creep.pos,
             done: false,
@@ -188,11 +198,34 @@ class CachedPath {
             };
         }
         
-        if (creep.pos.isEqualTo(destNode.pos)) { //creep is already there, do nothing;
+        if (creep.pos.isEqualTo(pathInfo.lp)) {
+            pathInfo.stuck++;
+        } else {
+            pathInfo.stuck = 0;
+        }
+
+        if (creep.pos.inRangeTo(destNode.pos, destTolarance)) { //creep is already there, do nothing;
             pathInfo.done = true;
             creep.memory._cachedPath = pathInfo;
             logger.log(creep.name, "already at destination.  be smarter.")
             return pathInfo;
+        }
+
+        //if we have a start pos(.s) set, then just move there and return;
+        if (pathInfo.s) {
+            let pos = new RoomPosition(pathInfo.s.x, pathInfo.s.y, pathInfo.s.roomName);
+            if (creep.pos.inRangeTo(pos, destTolarance)) {
+                pathInfo.s = false; // continue on path, should be in range now
+            } else {
+                let ret = creep.moveTo(pos, {range: destTolarance, visualizePathStyle:{stroke:"#f0f"}})
+                logger.log(creep.name, "moving to path", pos, ret);
+                if (ret == ERR_NO_PATH) {
+                    pathInfo.done = true;
+                }
+                creep.memory._cachedPath = pathInfo;
+                return pathInfo;
+            }
+            
         }
         
         //logger.log(creep.name, "moving to", destNode.id);
@@ -204,31 +237,35 @@ class CachedPath {
             //logger.log("reversing path", destNode.pos, this.orgin, this.goal)
            path = path.reverse();
         }
+        let closestPos = path[0];
+        let closestDist = 10000;
         for(let i in path) {
             let pos = path[i];
             let i2 = 1 + Number.parseInt(i);
-            
-            if (i2 > path.length) {
+            let posDist = creep.pos.toWorldPosition().getRangeTo(pos);
+
+            if (i2 >= path.length) { //out of positions, move towards closest one
+                //before we break, check if the last pos is the closest, this will matter on short interroom paths
+                if (posDist < closestDist) {
+                    closestPos = pos;
+                    closestDist = posDist;
+                }
                 break;
             }
             let nextPos = path[i2];//i is a string, cuz js
-            
-            if (!nextPos) {
-                if (creep.pos.inRangeTo(pos, 1)) {
-                    logger.log(creep.name, "at end of path")
-                }
-                //we're out of positions.. 
-                pathInfo.done = true;
-                //creep.memory._cachedPath = pathInfo;
-                break;
-            }
 
+            
+            //keep track of closest pos
+            if (posDist < closestDist) {
+                closestPos = pos;
+                closestDist = posDist;
+            }
             //if we're in range to the node, and this node is closer than the next, consider ourseleves here on the path.
             //logger.log(creep.pos.toWorldPosition().inRangeTo(pos, 1), creep.pos.toWorldPosition().getRangeTo(pos), creep.pos.toWorldPosition().getRangeTo(nextPos))
-            //logger.log(creep.pos, pos, nextPos);
+            //logger.log(creep, pos, nextPos);
             let onPath = creep.pos.isEqualTo(pos);//exactly this creeps pos
-            let closeToPath = (creep.pos.toWorldPosition().inRangeTo(pos, 1) //creep is in range
-                                  && creep.pos.toWorldPosition().getRangeTo(pos) <= creep.pos.toWorldPosition().getRangeTo(nextPos)); //next node isn't closer
+            let closeToPath = (posDist <= destTolarance //creep is in range
+                                  && posDist <= creep.pos.toWorldPosition().getRangeTo(nextPos)); //next node isn't closer
             
             // if (creep.name == "scout0") {
             //     logger.log(creep.pos, pos, nextPos)
@@ -253,7 +290,7 @@ class CachedPath {
 
                 let startPosToUse = pos; //use the matching pos from the path to get the direction, IE: follow the path dir, don't move to next path pos.
                 if (pathInfo.stuck > 2) {
-                    nextPosToUse = creep.pos; //use the creeps pos if we're stuck, ie: move onto the path
+                    startPosToUse = creep.pos; //use the creeps pos if we're stuck, ie: move onto the path
                 }
                 //store the pos we're moving to.
                 pathInfo.lpp = nextPos;
@@ -350,8 +387,8 @@ class CachedPath {
         }
         //logger.log("creep moved", JSON.stringify(pathInfo))
         if (!pathInfo.onPath && !pathInfo.closeToPath){
-            pathInfo.done = true;
-            
+            //pathInfo.done = true;
+            pathInfo.s = closestPos;
             logger.log(creep.name, "not on path!", JSON.stringify(pathInfo))
         }
         creep.memory._cachedPath = pathInfo;
@@ -363,26 +400,28 @@ class CachedPath {
         //logger.log(JSON.stringify(this.path))
         this._cachedPath = global.utils.map.pathToDirStr(this.path);
         //logger.log(this.orgin, JSON.stringify(global.utils.map.dirStrToPath(this.orgin, this._cachedPath)));
-        let obj = {
-            o: this.orgin.toWorldPosition().serialize(),
-            g: this.goal.toWorldPosition().serialize(),
-            opt: this.opts,
-            p: this._cachedPath,
-            pc: this.pathCost,
-            cd: this._cachedDist
-        }
 
-        let jsonStr = JSON.stringify(obj);
-        return jsonStr;
+        let arr = [
+            this.orgin.toWorldPosition().serialize(),
+            this.goal.toWorldPosition().serialize(),
+            JSON.stringify(this.opts),
+            this._cachedPath,
+            this.pathCost,
+            this._cachedDist
+        ]
+        return arr.join("☻");
     }
     static deserialize(str) {
-        let obj = JSON.parse(str);
-        let orgin = global.WorldPosition.deserialize(obj.o).toRoomPosition();
-        let goal = global.WorldPosition.deserialize(obj.g).toRoomPosition();
-        let inst = new CachedPath(orgin, goal, obj.opt);
-        inst._cachedPath = obj.p;
-        inst.pathCost = obj.pc;
-        inst._cachedDist = obj.cd;
+        //return false;
+        let [originStr, goalStr, optsJson, cachedPath, pathCost, cachedDist] = str.split("☻");
+        
+        logger.log("path:", originStr, goalStr, optsJson, cachedPath, pathCost, cachedDist)
+        let orgin = global.WorldPosition.deserialize(originStr).toRoomPosition();
+        let goal = global.WorldPosition.deserialize(goalStr).toRoomPosition();
+        let inst = new CachedPath(orgin, goal, JSON.parse(optsJson));
+        inst._cachedPath = cachedPath;
+        inst.pathCost = pathCost;
+        inst._cachedDist = cachedDist;
         //inst.getPath();
         return inst;
     }

@@ -71,7 +71,11 @@ class Node {
 
 
     get id() {
-        return `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`;
+        if (!this._id) {
+            this._id = this.pos.toWorldPosition().serialize();
+            //this._id = `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`;
+        }
+        return this._id;
     }
     constructor(pos, type, overRide = false) {
         if (overRide) {
@@ -106,7 +110,7 @@ class Node {
         }
 
         let d = this._destMap;
-        this._destMap = false;
+        //this._destMap = false;
         
         return d;
     }
@@ -221,6 +225,8 @@ class Node {
      * @param {DestinationInfo} destInfo 
      */
     addDestination(destInfo) {
+        //invalidate cached destmap
+        this._destMap = false;
         let pStar = global.utils.pStar.inst;
         let betterPath = false;
         if (pStar.distances.has(destInfo)) {
@@ -421,7 +427,7 @@ class Edge {
 
         this.path = new global.utils.map.CachedPath(this.node1Pos, this.node2Pos);
         this.cost = this.node1Pos.toWorldPosition().getRangeTo(this.node2Pos);
-        this.lastUpdated = false;
+        this.lastUpdated = 0;
     }
 
     refineEdge() {
@@ -490,16 +496,16 @@ class Edge {
         //we'll assume these will be valid for now
         let node1 = global.utils.pStar.inst.getNode(n1Id);
         let node2 = global.utils.pStar.inst.getNode(n2Id);
-        logger.log(n1Id, node1);
-        logger.log(n2Id, node2);
+        //logger.log(n1Id, node1);
+        //logger.log(n2Id, node2);
         let inst = new Edge(node1, node2);
         inst.cost = cost;
         inst.lastUpdated = lastUpdated;
         if (cachedPath) {
-            logger.log("----",cachedPath)
+            //logger.log("----",cachedPath)
             inst.path = global.utils.map.CachedPath.deserialize(cachedPath);
-            inst.path.getPath();
-            logger.log(JSON.stringify(inst.path))
+            //inst.path.getPath();
+            //logger.log(JSON.stringify(inst.path))
         }
         return inst;
     }
@@ -688,38 +694,235 @@ class pStar {
     findPath(startPos, destinationPos) {
         let startNode = this.findClosestNode(startPos);
         let endNode = this.findClosestNode(destinationPos);
+        if (!startNode || !endNode) {
+            return false;
+        }
         let nodePath = startNode.findNodePathTo(endNode);
         return nodePath;
     }
 
-    moveTo_new(creep, goal) {
+    serializeFindPath(path) {
+        //path is an array of nodes
+        let ids = [];
+        for (let n in path) {
+            let node = path[n];
+            ids.push(node.id);
+        }
+        return ids.join("|");
+    }
+    deserializeFindPath(str) {
+        let ids = str.split("|");
+        let path = [];
+        for (let i in ids) {
+            let id = ids[i];
+            let node = this.getNode(id);
+            path.push(node);
+        }
+        return path;
+    }
+    /**
+     * takes in a node path and returns an object with the next edge and remaining path
+     * @param {[Node]} path 
+     */
+    getNextEdge(path) {
+        if (path.length < 2) {
+            throw new Error("Calling next edge on finished path")
+        }
+        /** @var {Node} */
+        let currentNode = path[0];
+        /** @var {Node} */
+        let nextNode = path[1];
+        let edge = new Edge(currentNode, nextNode);
+        edge = this.edges.getById(edge.id);
+        path.shift();//remove first element
+        return {
+            edge: edge,
+            path: path
+        }
+    }
+
+
+    moveTo(creep, goal) {
+
+        let moveToColor = "#f00";
+        let pStarColor = "#00f";
+        let pStarColorOnPath = "#0f0";
+        let atNodeTolerance = creep.pos.isEdge() ? 0 : 2;
+
+        //creep.memory.pStarPath = false;
         let pathInfo = creep.memory.pStarPath || {
             path: false,
+            pathStage: false, // 0 = walking to first node, 1 = traveling through node network, 2 = walking to destination node
+            edgeId: false,
             method: "",
             done: false,
             goal: goal.pos,
-            stuck: 0,
         }
         //check for goal change
         if (!goal.pos.isEqualTo(new RoomPosition(pathInfo.goal.x, pathInfo.goal.y, pathInfo.goal.roomName))) {
             logger.log(creep.name, "goal changed", goal.pos, JSON.stringify(pathInfo.goal), goal.pos.isEqualTo(pathInfo.goal))
             creep.memory.pStarPath = {
+                path: false,
+                pathStage: false, // 0 = walking to first node, 1 = traveling through node network, 2 = walking to destination node
+                edgeId: false,
+                method: "",
                 done: false,
                 goal: goal.pos,
-                stuck: 0,
             };
             pathInfo = creep.memory.pStarPath
-            logger.log(pathInfo.nextNode)
+            logger.log(pathInfo.nextNode);
         }
 
-        
-        let path = this.findPath(creep.pos, goal.pos);
-        logger.log(creep.name, "path", JSON.stringify(path));
+        let path = false;
+        //logger.log(creep.name, "initial move method", pathInfo.method)
+        //initial state.  search for path
+        if (pathInfo.method == "") {
+            let path = this.findPath(creep.pos, goal.pos);
+            logger.log(creep.name, "path", JSON.stringify(path));
+            if (path && !path.incomplete) {
+                pathInfo.method = "pStar";
+                pathInfo.path = this.serializeFindPath(path.path);
+                pathInfo.pathStage = 0; //walk to first node
+                path = path.path;
+            } else {
+                logger.log(creep.name, "incomplete node path!")
+                pathInfo.method = "moveTo";
+                //global.no();
+            }
+        }
 
+        //if we're using pStar and the path hasn't been loaded from original pathfinding
+        if (pathInfo.method == "pStar" && path === false) {
+            path = this.deserializeFindPath(pathInfo.path);
+        }
+
+
+
+
+
+        switch(pathInfo.method) {
+            case "pStar":
+                //extract current and nextnodes
+                let edge = pathInfo.edgeId ? this.edges.getById(pathInfo.edgeId) : false;
+            
+                if (path.length < 2) {
+                    logger.log(creep.name, "ran out of path and didn't notice!", JSON.stringify(path));
+                    //we're dumb, just walk
+                    pathInfo.method = "moveTo"
+                }
+
+                let getNextEdge = () => {
+                    let nextEdgeInfo = this.getNextEdge(path);
+                    //logger.log("next edge", nextEdgeInfo.edge.id, JSON.stringify(nextEdgeInfo.path))
+                    edge = nextEdgeInfo.edge;
+                    pathInfo.path = this.serializeFindPath(nextEdgeInfo.path);
+                    pathInfo.edgeId = edge.id;
+                    path = nextEdgeInfo.path;
+                };
+                //logger.log("why no edge?", edge, JSON.stringify(path));
+                if (!edge && path.length >= 2) { //get edge from path
+                    getNextEdge();
+                    //global.no();
+                }
+
+                if (!edge) {
+                    logger.log(edge, path, JSON.stringify(pathInfo))
+                    logger.log(creep.name, "HAS NO EDGE TO FOLLOW!!! ------------- ERRRRRRRRRRRRROOOORRRRRRR");
+                    throw new Error("no edge defined!");
+                }
+
+                //  ------------  preform the actual move ---------------------
+                if (pathInfo.pathStage == 0) {//-----------------------------get in range of first node
+                    //try walking on edge
+                    let nextNode = path[0];
+                    
+                    let ret = edge.path.moveOnPath(creep, nextNode, goal);
+                    //logger.log(creep.name, "moving on first edge", edge.id, JSON.stringify(ret));
+                    if (ret.done) {
+                        //move to next stage
+                        pathInfo.pathStage = 1;
+                    }
+                    // let secondNode = path[0];
+                    // let firstNode = 
+                    // logger.log(path);
+                    // if (creep.pos.inRangeTo(firstNode.pos, atNodeTolerance)) {
+                    //     pathInfo.pathStage = 1; //at first node, move to next stage
+                    // } else {
+                    //     let ret = creep.moveTo(firstNode.pos, {range: atNodeTolerance, visualizePathStyle:{stroke:pStarColor}});
+                    //     logger.log(creep.name, "moving to first node", firstNode.id, ret);
+                    // }
+                }
+                
+                if (pathInfo.pathStage == 1) { //--------------------follow node network path
+                    
+                    /** @type {Node} */
+                    let nextNode = path[0];
+
+                    if (creep.pos.inRangeTo(nextNode.pos, atNodeTolerance)) {
+                        //at next node, go to next leg or skip to next stage
+                        if (path.length <= 2) { //at the end of the node path, go to next stage
+                            //leave existing path in memory so we can stil load the nodes
+                            //global.no();
+                            pathInfo.pathStage = 2;
+                        } else {
+                            //at next leg, get next edge and update pathinfo's path as well
+                            getNextEdge();
+
+                            //also reload currentNode and nextNode
+                            nextNode = path[0];
+                        }
+                    }
+
+                    //if we're still on pathStage == 1, then actually do the move
+                    if (pathInfo.pathStage == 1) {
+                        //logger.log(creep.name, "moving to", nextNode.id, JSON.stringify(goal))
+                        let ret = edge.path.moveOnPath(creep, nextNode, goal);
+                        //display edge when walkin on it
+                        edge.displayEdge(pStarColorOnPath);
+                        if (ret.done) {
+                            if (path.length <= 2) {
+                                //global.no();
+                                pathInfo.pathStage = 2;
+                            } else {
+                                //this edge is done
+                                getNextEdge();
+                            }
+                            
+                        }
+                        //logger.log(creep.name, "moving on edge", edge.id, ret)
+                    }
+                }
+                
+                if (pathInfo.pathStage == 2) {//------------------------go to goal
+                    //global.no();
+                    if (creep.pos.inRangeTo(goal.pos, goal.range)) {
+                        pathInfo.done = true;
+                        //logger.log(creep.name, "at goal", goal.pos);
+                    } else {
+                        let ret = creep.moveTo(goal.pos, {range: goal.range, visualizePathStyle:{stroke:pStarColor}});
+                        //logger.log(creep.name, "moving to goal", goal.pos, ret);
+                    }
+                    
+                }
+
+
+
+                
+                break;
+            case "moveTo":
+                    let ret = creep.moveTo(goal.pos, {range: goal.range, visualizePathStyle:{stroke:moveToColor}});
+                break;
+            default:
+                logger.log(creep, goal, JSON.stringify(pathInfo))
+                throw new Error("invalid movement method");
+                break;
+        }
+        creep.memory.pStarPath = pathInfo;
+        return pathInfo;
     }
 
 
-    moveTo(creep, goal, opts) {
+    moveTo_old(creep, goal, opts) {
         // let path = this.findPath(creep.pos, goal.pos);
         // logger.log(creep.name, "path", JSON.stringify(path));
         // creep.moveTo(goal.pos, {range:goal.range});
@@ -966,7 +1169,9 @@ class pStar {
                 }
             }
         }
-        global.utils.visual.circle(cheapestNode.pos, "#0f0", 1, 1)
+        if (cheapestNode) {
+            global.utils.visual.circle(cheapestNode.pos, "#0f0", 1, 1)
+        }
         //log("got node")
         return cheapestNode;
     }
@@ -1019,9 +1224,9 @@ class pStar {
 }
 
 
-global.profiler.registerClass(Node,"Node");
-global.profiler.registerClass(Edge,"Edge");
-global.profiler.registerClass(pStar,"pStar");
+// global.profiler.registerClass(Node,"Node");
+// global.profiler.registerClass(Edge,"Edge");
+// global.profiler.registerClass(pStar,"pStar");
 
 
 let inst = new pStar();

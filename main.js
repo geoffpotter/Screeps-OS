@@ -1,3 +1,11 @@
+
+// let memory = Memory;
+// global.Memory = memory;
+
+// delete global.Memory;
+// 	Memory = memory;
+// 	global.Memory = memory;
+
 var logger = require("screeps.logger");
 logger = new logger("main");
 
@@ -27,12 +35,13 @@ global.utils.map = require("util.map");
 global.utils.pStar = require("util.pStar")
 
 
-//profiler.registerObject(global.utils, "utils")
+profiler.registerObject(global.utils, "utils")
 // logger.log(JSON.stringify(global.creepClasses));
 // return;
 
 
 let kernelClass = require("INeRT.kernel");
+profiler.registerClass(kernelClass, 'kernel');
 let kernel = new kernelClass();
 
 logger.log("---------main reboot---------")
@@ -46,7 +55,7 @@ kernel.startProcess(initProc);
 // let testProc = new testProcClass("testin");
 // kernel.startProcess(testProc);
 //profiler.registerClass(kernel.__proto__, "kernel");
-profiler.registerClass(kernelClass, 'kernel');
+
 
 profiler.enable();
 
@@ -59,22 +68,32 @@ profiler.enable();
 // };
 let mainLoop = function () {
     profiler.wrap(function() {
+		// delete global.Memory;
+		// Memory = memory;
+		// global.Memory = memory;
+
     logger.log("----------------------- tick start -------------------------------------", Game.cpu.getUsed());
+	
+
 	kernel.run();
 	logger.log("creep count:", Object.keys(Game.creeps).length);
 	let heap = Game.cpu.getHeapStatistics();
 	logger.log(JSON.stringify(heap))
+	
+	
+	// RawMemory._parsed = Memory;
+
 	logger.log("----------------------- tick end -------------------------------------", Game.cpu.getUsed());
     });
 };
 if (Object.keys(Game.rooms)[0] !="sim") {
-    //mainLoop = wrapLoop(mainLoop);
+    mainLoop = wrapLoop(mainLoop);
 }
 module.exports.loop = mainLoop;
 
 
 function wrapLoop(fn) {
-    let memory;
+    //let memory;
     let tick;
     
     return () => {

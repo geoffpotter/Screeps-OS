@@ -34,7 +34,8 @@ class nodeProc extends processClass {
     updateNode() {
         //logger.log("updating node", this.data.nodeId);
         this.node.refineNode();
-        return;
+        
+        return 100 - this.kernel.cpuDefcon*10;
     }
 
     displayNode() {

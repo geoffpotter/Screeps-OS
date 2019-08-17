@@ -32,15 +32,20 @@ class intelProc extends processClass {
         if (!this.pStar) {
             this.pStar = this.kernel.getProcess("pStar");
         }
-
+        let roomsUpdated = 0;
+        let updateLimit = 3;
         for(let roomName in Game.rooms) {
             let room = Game.rooms[roomName];
-            //if (!room.memory.lastUpdate || room.memory.lastUpdate <= (Game.time - 10)) {
+            if (!room.memory.lastUpdate || room.memory.lastUpdate <= (Game.time - 2000)) {
                 //build or update room intel
-                //logger.log("here!", room);
+                logger.log("here!", room);
                 this.updateRoomIntel(roomName);
                 room.memory.lastUpdate = Game.time;
-            //}
+            }
+            roomsUpdated++;
+            if (roomsUpdated > updateLimit) {
+                break;
+            }
         }
     }
     
@@ -242,11 +247,11 @@ class intelProc extends processClass {
             let badGuy = guys[c];
             
             if (badGuy.owner.username == "Invader") {
-                intel.creeps.invaders.push(badGuy);
+                intel.creeps.invaders.push(badGuy.id);
             } else if(badGuy.owner.username == "Source Keeper") {
-                intel.creeps.sourceKeepers.push(badGuy);
+                intel.creeps.sourceKeepers.push(badGuy.id);
             } else {
-                intel.creeps.enemies.push(badGuy);
+                intel.creeps.enemies.push(badGuy.id);
             }
         }
     }
