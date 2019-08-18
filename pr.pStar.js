@@ -26,7 +26,7 @@ class nodeProc extends processClass {
         let updateThread = this.createThread("updateNode", "nodes");
         //updateThread.suspend = 0 + Math.floor(Math.random() * 10);
         return [
-            updateThread,
+            //updateThread,
             this.createThread("displayNode", "work")
         ];
     }
@@ -61,6 +61,7 @@ class pStarProc extends processClass {
             logger.log("pStar deserialize.  CPU:", used, "Size:", Memory.pStarCache.length);
             logger.log("wtf",JSON.stringify(global.utils.pStar.inst));
 
+            return;
             //start a proc for each node
             let allNodes = global.utils.pStar.inst.nodes.getAll();
             logger.log("starting node procs")
@@ -80,7 +81,7 @@ class pStarProc extends processClass {
         return [
             //this.createThread("refineNodes", "nodes"),
             this.createThread("refineEdges", "edges"),
-            //this.createThread("displayEdges", "work"),
+            this.createThread("displayEdges", "work"),
             this.createThread("pStarSave", "pathing")
         ];
     }
@@ -122,6 +123,7 @@ class pStarProc extends processClass {
 
     addNode(node) {
         global.utils.pStar.inst.addNode(node);
+        return;
         //create process for node
         let nodeProcessName = "node-" + node.id;
         if (!this.kernel.getProcess(nodeProcessName)) {

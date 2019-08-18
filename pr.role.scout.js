@@ -9,7 +9,7 @@
 
 var logger = require("screeps.logger");
 logger = new logger("pr.role.scout");
-logger.enabled = false;
+//logger.enabled = false;
 
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
@@ -65,9 +65,10 @@ class scout extends processClass {
             let targetRoom = creep.memory.targetRoom;
             if (!targetRoom) {
 
-                let homeRoom = Game.rooms["E3N13"];
+                let homeRoom = Game.rooms["E2N17"];
                 let exits = Game.map.describeExits(homeRoom ? homeRoom.name : creep.room.name);
                 let randomExit = _.sample(exits);
+                randomExit = "E1N17";
                 if (randomExit == creep.room.name) {
                     randomExit = homeRoom.name
                 }

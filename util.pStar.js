@@ -72,8 +72,8 @@ class Node {
 
     get id() {
         if (!this._id) {
-            this._id = this.pos.toWorldPosition().serialize();
-            //this._id = `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`;
+            //this._id = this.pos.toWorldPosition().serialize(); //smaller ids
+            this._id = `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`; //easier to debug
         }
         return this._id;
     }
@@ -153,12 +153,13 @@ class Node {
      */
     getNodeEdge(otherNode) {
         let pStar = global.utils.pStar.inst;
-
-        let tempEdge = new Edge(this, otherNode); //just to build the id
-        if (pStar.edges.has(tempEdge)) {
+        let edgeId = Edge.makeEdgeId(this.id, otherNode.id);
+        let edge = pStar.edges.getById(edgeId);
+        if (edge) {
             //it exists!
-            return pStar.edges.getById(tempEdge.id);
+            return edge;
         }
+        logger.log("couldn't find node edge!", edgeId);
         return false;
     }
     refineNode() {
@@ -275,7 +276,7 @@ class Node {
         }
         let dest = this.destinationsMap[destNode.id];
         if (!dest) {
-            return false;
+            return this.pos.toWorldPosition().getRangeTo(destNode.pos);
         }
         let dist = dest.travelCost;
         return dist;
@@ -366,7 +367,7 @@ class Node {
             path,
             incomplete,
             cost: this.destinationsMap[destNode.id].travelCost,
-            hops
+            hops: hops + 1
         }
     }
 
@@ -378,16 +379,20 @@ class Node {
             //logger.log("displayin", this.id)
             let debug = [];
             for(let d in dests) {
+                /** @type {DestinationInfo} */
                 let dest = dests[d];
                 //logger.log(dest.id, dest.travelCost)
-                debug.push(dest.id + " > " + dest.travelCost);
+                debug.push(dest.id + " > " + dest.travelCost + " by " + dest.nextNode.id);
             }
             global.utils.visual.drawTextLines(debug, this.pos);
+        } else {
+            global.utils.visual.drawText(" " + this.destinations.length + " dests", this.pos)
         }
     }
 
     serialize() {
         let ser = this.pos.toWorldPosition().serialize() + '|' + this.type
+        //let ser = this.pos.x + "-" + this.pos.y + "-" + this.pos.roomName + '|' + this.type
         return ser;
     }
     /**
@@ -404,6 +409,12 @@ class Node {
 }
 
 class Edge {
+
+    static makeEdgeId(node1Id, node2Id) {
+        let nodes = [node1Id, node2Id];
+        nodes = nodes.sort();
+        return nodes[0] + "_" + nodes[1];
+    }
     get id() {
         return this.node1Id + "_" + this.node2Id;
     }
@@ -431,25 +442,31 @@ class Edge {
     }
 
     refineEdge() {
-        //logger.log("refining edge", this.id);
 
-        if (!Game.rooms[this.node1Pos.roomName] || !Game.rooms[this.node2Pos.roomName]) {
-            //I can't see! bum ba dum dum dum dum WOOWOOOOO is meee!!
-            return;
-            //I can't see!
+        if (!this.path.path || this.lastUpdated == 0 || (Game.time - this.lastUpdated) >= global.utils.pStar.inst.nodeTicksValid) {
+            //logger.log("refining edge", this.id);
+
+            if (!Game.rooms[this.node1Pos.roomName] || !Game.rooms[this.node2Pos.roomName]) {
+                //I can't see! bum ba dum dum dum dum WOOWOOOOO is meee!!
+                return false;
+                //I can't see!
+            }
+            
+            //invalidate connected nodes
+            let pStar = global.utils.pStar.inst;
+            pStar.getNode(this.node1Id).lastUpdated = 0;
+            pStar.getNode(this.node2Id).lastUpdated = 0;
+            
+
+            //bake in path/cost
+            let path = this.path.getPath();
+            this.cost = this.path.pathCost;
+            this.lastUpdated = Game.time;
+            return true;
+        } else {
+            //logger.log(this.node1Pos, this.node2Pos, "already updated", this.path.path)
         }
-        
-        //invalidate connected nodes
-        let pStar = global.utils.pStar.inst;
-        pStar.getNode(this.node1Id).lastUpdated = false;
-        pStar.getNode(this.node2Id).lastUpdated = false;
-        
-
-        //bake in path/cost
-        let path = this.path.getPath();
-        this.cost = this.path.pathCost;
-        this.lastUpdated = Game.time;
-
+        return false;
     }
 
     displayEdge(color = "#999", opacity = 1) {
@@ -522,13 +539,14 @@ class pStar {
 
         this.nodeTicksValid = 10000;
         this.maxNodeUpdatesPerTick = 10;
-        this.edgeTicksValid = 50000;
+        this.edgeTicksValid = 10000;
         this.maxEdgeUpdatesPerTick = 10;
     }
 
     addEdge(node1, node2) {
-        let edge = new Edge(node1, node2);
-        if (!this.edges.has(edge.id)) {
+        let edgeId = Edge.makeEdgeId(node1.id, node2.id);
+        if (!this.edges.has(edgeId)) {
+            let edge = new Edge(node1, node2);
             this.edges.add(edge);
         }
     }
@@ -538,7 +556,7 @@ class pStar {
         let nodesRefined = 0;
         for(let n in nodes) {
             let node = nodes[n];
-            if (node.lastUpdated == false || (Game.time - node.lastUpdated) >= this.nodeTicksValid) {
+            if (node.lastUpdated == 0 || (Game.time - node.lastUpdated) >= this.nodeTicksValid) {
                 //logger.log("node",JSON.stringify(node))
                 node.refineNode();
                 nodesRefined++;
@@ -555,8 +573,8 @@ class pStar {
         let edgesRefined = 0;
         for(let e in edges) {
             let edge = edges[e];
-            if (edge.lastUpdated == false || (Game.time - edge.lastUpdated) >= this.edgeTicksValid) {
-                edge.refineEdge();
+            let refined = edge.refineEdge();
+            if (refined) {
                 edgesRefined++;
             }
             if (edgesRefined >= this.maxEdgeUpdatesPerTick) {
@@ -648,7 +666,7 @@ class pStar {
                     return dists[e.n.id+"-"+e.o.id]
                 });
                 logger.log(JSON.stringify(edges))
-                let maxConns = 3;
+                let maxConns = 1;
                 for(let i=0;i<edges.length&&i<maxConns;i++) {
                     let o = edges[i];
                     this.addEdge(o.n, o.o);
@@ -665,16 +683,18 @@ class pStar {
     }
 
     displayNodes() {
-        // let allNodes = this.nodes.getAll();
-        // for(let n in allNodes) {
-        //     let node = allNodes[n];
-        //     node.displayNode();
-        // }
+        let allNodes = this.nodes.getAll();
+        for(let n in allNodes) {
+            let node = allNodes[n];
+            node.displayNode();
+        }
         let allEdges = this.edges.getAll();
         for(let e in allEdges) {
             let edge = allEdges[e];
+            //if (!edge.path._cachedPath) { //display all non cached paths
             //logger.log(JSON.stringify(edge))
-            edge.displayEdge("#999", 0.1);
+                edge.displayEdge("#999", 0.1);
+            //}
         }
         logger.log("total nodes:", Object.keys(this.nodes.thingsById).length);
         logger.log("total edges:", Object.keys(this.edges.thingsById).length);
@@ -698,6 +718,9 @@ class pStar {
             return false;
         }
         let nodePath = startNode.findNodePathTo(endNode);
+        if (nodePath.incomplete) {
+            nodePath = global.utils.pStar.findPath(startNode, endNode);
+        }
         return nodePath;
     }
 
@@ -732,8 +755,8 @@ class pStar {
         let currentNode = path[0];
         /** @var {Node} */
         let nextNode = path[1];
-        let edge = new Edge(currentNode, nextNode);
-        edge = this.edges.getById(edge.id);
+        let edgeId = Edge.makeEdgeId(currentNode.id, nextNode.id);
+        let edge = this.edges.getById(edgeId);
         path.shift();//remove first element
         return {
             edge: edge,
@@ -759,6 +782,7 @@ class pStar {
             goal: goal.pos,
         }
         //check for goal change
+        //logger.log("wtf", JSON.stringify(pathInfo.goal))
         if (!goal.pos.isEqualTo(new RoomPosition(pathInfo.goal.x, pathInfo.goal.y, pathInfo.goal.roomName))) {
             logger.log(creep.name, "goal changed", goal.pos, JSON.stringify(pathInfo.goal), goal.pos.isEqualTo(pathInfo.goal))
             creep.memory.pStarPath = {
@@ -795,7 +819,11 @@ class pStar {
         if (pathInfo.method == "pStar" && path === false) {
             path = this.deserializeFindPath(pathInfo.path);
         }
-
+//logger.log('jkj', path)
+        if (path == "false" || (!pathInfo.edgeId && path.length==1)) {
+            logger.log(creep.name, "doesn't know what is going on, so he's gonna walk.")
+            pathInfo.method = "moveTo";
+        }
 
 
 
@@ -805,7 +833,7 @@ class pStar {
                 //extract current and nextnodes
                 let edge = pathInfo.edgeId ? this.edges.getById(pathInfo.edgeId) : false;
             
-                if (path.length < 2) {
+                if (path.length < 1) {
                     logger.log(creep.name, "ran out of path and didn't notice!", JSON.stringify(path));
                     //we're dumb, just walk
                     pathInfo.method = "moveTo"
@@ -838,6 +866,12 @@ class pStar {
                     
                     let ret = edge.path.moveOnPath(creep, nextNode, goal);
                     //logger.log(creep.name, "moving on first edge", edge.id, JSON.stringify(ret));
+                    if (ret.onPath || ret.closeToPath) {
+                        edge.displayEdge(pStarColorOnPath);
+                    } else {
+                        edge.displayEdge(moveToColor);
+                    }
+
                     if (ret.done) {
                         //move to next stage
                         pathInfo.pathStage = 1;
@@ -860,9 +894,9 @@ class pStar {
 
                     if (creep.pos.inRangeTo(nextNode.pos, atNodeTolerance)) {
                         //at next node, go to next leg or skip to next stage
-                        if (path.length <= 2) { //at the end of the node path, go to next stage
+                        if (path.length < 2) { //at the end of the node path, go to next stage
                             //leave existing path in memory so we can stil load the nodes
-                            //global.no();
+                            logger.log(creep.name, nextNode.id);
                             pathInfo.pathStage = 2;
                         } else {
                             //at next leg, get next edge and update pathinfo's path as well
@@ -1064,8 +1098,8 @@ class pStar {
             //get edge
             //let nextNodeInPath = nextNode.findClosestNeighborToDestination(destNode);
             //logger.log(currentNode.id, nextNode.id)
-            edge = new Edge(currentNode, nextNode);
-            edge = this.edges.getById(edge.id);
+            let edgeId = Edge.makeEdgeId(currentNode.id, nextNode.id);
+            edge = this.edges.getById(edgeId);
             pathInfo.edgeId = edge.id;
             //logger.log("found edge to walk", edge)
         }
@@ -1235,5 +1269,190 @@ module.exports = {
     inst,
     class: pStar,
     Node,
-    Edge
+    Edge,
+
+     /**
+     * find a path through the pStar network using A*.. maybe.. 
+     * @param {Node} startNode 
+     * @param {Node} endNode 
+     * @param {IndexingCollection} allNodes 
+     */
+    findPath(startNode, endNode) {
+        let openNodes = new global.utils.array.PriorityQueue((a, b) => {
+            return a.f < b.f;//compare 
+        });
+        let heuristic = (node, goal) => {
+            return node.getDistanceTo(goal);
+        }
+        
+
+        let nodeInfoLookup = {}; //node.id -> node
+        let startNodeInfo = {
+            node: startNode,
+            parent: false,
+            h:heuristic(startNode, endNode),//heuristic to goal node
+            g:0,//shortest distance to source node
+            f:0,//g+h, fscore for this node
+            closed: false,
+        };
+        nodeInfoLookup[startNode.id] = startNodeInfo;
+        openNodes.push(startNodeInfo);
+        
+        //new DestinationInfo(this, otherNode, otherNode, edge.cost);
+        while(openNodes.size() > 0) {
+            let nodeInfo = openNodes.pop();
+            /** @type {Node} */
+            let node = nodeInfo.node;
+            //logger.log("processing node", JSON.stringify(nodeInfo));
+            
+
+            //process node
+            //if edge to parent is not refined, then refine it, recalculate our g score and re-add the node and skip to next node
+            if (nodeInfo.parent) {
+                
+                /** @type {Node} */
+                let parentNode = nodeInfo.parent;
+                let parentEdgeId = Edge.makeEdgeId(node.id, parentNode.id);
+                /** @type {Edge} */
+                let parentEdge = global.utils.pStar.inst.edges.getById(parentEdgeId);
+                //let parentEdge = node.getNodeEdge(parentNode);
+                if (!parentEdge) {
+                    //network is broken!
+                    logger.log('network broken, missing parent edge')
+                    logger.log(node.id, parentNode.id);
+                    logger.log(parentEdge);
+                    let edgeId = Edge.makeEdgeId(node.id, parentNode.id);
+                    logger.log(edgeId);
+                    logger.log(new Edge(parentNode, node).id == edgeId);
+                    logger.log(this.inst.edges.getById(edgeId))
+                    logger.log("all edges");
+                    let edges = this.inst.edges.getAll();
+                    for(let e in edges) {
+                        let edge = edges[e];
+                        logger.log(edge.id, edgeId, edge.id == edgeId)
+                    }
+                }
+                let refined = parentEdge.refineEdge();
+                //logger.log(node.id, "has parent, edge refined?", refined);
+                if (refined) {
+                    //if the edge was refined, recalc the scores for this node and add it back into the queue and skip to next node
+                    //recalc g score
+                    //logger.log(parentEdge.id, 'edge refined', node.id, "going back into queue")
+                    //logger.log(JSON.stringify(nodeInfo))
+                    let parentNodeInfo = nodeInfoLookup[parentNode.id];
+                    nodeInfo.g = parentNodeInfo.g + parentEdge.cost;
+                    nodeInfo.f = nodeInfo.g + nodeInfo.h;
+                    openNodes.push(nodeInfo);
+                    continue;
+                }
+            } else {
+                logger.log(node.id, "has no parent set.. is it the initial node, cuz otherwise you're a dumbass")
+            }
+
+
+            //logger.log(node.id, "closed")
+            //by this point the edge to our parent is refined, and we are not the target node.  Do normal A* action and mark this node closed
+            nodeInfo.closed = true;
+            
+            //wait until after parent edge has been updated to say we've reached the goal.
+            if (node.pos.isEqualTo(endNode.pos)) {
+                logger.log("found path!", startNode.id, endNode.id);
+                logger.log(JSON.stringify(nodeInfo));
+                //get the actual path
+                let path = [];
+                let thisNodeInfo = nodeInfo;
+                let lastNode = false;
+                while(thisNodeInfo != false) { //follow back to start node and extract nodes into path array
+                    let node = thisNodeInfo.node;
+                    path.push(node);
+
+                    if (lastNode) {
+                        //for all nodes other than the end node(first node in path), add a destination to the endNode with the g score of that nodeInfo
+                        
+                        
+                        //cost is total path cost, minus the g score of this node
+                        let thisCost = nodeInfo.g - thisNodeInfo.g;
+                        let dest = new DestinationInfo(node, endNode, lastNode, thisCost);
+                        logger.log(node.id, "adding destination", JSON.stringify(dest))
+                        node.addDestination(dest);
+                    }
+                    if (thisNodeInfo.parent) {
+                        
+
+                        thisNodeInfo = nodeInfoLookup[thisNodeInfo.parent.id];//next node up the path
+                    } else {
+                        //end of path, node == startNode
+                        thisNodeInfo = false;
+                    }
+                    lastNode = node;
+                }
+
+                return {
+                    path: path.reverse(),
+                    incomplete: false,
+                    cost: nodeInfo.g,
+                    hops: path.length
+                };
+            }
+
+
+            //get neighbors, init them if needed, and add them to the queue with this node as parent if that lowsers their g score, otherwise leave them be
+            let neighbors = node.edgeNodes;
+            for(let n in neighbors) {
+                /** @type {node} */
+                let neighbor = neighbors[n];
+                
+                if (neighbor.closed || neighbor === node) {
+                    continue;
+                }
+
+                let neighborInfo = nodeInfoLookup[neighbor.id];
+                let edgeToNode = node.getNodeEdge(neighbor);
+                let newGScore = nodeInfo.g + edgeToNode.cost;
+                //logger.log(node.id, "checking neighbor", neighbor.id, newGScore);
+                if (!neighborInfo) {
+                    //logger.log('adding new node', neighbor.id)
+                    //new node!
+                    neighborInfo = {
+                        node: neighbor,
+                        parent: node,
+                        h:heuristic(neighbor, endNode),//heuristic to goal node
+                        g: newGScore,//shortest distance to source node
+                        f:0,//g+h, fscore for this node
+                        closed: false,
+                    };
+                    //update f score
+                    neighborInfo.f = neighborInfo.h + neighborInfo.g;
+                    //store node info
+                    nodeInfoLookup[neighbor.id] = neighborInfo;
+                    //add to open nodes
+                    openNodes.push(neighborInfo);
+                } else {
+                    //logger.log("nighbor already exists", neighbor.id);
+                    //we've seen this node before, check if we've got there cheaper than before.
+                    if (newGScore < neighborInfo.g) { //we can provide a better path to the neighbor, swap our node info with the one in the queue
+                        //logger.log(node.id, "found better path to", neighbor.id);
+                        //logger.log("replacing node because we found a better path", JSON.stringify(openNodes))
+                        neighborInfo.parent = node;
+                        neighborInfo.g = newGScore;
+                        neighborInfo.f = neighborInfo.h + neighborInfo.g;
+                        openNodes.replaceByValue(neighborInfo, (a, b) => {return a.node.id == b.node.id});
+                        //logger.log(JSON.stringify(openNodes));
+                    }
+                }
+            }
+        }
+
+        logger.log("we're dumb, and didn't find a path.. one prolly exists tho.. stupid head.");
+        logger.log(JSON.stringify(nodeInfoLookup));
+        return {
+            path: [],
+            incomplete: true,
+            cost: false,
+            hops: false
+        };;
+    }
+
+
+
 }

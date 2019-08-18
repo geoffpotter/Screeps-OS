@@ -89,7 +89,7 @@ module.exports = {
         }
 
         let lastPosition = path[0];
-        this.circle(lastPosition, color);
+        //this.circle(lastPosition, color);
         for (let position of path) {
             if (position.roomName === lastPosition.roomName) {
                 new RoomVisual(position.roomName)

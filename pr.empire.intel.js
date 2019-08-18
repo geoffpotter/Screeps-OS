@@ -36,13 +36,14 @@ class intelProc extends processClass {
         let updateLimit = 3;
         for(let roomName in Game.rooms) {
             let room = Game.rooms[roomName];
-            if (!room.memory.lastUpdate || room.memory.lastUpdate <= (Game.time - 2000)) {
+            if (!room.memory.lastUpdate || room.memory.lastUpdate <= (Game.time - 20000)) {
                 //build or update room intel
                 logger.log("here!", room);
                 this.updateRoomIntel(roomName);
                 room.memory.lastUpdate = Game.time;
+                roomsUpdated++;
             }
-            roomsUpdated++;
+            
             if (roomsUpdated > updateLimit) {
                 break;
             }

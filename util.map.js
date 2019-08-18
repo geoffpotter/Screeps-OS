@@ -10,6 +10,7 @@ logger = new logger("util.map");
 
 
 
+
 class CachedPath {
     /**
      * 
@@ -178,6 +179,7 @@ class CachedPath {
             s: false,//starting position, if this is set, moveTo this pos until closeToPath
             lp: creep.pos,
             lpp: creep.pos,
+            idx: 0, //last index in path we thought we were at
             done: false,
             onPath: false,
             closeToPath: false,
@@ -191,6 +193,7 @@ class CachedPath {
                 stuck: 0,
                 lp: creep.pos,
                 lpp: creep.pos,
+                idx: 0,
                 done: false,
                 onPath: false,
                 closeToPath: false,
@@ -239,7 +242,8 @@ class CachedPath {
         }
         let closestPos = path[0];
         let closestDist = 10000;
-        for(let i in path) {
+        //for(let i in path) {
+        for(let i = pathInfo.idx;i < path.length;i++) {
             let pos = path[i];
             let i2 = 1 + Number.parseInt(i);
             let posDist = creep.pos.toWorldPosition().getRangeTo(pos);
@@ -265,7 +269,7 @@ class CachedPath {
             //logger.log(creep, pos, nextPos);
             let onPath = creep.pos.isEqualTo(pos);//exactly this creeps pos
             let closeToPath = (posDist <= destTolarance //creep is in range
-                                  && posDist <= creep.pos.toWorldPosition().getRangeTo(nextPos)); //next node isn't closer
+                                  && posDist < creep.pos.toWorldPosition().getRangeTo(nextPos)); //next node isn't closer
             
             // if (creep.name == "scout0") {
             //     logger.log(creep.pos, pos, nextPos)
@@ -288,6 +292,10 @@ class CachedPath {
                 //store last creep position
                 pathInfo.lp = creep.pos;
 
+                //store our path index
+                pathInfo.idx = i;
+                global.utils.visual.circle(pos, "#666");
+                global.utils.visual.circle(nextPos, "#999");
                 let startPosToUse = pos; //use the matching pos from the path to get the direction, IE: follow the path dir, don't move to next path pos.
                 if (pathInfo.stuck > 2) {
                     startPosToUse = creep.pos; //use the creeps pos if we're stuck, ie: move onto the path
@@ -320,9 +328,9 @@ class CachedPath {
                     //logger.log(creep.name, moveDir, try1, try2, (moveDir-2)%8)
                     //turn nextPos into two new POSs in try1 and try2 directions
                     //go from original startPos that was selected to original moveDir, then to try dir
-                    let try1Pos = creep.pos.toWorldPosition().moveInDir(try1).toRoomPosition();
-                    let try2Pos = creep.pos.toWorldPosition().moveInDir(try2).toRoomPosition();
-                    //logger.log(moveDir, try1, try2);
+                    let try1Pos = pos.toWorldPosition().moveInDir(try1).toRoomPosition();
+                    let try2Pos = pos.toWorldPosition().moveInDir(try2).toRoomPosition();
+                    logger.log(creep.name, moveDir, try1, try2);
 
                     //order trys by range to nextPos
                     let tries = [try1Pos, try2Pos];
@@ -350,8 +358,9 @@ class CachedPath {
                         nextPos = try2Pos;
                     } else {
                         //logger.log(creep.name, "no easy walkable paths, if creeps are blocking, swap places with one");
-                        creep.say("move!")
+                        
                         if (blockingObject.type == "creep") {
+                            creep.say("move!")
                             //orig path blocked by creep, swap creeps
                             let otherCreep = blockingObject.creep;
                             otherCreep.say("I'm moving!")
@@ -429,9 +438,14 @@ class CachedPath {
 }
 
 
+
+
+
 module.exports = {
 
     CachedPath,
+
+   
     /**
      * 
      * @param {*} path A path as returned by pathfiner, an array of room positions.
@@ -446,7 +460,7 @@ module.exports = {
         let lastNode = path[0];
         let dirs = [];
         for (let i = 1; i < path.length; i++) {
-            /** @type {RoomPosition} */
+            ///** @type {RoomPosition} */
             let node = path[i];
             let dir = lastNode.getDirectionTo(node);
             dirs.push(dir);
