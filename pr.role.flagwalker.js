@@ -9,7 +9,7 @@
 
 var logger = require("screeps.logger");
 logger = new logger("pr.role.flagwalker");
-logger.enabled = false;
+//logger.enabled = false;
 
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
@@ -36,7 +36,7 @@ class flagwalker extends processClass {
         
         let spawn = Game.spawns['Spawn1'];
         let creeps = Game.creeps;
-        let numflagwalkers = 100;
+        let numflagwalkers = 1;
         logger.log("spawnin", Object.keys(creeps).length, numflagwalkers)
         if (Object.keys(creeps).length < numflagwalkers) {
             logger.log("not enough flagwalkers", spawn.spawning, spawn.room.energyAvailable)
@@ -63,10 +63,15 @@ class flagwalker extends processClass {
             if (!targetFlagName || creep.pos.inRangeTo(Game.flags[targetFlagName], 2)) {
                 let newFlagName = _.sample(Object.keys(Game.flags));
                 creep.memory.targetFlagName = newFlagName;
+                targetFlagName = newFlagName;
                 creep.say(targetFlagName);
             }
             let targetFlag = Game.flags[targetFlagName];
-
+            if (!targetFlag) {
+                logger.log(creep.name, "invalid flag!", targetFlagName, targetFlag)
+                creep.memory.targetFlagName = false;
+                return;
+            }
             //creep.say(targetFlagName);
             let roomCenter = targetFlag.pos;
             let i = creepName.substr(5);

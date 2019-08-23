@@ -80,7 +80,7 @@ class pStarProc extends processClass {
     initThreads() {
         return [
             //this.createThread("refineNodes", "nodes"),
-            this.createThread("refineEdges", "edges"),
+            //this.createThread("refineEdges", "edges"),
             this.createThread("displayEdges", "work"),
             this.createThread("pStarSave", "pathing")
         ];

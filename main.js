@@ -17,7 +17,8 @@ logger = new logger("main");
 //return;
 
 //_.each(Game.flags, (f) => f.remove());
-
+// Memory.creeps = {};
+// return;
 //Memory.rooms ={} 
 //util classe
 // RawMemory.set("");
@@ -32,8 +33,8 @@ global.utils = {};
 global.utils.array = require("util.array");
 global.utils.visual = require("util.visual");
 global.utils.map = require("util.map");
-global.utils.pStar = require("util.pStar")
-
+global.utils.pStar = require("util.pStar");
+global.utils.cm = require("util.cm");
 
 profiler.registerObject(global.utils, "utils")
 // logger.log(JSON.stringify(global.creepClasses));

@@ -65,10 +65,10 @@ class scout extends processClass {
             let targetRoom = creep.memory.targetRoom;
             if (!targetRoom) {
 
-                let homeRoom = Game.rooms["E2N17"];
+                let homeRoom = false;//Game.rooms["E2N17"];
                 let exits = Game.map.describeExits(homeRoom ? homeRoom.name : creep.room.name);
                 let randomExit = _.sample(exits);
-                randomExit = "E1N17";
+                //randomExit = "E1N17";
                 if (randomExit == creep.room.name) {
                     randomExit = homeRoom.name
                 }

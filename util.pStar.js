@@ -462,6 +462,15 @@ class Edge {
             let path = this.path.getPath();
             this.cost = this.path.pathCost;
             this.lastUpdated = Game.time;
+
+            //we got the path, add the positions to our cost matrix
+            
+            let cm = global.utils.cm.getCM(this.node1Pos.roomName, "pStar");
+            for(let p in path) {
+                let pos = path[p];
+                cm.set(pos.x, pos.y, 1);
+            }
+
             return true;
         } else {
             //logger.log(this.node1Pos, this.node2Pos, "already updated", this.path.path)
@@ -666,7 +675,7 @@ class pStar {
                     return dists[e.n.id+"-"+e.o.id]
                 });
                 logger.log(JSON.stringify(edges))
-                let maxConns = 1;
+                let maxConns = 2;
                 for(let i=0;i<edges.length&&i<maxConns;i++) {
                     let o = edges[i];
                     this.addEdge(o.n, o.o);
@@ -766,6 +775,14 @@ class pStar {
 
 
     moveTo(creep, goal) {
+        let start = Game.cpu.getUsed();
+        let log = (...args) => {
+            let usedNow = Game.cpu.getUsed();
+            let used = usedNow - start;
+            logger.log("cpu used:", used, ...args);
+            start = usedNow;
+        }
+
 
         let moveToColor = "#f00";
         let pStarColor = "#00f";
@@ -797,6 +814,7 @@ class pStar {
             logger.log(pathInfo.nextNode);
         }
 
+        log("init done")
         let path = false;
         //logger.log(creep.name, "initial move method", pathInfo.method)
         //initial state.  search for path
@@ -814,7 +832,7 @@ class pStar {
                 //global.no();
             }
         }
-
+        log("pathfinding done", pathInfo.method)
         //if we're using pStar and the path hasn't been loaded from original pathfinding
         if (pathInfo.method == "pStar" && path === false) {
             path = this.deserializeFindPath(pathInfo.path);
@@ -827,7 +845,7 @@ class pStar {
 
 
 
-
+        log("starting switch");
         switch(pathInfo.method) {
             case "pStar":
                 //extract current and nextnodes
@@ -858,7 +876,7 @@ class pStar {
                     logger.log(creep.name, "HAS NO EDGE TO FOLLOW!!! ------------- ERRRRRRRRRRRRROOOORRRRRRR");
                     throw new Error("no edge defined!");
                 }
-
+                log("moving")
                 //  ------------  preform the actual move ---------------------
                 if (pathInfo.pathStage == 0) {//-----------------------------get in range of first node
                     //try walking on edge
@@ -885,6 +903,7 @@ class pStar {
                     //     let ret = creep.moveTo(firstNode.pos, {range: atNodeTolerance, visualizePathStyle:{stroke:pStarColor}});
                     //     logger.log(creep.name, "moving to first node", firstNode.id, ret);
                     // }
+                    log('stage 0')
                 }
                 
                 if (pathInfo.pathStage == 1) { //--------------------follow node network path
@@ -925,6 +944,7 @@ class pStar {
                         }
                         //logger.log(creep.name, "moving on edge", edge.id, ret)
                     }
+                    log('stage 1')
                 }
                 
                 if (pathInfo.pathStage == 2) {//------------------------go to goal
@@ -936,7 +956,7 @@ class pStar {
                         let ret = creep.moveTo(goal.pos, {range: goal.range, visualizePathStyle:{stroke:pStarColor}});
                         //logger.log(creep.name, "moving to goal", goal.pos, ret);
                     }
-                    
+                    log('stage 2')
                 }
 
 
@@ -1258,9 +1278,9 @@ class pStar {
 }
 
 
-// global.profiler.registerClass(Node,"Node");
-// global.profiler.registerClass(Edge,"Edge");
-// global.profiler.registerClass(pStar,"pStar");
+global.profiler.registerClass(Node,"Node");
+global.profiler.registerClass(Edge,"Edge");
+global.profiler.registerClass(pStar,"pStar");
 
 
 let inst = new pStar();
@@ -1277,7 +1297,7 @@ module.exports = {
      * @param {Node} endNode 
      * @param {IndexingCollection} allNodes 
      */
-    findPath(startNode, endNode) {
+    findPath(startNode, endNode, maxOps=100) {
         let openNodes = new global.utils.array.PriorityQueue((a, b) => {
             return a.f < b.f;//compare 
         });
@@ -1298,8 +1318,12 @@ module.exports = {
         nodeInfoLookup[startNode.id] = startNodeInfo;
         openNodes.push(startNodeInfo);
         
+        let opts = 0;
         //new DestinationInfo(this, otherNode, otherNode, edge.cost);
         while(openNodes.size() > 0) {
+            if (opts > maxOps) {
+                break;
+            }
             let nodeInfo = openNodes.pop();
             /** @type {Node} */
             let node = nodeInfo.node;
@@ -1408,7 +1432,7 @@ module.exports = {
 
                 let neighborInfo = nodeInfoLookup[neighbor.id];
                 let edgeToNode = node.getNodeEdge(neighbor);
-                let newGScore = nodeInfo.g + edgeToNode.cost;
+                let newGScore = Number.parseInt(nodeInfo.g) + Number.parseInt(edgeToNode.cost);
                 //logger.log(node.id, "checking neighbor", neighbor.id, newGScore);
                 if (!neighborInfo) {
                     //logger.log('adding new node', neighbor.id)
@@ -1416,7 +1440,7 @@ module.exports = {
                     neighborInfo = {
                         node: neighbor,
                         parent: node,
-                        h:heuristic(neighbor, endNode),//heuristic to goal node
+                        h: Number.parseInt(heuristic(neighbor, endNode)),//heuristic to goal node
                         g: newGScore,//shortest distance to source node
                         f:0,//g+h, fscore for this node
                         closed: false,
@@ -1441,10 +1465,12 @@ module.exports = {
                     }
                 }
             }
+            opts++;
         }
 
         logger.log("we're dumb, and didn't find a path.. one prolly exists tho.. stupid head.");
         logger.log(JSON.stringify(nodeInfoLookup));
+        throw new Error("invalid path!" + opts)
         return {
             path: [],
             incomplete: true,
