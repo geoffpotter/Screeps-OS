@@ -16,7 +16,7 @@ logger = new logger("main");
 // _.each(Game.creeps, (c) => c.memory.task = false)
 //return;
 
-//_.each(Game.flags, (f) => f.remove());
+ //_.each(Game.flags, (f) => f.remove());
 // Memory.creeps = {};
 // return;
 //Memory.rooms ={} 

@@ -29,27 +29,57 @@ class pathingProc extends processClass {
         //     this.paths = new global.utils.array.IndexingCollection();
         // }
 
-        if (Memory.pStar) {
-            global.utils.pStar.inst = global.utils.pStar.class.deserialize(Memory.pStar);
-        }
+        
         this.nodeMap = {};
     }
     initThreads() {
-        return [this.createThread("run", "init")];
-    }
-    run() {
-        logger.log(this.name, "init")
+        return [
+            
+            this.createThread("init_onTick", "init"),
+            this.createThread("run", "init"),
+            this.createThread("save", "work")
+        ];
         
-        this.mapFlags();
-
-        //global.utils.pStar.inst.refineEdges();
-        //global.utils.pStar.inst.refineNodes();
+    }
+    init_onTick() {
+        if (Memory.pStar) {
+            global.utils.pStar.inst = global.utils.pStar.class.deserialize(Memory.pStar);
+        }
+    }
+    save() {
         let start = Game.cpu.getUsed();
         let serialized = global.utils.pStar.inst.serialize();
         Memory.pStar = serialized;
         let cpu = Game.cpu.getUsed() - start;
-
         logger.log("serialized length:", serialized.length, "cpu used:", cpu);
+//Game.cpu.halt();
+        // start = Game.cpu.getUsed();
+        // let deserialized = global.utils.pStar.class.deserialize(serialized);
+        // cpu = Game.cpu.getUsed() - start;
+        // logger.log("deserialize cpu", cpu);
+        // logger.log("match", serialized == deserialized.serialize(), serialized, deserialized.serialize());
+    }
+    run() {
+        logger.log(this.name, "init")
+        
+        if (Game.time % 3 == 0) {
+            //Game.cpu.halt();
+        }
+
+        if (Memory.pStar) {
+            //global.utils.pStar.inst = {};
+            //global.utils.pStar.inst = global.utils.pStar.class.deserialize(Memory.pStar);
+        }
+        
+        this.mapFlags();
+
+        
+        //global.utils.pStar.inst.refineEdges();
+        //global.utils.pStar.inst.refineNodes();
+        global.utils.pStar.inst.displayNodes();
+        
+
+        // 
         
         // start = Game.cpu.getUsed();
         // let deserialized = global.utils.pStar.class.deserialize(serialized);
@@ -84,7 +114,7 @@ class pathingProc extends processClass {
         // logger.log("cpu used", used, JSON.stringify(path))
         
         
-        global.utils.pStar.inst.displayNodes();
+        
     }
 
     mapFlags() {

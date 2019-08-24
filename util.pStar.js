@@ -507,14 +507,20 @@ class Edge {
         }
     }
     
-    serialize() {
+
+    serialize(level) {
+        //level = 1;
+        //level is 1-x for "memory level", like L1, L2, L3 cache. but reversed
+        logger.log(this.id, "serializing", level, level==1 ? "adding path" : "not adding path", "lol even has a path?", this.path.path.length>0)
         let arr = [
             this.node1Id,
             this.node2Id,
             this.cost,
             this.lastUpdated,
-            this.path.serialize()
+            level == 1 ? this.path.serialize() : ""
         ]
+        //logger.log(this.id,'serialized')
+        //logger.log(JSON.stringify(arr))
         return arr.join("|");
     }
     static deserialize(str) {
@@ -530,7 +536,7 @@ class Edge {
         if (cachedPath) {
             //logger.log("----",cachedPath)
             inst.path = global.utils.map.CachedPath.deserialize(cachedPath);
-            //inst.path.getPath();
+            inst.path.getPath();
             //logger.log(JSON.stringify(inst.path))
         }
         return inst;
@@ -540,10 +546,10 @@ class Edge {
 class pStar {
     constructor() {
         
-        this.nodes = new global.utils.array.IndexingCollection("id", ["pos.roomName", "type"]);
-        this.edges = new global.utils.array.IndexingCollection("id", ["node1Id", "node2Id"]);
+        this.nodes = new global.utils.array.IndexingCollection("id", ["pos.roomName", "type"], [100000, 1000000]);
+        this.edges = new global.utils.array.IndexingCollection("id", ["node1Id", "node2Id"], [5, 200000, 1000000]);
         
-        this.distances = new global.utils.array.IndexingCollection("id", ["origin.id", "goal.id"]);
+        this.distances = new global.utils.array.IndexingCollection("id", ["origin.id", "goal.id"], [2, 1000000]);
 
 
         this.nodeTicksValid = 10000;
@@ -1262,10 +1268,16 @@ class pStar {
         let oldInst = global.utils.pStar.inst;
         global.utils.pStar.inst = inst;
 
+        let nLims = inst.nodes.limits;
+        let eLims = inst.edges.limits;
+        let dLims = inst.distances.limits;
         inst.nodes = global.utils.array.IndexingCollection.deserialize(obj.nodes, Node);
+        inst.nodes.limits = nLims;
         inst.edges = global.utils.array.IndexingCollection.deserialize(obj.edges, Edge);
+        inst.edges.limits = eLims;
         if (obj.dists) {
             inst.distances = global.utils.array.IndexingCollection.deserialize(obj.dists, DestinationInfo);
+            inst.distances.limits = dLims;
         }
         
         global.utils.pStar.inst = oldInst;

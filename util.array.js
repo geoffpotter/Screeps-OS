@@ -5,10 +5,19 @@
 var logger = require("screeps.logger");
 logger = new logger("util.arrays");
 
-class IndexingCollection {
-    constructor(idField = "id", groupByFields = []) {
+class LRUInfo {
+    constructor(id) {
+        this.id = id;
+        this.prev = this.next = false;
+    }
+}
 
-        this.idField = idField;
+class IndexingCollection {
+    constructor(idField = "id", groupByFields = [], limits = false) {
+        if (!limits) {
+            limits = [10, 20, 30];
+        }
+        this.idField = idField; 
         this.groupByFields = groupByFields;
         //Main storage of all things
         this.thingsById = {};
@@ -19,16 +28,112 @@ class IndexingCollection {
             this.groups[field] = {};
         }
 
+        /** @type {Map<String, LRUInfo>} */
+        this.nodeInfoById = new Map();
+
+        this.limits = limits;
+        /** @type {LRUInfo} */
+        this.head = false;
+        /** @type {LRUInfo} */
+        this.tail = false;
+    }
+
+    /**
+     * 
+     * @param {LRUInfo} thingInfo 
+     */
+    _markUsed(thingInfo) {
+        //if we have a prev and next then we're 
+        if (this.head && thingInfo.id == this.head.id) {
+            logger.log(thingInfo.id, "already most recently used")
+            return;
+        }
+        
+        //logger.log("marking", thingInfo.id, "as used.  Next? ", thingInfo.next ? thingInfo.next.id : "none", "pref?", thingInfo.prev ? thingInfo.prev.id : "none")
+        //this._debugQueue();
+        if (thingInfo.next || thingInfo.prev) { //thing already in path
+            //remove thing info.
+            let next = thingInfo.next;
+            let prev = thingInfo.prev;
+            if(next)
+                next.prev = prev;
+            if(prev)
+                prev.next = next;
+
+            thingInfo.next = thingInfo.prev = false;
+        }
+        if (!this.head) { //first node
+            this.head = this.tail = thingInfo;
+        } else {//already have nodes
+            this.head.prev = thingInfo; //add this node to top of list
+            thingInfo.next = this.head;
+            this.head = thingInfo; //mark this node as head
+
+            //clear up .head and .tail
+            if (this.head.id == thingInfo.id) {
+                thingInfo.prev = false;
+            }
+            // if (this.tail.id == thingInfo.id) {
+            //     thingInfo.next = false;
+            // }
+        }
+        //logger.log("marked", thingInfo.id, "as used.  Next? ", thingInfo.next ? thingInfo.next.id : "none", "pref?", thingInfo.prev ? thingInfo.prev.id : "none")
+        
+        //this._debugQueue();  
+    }
+
+    _enforceLimit() {
+        //logger.log("enforcing limits")
+        let finalLimit = this.limits[this.limits.length-1];
+        while(this.nodeInfoById.size > finalLimit) {
+            logger.log('over limit!',this.nodeInfoById.size, finalLimit);
+            let nodeInfoToRemove = this.tail;
+            let nodeToRemove = this.getById(nodeInfoToRemove.id);
+            logger.log("removing node", JSON.stringify(nodeToRemove));
+            this.remove(nodeToRemove);
+        }
+    }
+
+    forEach(fn) {
+        let curr = this.head;
+        let cThing = this.thingsById[curr.id];
+        if (!cThing) {
+            logger.log("broken...");
+            return;
+        }
+        fn(cThing);
+        let i = 0;
+        let max = 100;
+        while(curr = curr.next) {
+            if (i > max) {
+                logger.log('broke somethin?');
+                throw new Error("wtf")
+            }
+            //logger.log('for eachin', curr.id, curr.next.id, curr.prev.id);
+            cThing = this.thingsById[curr.id];
+            fn(cThing);
+            i++;
+        }
+    }
+    _debugQueue() {
+        let out = "";
+        this.forEach((thing) => {
+            //logger.log(thing.id)
+            out += thing.id + ">"
+        })
+        logger.log('internal queue:', out);
     }
 
     add(theThing) {
         let id = _.get(theThing, this.idField);
+
         if (this.thingsById[id]) {
             logger.log("before:", Object.keys(this.thingsById).length)
             this.remove(theThing);
             logger.log(Object.keys(this.thingsById).length)
         }
         //new thing!
+
         this.thingsById[id] = theThing;
         for(let f in this.groupByFields) {
             let fieldPath = this.groupByFields[f];
@@ -38,12 +143,11 @@ class IndexingCollection {
             }
             this.groups[fieldPath][value].push(id);
         }
-
-        //used to disallow adding existing items, now will update item by removing, then adding
-        // } else {
-        //     //it's already here.. why are you calling this?
-        //     throw new Error("Thing already in collection! -> " + id);
-        // }
+        
+        let nodeInfo = new LRUInfo(id);
+        this.nodeInfoById.set(id, nodeInfo);
+        this._markUsed(nodeInfo);
+        this._enforceLimit();
     }
 
     remove(theThing) {
@@ -55,6 +159,8 @@ class IndexingCollection {
         } else {
             //remove from id lookup and groups
             delete this.thingsById[id];
+
+            this.nodeInfoById.delete(id);
 
             for(let f in this.groupByFields) {
                 let fieldPath = this.groupByFields[f];
@@ -74,7 +180,12 @@ class IndexingCollection {
 
     has(aThing) {
         let id = _.get(aThing, this.idField);
-        return !!this.thingsById[id];
+        let has = !!this.thingsById[id];
+        if (has) {
+            let info = this.nodeInfoById.get(id);
+            this._markUsed(info);
+        }
+        return has;
     }
     getAll() {
         return _.values(this.thingsById);
@@ -83,6 +194,8 @@ class IndexingCollection {
         if(!this.thingsById[id]) {
             return false;
         }
+        let info = this.nodeInfoById.get(id);
+        this._markUsed(info);
         return this.thingsById[id];
     }
     getGroupWithValue(fieldPath, value) {
@@ -103,21 +216,66 @@ class IndexingCollection {
         let arr = [];
         //add the id field, then groups, then a false, then the things
         arr.push(this.idField);
+        arr.push(this.limits.join("Œ"))
         arr = arr.concat(this.groupByFields);
         arr.push(false);
         
-        let all = this.getAll();
-        for(let i in all) {
-            let thing = all[i];
-            let serialized = thing.serialize();
+
+        let numSerialized = 0;
+        let currLimitIndex = 0;
+        this.forEach((thing) => {
+            //logger.log('serializing thing', thing.id, numSerialized, currLimit, currLimitIndex)
+            let serialized = thing.serialize(currLimitIndex+1);
             arr.push(serialized);
-        }
-       
+            numSerialized++;
+
+            let currLimit = this.limits[currLimitIndex];
+            while(currLimit && numSerialized >= currLimit) {
+                currLimit = this.limits[currLimitIndex];
+                currLimitIndex++;
+                logger.log("next limit", currLimitIndex+1, "/", this.limits.length, "for serializing", this.limits[currLimitIndex-1]);
+                //check if we're out of limits, if so, stop serializing shit dummy
+                if (currLimitIndex >= (this.limits.length-1)) {
+                    
+                    return;
+                }
+            }
+            
+
+            
+        })
+
+
+        // let all = this.getAll();
+        // let numSerialized = 0;
+        // let currLimitIndex = 0;
+        // let num = all.length;
+        // for(let i=0;i<num;i++) {
+        //     //check if we're out of limits, if so, stop serializing shit dummy
+        //     if (currLimitIndex >= (this.limits.length-1)) {
+        //         logger.log("at the limit for serializing", this.limits[currLimitIndex-1]);
+        //         break;
+        //     }
+        //     //check if we're at this limit
+        //     let currLimit = this.limits[currLimitIndex];
+        //     if (numSerialized >= currLimit) {
+        //         currLimitIndex++; //go to next limit
+        //         i--;//redo last index
+        //         continue;
+        //     }
+        //     let thing = all[i];
+        //     //logger.log('serializing thing', thing.id, numSerialized, currLimit, currLimitIndex)
+        //     let serialized = thing.serialize(currLimitIndex+1);
+        //     arr.push(serialized);
+        //     numSerialized++;
+        // }
+        logger.log("serialized", numSerialized, "things")
         return arr.join("∪");
     }
     static deserialize(str, thingClass) {
         let arr = str.split("∪");
         let idField = arr.shift();
+        let limits = arr.shift().split("Œ");
         let groups = [];
         let group = true;
         while(group != "false") {
@@ -127,7 +285,7 @@ class IndexingCollection {
         }
         
         
-        let inst = new IndexingCollection(idField, groups);
+        let inst = new IndexingCollection(idField, groups, limits);
         for(let i in arr) {
             let itemObj = arr[i];
             let item = thingClass.deserialize(itemObj);
