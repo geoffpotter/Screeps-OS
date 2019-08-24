@@ -31,6 +31,8 @@ class pathingProc extends processClass {
 
         
         this.nodeMap = {};
+
+        this.edges = new global.utils.array.IndexingCollection("id", ["node1Id", "node2Id"], [5, 100000, 100000]);
     }
     initThreads() {
         return [
@@ -45,6 +47,11 @@ class pathingProc extends processClass {
         if (Memory.pStar) {
             global.utils.pStar.inst = global.utils.pStar.class.deserialize(Memory.pStar);
         }
+
+        if (Memory.edges) {
+            this.edges = global.utils.array.IndexingCollection.deserialize(Memory.edges, global.utils.pStar.Edge)
+        }
+        //return threadClass.DONE;
     }
     save() {
         let start = Game.cpu.getUsed();
@@ -52,6 +59,16 @@ class pathingProc extends processClass {
         Memory.pStar = serialized;
         let cpu = Game.cpu.getUsed() - start;
         logger.log("serialized length:", serialized.length, "cpu used:", cpu);
+        global.utils.pStar.inst.edges._debugQueue();
+
+
+        // Memory.edges = this.edges.serialize();
+        // let allEdges = this.edges.getAll();
+        // for(let e in allEdges) {
+        //     let edge = allEdges[e];
+        //     edge.displayEdge();
+        // }
+
 //Game.cpu.halt();
         // start = Game.cpu.getUsed();
         // let deserialized = global.utils.pStar.class.deserialize(serialized);
@@ -145,8 +162,18 @@ class pathingProc extends processClass {
             if (pos.x < edgeMin || pos.x > edgeMax || pos.y < edgeMin || pos.y > edgeMax) {
                 type = Node.ROOM_EXIT;
             }
-            let node = new Node(otherFlag.pos, type);
-            if (this.kernel.time%1==0 && !global.utils.pStar.inst.hasNode(node)) {
+            let node;
+            if (!this.nodeMap[otherFlag.name]) {
+                node = new Node(otherFlag.pos, type);
+                this.nodeMap[otherFlag.name] = node;
+            } else {
+                node = this.nodeMap[otherFlag.name];
+            }
+            let edge = new global.utils.pStar.Edge(sNode, node);
+            if (!this.edges.has(edge)) {
+                this.edges.add(edge);
+            }
+            if (!global.utils.pStar.inst.hasNode(node)) {
                 logger.log("adding other flag", node.id);
                 global.utils.pStar.inst.addNode(node);
                 this.nodeMap[otherFlag.name] = node;

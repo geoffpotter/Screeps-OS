@@ -8,7 +8,7 @@ logger = new logger("util.arrays");
 class LRUInfo {
     constructor(id) {
         this.id = id;
-        this.prev = this.next = false;
+        this.newer = this.older = false;
     }
 }
 
@@ -43,52 +43,59 @@ class IndexingCollection {
      * @param {LRUInfo} thingInfo 
      */
     _markUsed(thingInfo) {
-        //if we have a prev and next then we're 
+        //if we have a newer and older then we're 
         if (this.head && thingInfo.id == this.head.id) {
             logger.log(thingInfo.id, "already most recently used")
             return;
         }
         
-        //logger.log("marking", thingInfo.id, "as used.  Next? ", thingInfo.next ? thingInfo.next.id : "none", "pref?", thingInfo.prev ? thingInfo.prev.id : "none")
+        //logger.log("marking", thingInfo.id, "as used.  older? ", thingInfo.older ? thingInfo.older.id : "none", "pref?", thingInfo.newer ? thingInfo.newer.id : "none")
         //this._debugQueue();
-        if (thingInfo.next || thingInfo.prev) { //thing already in path
+        
+        
+        
+        
+        
+        if (thingInfo.older || thingInfo.newer) { //thing already in path
             //remove thing info.
-            let next = thingInfo.next;
-            let prev = thingInfo.prev;
-            if(next)
-                next.prev = prev;
-            if(prev)
-                prev.next = next;
+            let older = thingInfo.older;
+            let newer = thingInfo.newer;
+            if(older)
+                older.newer = newer;
+            if(newer)
+                newer.older = older;
 
-            thingInfo.next = thingInfo.prev = false;
+            thingInfo.older = thingInfo.newer = false;
         }
         if (!this.head) { //first node
             this.head = this.tail = thingInfo;
         } else {//already have nodes
-            this.head.prev = thingInfo; //add this node to top of list
-            thingInfo.next = this.head;
+            this.head.newer = thingInfo; //add this node to top of list
+            thingInfo.older = this.head;
             this.head = thingInfo; //mark this node as head
 
             //clear up .head and .tail
             if (this.head.id == thingInfo.id) {
-                thingInfo.prev = false;
+                thingInfo.newer = false;
             }
             // if (this.tail.id == thingInfo.id) {
-            //     thingInfo.next = false;
+            //     thingInfo.older = false;
             // }
         }
-        //logger.log("marked", thingInfo.id, "as used.  Next? ", thingInfo.next ? thingInfo.next.id : "none", "pref?", thingInfo.prev ? thingInfo.prev.id : "none")
+        //logger.log("marked", thingInfo.id, "as used.  older? ", thingInfo.older ? thingInfo.older.id : "none", "pref?", thingInfo.newer ? thingInfo.newer.id : "none")
         
         //this._debugQueue();  
     }
 
     _enforceLimit() {
-        //logger.log("enforcing limits")
+        //logger.log("enforcing limits", this.head.id, this.tail.id);
+        //this._debugQueue();
         let finalLimit = this.limits[this.limits.length-1];
         while(this.nodeInfoById.size > finalLimit) {
             logger.log('over limit!',this.nodeInfoById.size, finalLimit);
             let nodeInfoToRemove = this.tail;
-            let nodeToRemove = this.getById(nodeInfoToRemove.id);
+            let nodeToRemove = this.thingsById[nodeInfoToRemove.id];
+            this._debugQueue();
             logger.log("removing node", JSON.stringify(nodeToRemove));
             this.remove(nodeToRemove);
         }
@@ -98,18 +105,18 @@ class IndexingCollection {
         let curr = this.head;
         let cThing = this.thingsById[curr.id];
         if (!cThing) {
-            logger.log("broken...");
+            logger.log("broken...", this.head.id, Object.keys(this.thingsById));
             return;
         }
         fn(cThing);
         let i = 0;
-        let max = 100;
-        while(curr = curr.next) {
+        let max = Object.keys(this.thingsById).length + 10; //+10 for sanity.. shouldn't ever go more than once for each item
+        while(curr = curr.older) {
             if (i > max) {
                 logger.log('broke somethin?');
                 throw new Error("wtf")
             }
-            //logger.log('for eachin', curr.id, curr.next.id, curr.prev.id);
+            //logger.log('for eachin', curr.id, curr.older.id, curr.newer.id);
             cThing = this.thingsById[curr.id];
             fn(cThing);
             i++;
@@ -118,7 +125,7 @@ class IndexingCollection {
     _debugQueue() {
         let out = "";
         this.forEach((thing) => {
-            //logger.log(thing.id)
+            //logger.log(thing)
             out += thing.id + ">"
         })
         logger.log('internal queue:', out);
@@ -160,6 +167,22 @@ class IndexingCollection {
             //remove from id lookup and groups
             delete this.thingsById[id];
 
+            let nodeInfo = this.nodeInfoById.get(id);
+            if (nodeInfo.newer) {
+                let newerNode = nodeInfo.newer;
+                newerNode.older = nodeInfo.older; 
+            }
+            if (nodeInfo.older) {
+                let olderNode = nodeInfo.older;
+                olderNode.newer = nodeInfo.newer;
+            }
+            if (nodeInfo.id == this.head.id) {
+                this.head = nodeInfo.older;
+            }
+            if (nodeInfo.id == this.tail.id) {
+                this.tail = nodeInfo.newer;
+            }
+            
             this.nodeInfoById.delete(id);
 
             for(let f in this.groupByFields) {
@@ -183,7 +206,7 @@ class IndexingCollection {
         let has = !!this.thingsById[id];
         if (has) {
             let info = this.nodeInfoById.get(id);
-            this._markUsed(info);
+            //this._markUsed(info);
         }
         return has;
     }
@@ -286,6 +309,8 @@ class IndexingCollection {
         
         
         let inst = new IndexingCollection(idField, groups, limits);
+        //reverse items before putting them back in, to keep the lru order
+        arr = arr.reverse();
         for(let i in arr) {
             let itemObj = arr[i];
             let item = thingClass.deserialize(itemObj);

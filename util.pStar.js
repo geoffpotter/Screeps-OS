@@ -511,14 +511,16 @@ class Edge {
     serialize(level) {
         //level = 1;
         //level is 1-x for "memory level", like L1, L2, L3 cache. but reversed
-        logger.log(this.id, "serializing", level, level==1 ? "adding path" : "not adding path", "lol even has a path?", this.path.path.length>0)
+        //logger.log(this.id, "serializing", level, level==1 ? "adding path" : "not adding path", "lol even has a path?", this.path.path.length>0)
         let arr = [
             this.node1Id,
             this.node2Id,
             this.cost,
-            this.lastUpdated,
-            level == 1 ? this.path.serialize() : ""
+            this.lastUpdated
         ]
+        if (level == 1) {
+            arr.push(this.path.serialize())
+        }
         //logger.log(this.id,'serialized')
         //logger.log(JSON.stringify(arr))
         return arr.join("|");
@@ -534,7 +536,7 @@ class Edge {
         inst.cost = cost;
         inst.lastUpdated = lastUpdated;
         if (cachedPath) {
-            //logger.log("----",cachedPath)
+            logger.log("----",cachedPath)
             inst.path = global.utils.map.CachedPath.deserialize(cachedPath);
             inst.path.getPath();
             //logger.log(JSON.stringify(inst.path))
@@ -547,7 +549,7 @@ class pStar {
     constructor() {
         
         this.nodes = new global.utils.array.IndexingCollection("id", ["pos.roomName", "type"], [100000, 1000000]);
-        this.edges = new global.utils.array.IndexingCollection("id", ["node1Id", "node2Id"], [5, 200000, 1000000]);
+        this.edges = new global.utils.array.IndexingCollection("id", ["node1Id", "node2Id"], [10, 200000, 1000000]);
         
         this.distances = new global.utils.array.IndexingCollection("id", ["origin.id", "goal.id"], [2, 1000000]);
 

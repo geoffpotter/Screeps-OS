@@ -59,7 +59,7 @@ class pStarProc extends processClass {
             global.utils.pStar.inst = global.utils.pStar.class.deserialize(Memory.pStarCache);
             let used = Game.cpu.getUsed() - start;
             logger.log("pStar deserialize.  CPU:", used, "Size:", Memory.pStarCache.length);
-            logger.log("wtf",JSON.stringify(global.utils.pStar.inst));
+            //logger.log("wtf",JSON.stringify(global.utils.pStar.inst));
 
             return;
             //start a proc for each node
