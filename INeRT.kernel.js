@@ -41,10 +41,11 @@ logger = new logger("INeRT.kernel");
 //logger.enabled = false;
 logger.color = COLOR_GREEN;
 
-let stat = require("util.stat");
+let stat = require("util.stat").classes.stat;
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 let queuesClass = require("INeRT.queue.types");
+let queueClass = require("INeRT.queue.base")
 
 class kernel {
     constructor() { // class constructor
@@ -210,6 +211,7 @@ class kernel {
         let cpuByProc = {};
         
         //run threads
+        /** @type {threadClass} */
         let thread = false;
         //while we've got threads to run, run em
         logger.log("Starting kernel run")
@@ -240,8 +242,18 @@ class kernel {
             cpuByProc[thread.process.name] += cpuUsed;
             
             //logger.log('ran', thread.process.name, "func", thread.method, "got", ret);
-            if (ret === threadClass.DONE) {
+            if (ret === threadClass.DONE || ret === threadClass.HUNGRY) {
+                let queueName = thread.targetQueue;
                 this.queues.removeThread(thread);
+                /** @type {queueClass} */
+                let queueItWasIn = this.queues.getQueue(queueName);
+                queueItWasIn.currentIndex--;//roll current index back one, since we've removed the item at that index now
+
+                //
+                if (ret === threadClass.HUNGRY) {
+                    //if it's hungry, add it back in after removing it.  this should cause it to run again at the end of it's queue.  Be careful..
+                    this.startThread(thread);
+                }
             }
             
             threadsRun++;

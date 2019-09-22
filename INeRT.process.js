@@ -12,7 +12,7 @@ logger = new logger("INeRT.process");
 logger.enabled = false;
 logger.color = COLOR_GREY;
 
-let stat = require("util.stat");
+let stat = require("util.stat").classes.stat;
 let threadClass = require("INeRT.thread");
 
 class process {

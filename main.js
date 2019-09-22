@@ -1,7 +1,7 @@
 
 // let memory = Memory;
 // global.Memory = memory;
- 
+
 // delete global.Memory;
 // 	Memory = memory;
 // 	global.Memory = memory;
@@ -16,11 +16,13 @@ logger = new logger("main");
 // _.each(Game.creeps, (c) => c.memory.task = false)
 //return;
 
- //_.each(Game.flags, (f) => f.remove());
+//_.each(Game.flags, (f) => f.remove());
 // Memory.creeps = {};
 // return;
-//Memory.rooms ={} 
+//Memory.rooms ={}
 //util classe
+// Memory.pStar = "";
+// return;
 // RawMemory.set("");
 //  return;
 //prototype overrides
@@ -36,9 +38,35 @@ global.utils.map = require("util.map");
 global.utils.pStar = require("util.pStar");
 global.utils.cm = require("util.cm");
 
-profiler.registerObject(global.utils, "utils")
+for(let u in global.utils) {
+	let util = global.utils[u];
+	//util = profiler.registerObject(util, "utils." + u);
+	for(let itemName in util) {
+		let item = util[itemName];
+		let label = "utils." + u + "." + itemName;
+		logger.log("wrapping", label)
+		//all classes go in a .classes property of the utility.
+		if (itemName == "classes") {
+			for(let className in item) {
+				let cl = item[className];
+				logger.log("registering class",  label + "." + className)
+				profiler.registerClass(cl, label + "." + className);
+			}
+		} else if (typeof item == "function") {
+			item = profiler.registerFN(item, label);
+		} else if (typeof item == "object") {
+			//likely a good place for recursion.. meh..
+			item = profiler.registerObject(item, label)
+		}
+		
+		//logger.log(u, itemName, item.toString().indexOf("this"), item.constructor.name, item.profilerWrapped)
+		util[itemName] = item;
+	}
+	global.utils[u] = util;
+}
+//profiler.registerObject(global.utils, "utils")
 // logger.log(JSON.stringify(global.creepClasses));
-// return;
+//return;
 
 
 let kernelClass = require("INeRT.kernel");

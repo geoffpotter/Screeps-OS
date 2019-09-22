@@ -25,16 +25,16 @@ class CachedPath {
         this.goal = goal;
         this.opts = opts;
 
-        //validate orgin
-        if (!this.orgin || !(this.orgin.x >= 0) || !(this.orgin.y >= 0) || !this.orgin.roomName) {
-            logger.log(JSON.stringify(this.orgin), JSON.stringify(this.goal))
-            throw new Error("Orgin invalid! " + JSON.stringify(this.orgin))
-        }
-        //validate goal
-        if (!this.goal || !(this.goal.x >= 0) || !(this.goal.y >= 0) || !this.goal.roomName) {
-            logger.log(JSON.stringify(this.orgin), JSON.stringify(this.goal))
-            throw new Error("Goal invalid! " + JSON.stringify(this.goal))
-        }
+        // //validate orgin
+        // if (!this.orgin || !(this.orgin.x >= 0) || !(this.orgin.y >= 0) || !this.orgin.roomName) {
+        //     logger.log(JSON.stringify(this.orgin), JSON.stringify(this.goal))
+        //     throw new Error("Orgin invalid! " + JSON.stringify(this.orgin))
+        // }
+        // //validate goal
+        // if (!this.goal || !(this.goal.x >= 0) || !(this.goal.y >= 0) || !this.goal.roomName) {
+        //     logger.log(JSON.stringify(this.orgin), JSON.stringify(this.goal))
+        //     throw new Error("Goal invalid! " + JSON.stringify(this.goal))
+        // }
 
         //ensure room positions
         if (!(this.orgin instanceof RoomPosition)) {
@@ -56,9 +56,9 @@ class CachedPath {
         /*
         control vars
         */
-       this.pathCost = 99;
+       this.pathCost = false;
        this._cachedPath = 0;
-       this._cachedDist = 99;
+       this._cachedDist = 0;
     }
 
     get id() {
@@ -73,7 +73,7 @@ class CachedPath {
         } else if (this._cachedDist) {
             return this._cachedDist;
         } else {
-            this._cachedDist = this.orgin.toWorldPosition().getRangeTo(this.goal.pos);
+            this._cachedDist = this.orgin.toWorldPosition().getRangeTo(this.goal);
             return this._cachedDist;
         }
     }
@@ -106,13 +106,14 @@ class CachedPath {
         if (!this.goal.isClearSpace()) {
             range = 1;
         }
-        this.opts.plainCost = 2;
-        this.opts.swampCost = 10;
-        this.opts.roomCallback = function(roomName) {
+        let opts = _.clone(this.opts);
+        opts.plainCost = 2;
+        opts.swampCost = 10;
+        opts.roomCallback = function(roomName) {
             let cm = global.utils.cm.getCM(roomName, "pStar");
             return cm;
         }
-        let path = PathFinder.search(this.orgin, {pos:this.goal, range: range}, this.opts);
+        let path = PathFinder.search(this.orgin, {pos:this.goal, range: range}, opts);
         if (path.incomplete) {
             return [];
         }
@@ -230,10 +231,11 @@ class CachedPath {
         //log('init done')
         //if we have a start pos(.s) set, then just move there and return;
         if (pathInfo.s) {
+            destTolarance = 0; //if we're going to the start position, go all the way there
             let pos = new RoomPosition(pathInfo.s.x, pathInfo.s.y, pathInfo.s.roomName);
             if (creep.pos.inRangeTo(pos, destTolarance)) {
                 pathInfo.s = false; // continue on path, should be in range now
-                log("at start pos")
+                //log("at start pos")
             } else {
                 let ret = creep.moveTo(pos, {range: destTolarance, visualizePathStyle:{stroke:"#f0f"}})
                 logger.log(creep.name, "moving to path", pos, ret);
@@ -241,7 +243,7 @@ class CachedPath {
                     pathInfo.done = true;
                 }
                 creep.memory._cachedPath = pathInfo;
-                log('moved to start pos')
+                //log('moved to start pos')
                 return pathInfo;
             }
             
@@ -429,9 +431,10 @@ class CachedPath {
         }
         //log('finalizing')
         //logger.log("creep moved", JSON.stringify(pathInfo))
-        if (!pathInfo.onPath && !pathInfo.closeToPath){
+        if (!pathInfo.onPath && !pathInfo.closeToPath || pathInfo.stuck > 3){
             //pathInfo.done = true;
             pathInfo.s = closestPos;
+            creep.say('off path!')
             logger.log(creep.name, "not on path!", JSON.stringify(pathInfo));
             logger.log(closestPos)
         }
@@ -467,6 +470,11 @@ class CachedPath {
         let goal = global.WorldPosition.deserialize(goalStr).toRoomPosition();
         let inst = new CachedPath(orgin, goal, JSON.parse(optsJson));
         inst._cachedPath = cachedPath;
+        if (cachedPath && cachedPath != 0 && cachedPath != "false") {
+            logger.log("fillin path", cachedPath)
+            inst.path = global.utils.map.dirStrToPath(orgin, cachedPath);
+        }
+        
         inst.pathCost = pathCost;
         inst._cachedDist = cachedDist;
         //inst.getPath();
@@ -476,14 +484,44 @@ class CachedPath {
 
 }
 
-
+// global.profiler.registerClass(CachedPath,"CachedPath");
+// CachedPath.deserialize = global.profiler.registerFN(CachedPath.deserialize, "CachedPath.deserialize");
 
 
 
 module.exports = {
+    classes: {
+        CachedPath,
+    },
+    
 
-    CachedPath,
 
+    getExitPositions(roomName) {
+        let terrain = Game.map.getRoomTerrain(roomName);
+        let raw = terrain.getRawBuffer();
+        let exitDescriptions = {}; // DIRECTION => list of exit roomPositions in that dir
+        let exits = Game.map.describeExits(roomName);
+        //for each side that has an exit, check every node that
+        for(let exitDir in exits) {
+            let exitsThisWay = [];
+            //fill in room positions that aren't walls
+            //logger.log("checking dir", exitDir, TOP)
+            for(let i=0;i<50;i++) {
+                let x = (exitDir == TOP || exitDir == BOTTOM) ? i : (exitDir == LEFT ? 0 : 49);
+                let y = (exitDir == LEFT || exitDir == RIGHT) ? i : (exitDir == TOP ? 0 : 49);;
+                let code = raw[y*50 + x];
+                let isWall = code & TERRAIN_MASK_WALL;
+                //logger.log("checking for exit", roomName, x, y, isWall, code)
+                if (!isWall) {
+                    let pos = new RoomPosition(x, y, roomName);
+                    exitsThisWay.push(pos);
+                }
+            }
+            exitDescriptions[exitDir] = exitsThisWay;
+        }
+
+        return exitDescriptions;
+    },
    
     /**
      * 

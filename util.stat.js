@@ -53,4 +53,8 @@ class stat {
 
 
 
-module.exports = stat;
+module.exports = {
+    classes: {
+        stat
+    }
+}

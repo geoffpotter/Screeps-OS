@@ -18,7 +18,7 @@ let intelClass = require("pr.empire.intel");
 
 let scoutClass = require("pr.role.scout");
 
-let stat = require("util.stat");
+let stat = require("util.stat").classes.stat;
 
 class empire extends processClass {
     init() {

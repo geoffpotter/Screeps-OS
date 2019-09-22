@@ -17,6 +17,9 @@ class IndexingCollection {
         if (!limits) {
             limits = [10, 20, 30];
         }
+        if (!idField) {
+            throw new Error("Id field required!")
+        }
         this.idField = idField; 
         this.groupByFields = groupByFields;
         //Main storage of all things
@@ -36,6 +39,8 @@ class IndexingCollection {
         this.head = false;
         /** @type {LRUInfo} */
         this.tail = false;
+
+        this.serializeSeperator = "∪";
     }
 
     /**
@@ -45,7 +50,7 @@ class IndexingCollection {
     _markUsed(thingInfo) {
         //if we have a newer and older then we're 
         if (this.head && thingInfo.id == this.head.id) {
-            logger.log(thingInfo.id, "already most recently used")
+            //logger.log(thingInfo.id, "already most recently used")
             return;
         }
         
@@ -102,9 +107,13 @@ class IndexingCollection {
     }
 
     forEach(fn) {
+        
         let curr = this.head;
         let cThing = this.thingsById[curr.id];
         if (!cThing) {
+            if (Object.keys(this.thingsById).length == 0) {
+                return;//it's empty, not broken.. guess that makes me the asshole!
+            }
             logger.log("broken...", this.head.id, Object.keys(this.thingsById));
             return;
         }
@@ -135,7 +144,7 @@ class IndexingCollection {
         let id = _.get(theThing, this.idField);
 
         if (this.thingsById[id]) {
-            logger.log("before:", Object.keys(this.thingsById).length)
+            logger.log("before:", Object.keys(this.thingsById), id, theThing.id,  JSON.stringify(this.idField))
             this.remove(theThing);
             logger.log(Object.keys(this.thingsById).length)
         }
@@ -201,6 +210,10 @@ class IndexingCollection {
         }
     }
 
+    hasId(id) {
+        let has = !!this.thingsById[id];
+        return has;
+    }
     has(aThing) {
         let id = _.get(aThing, this.idField);
         let has = !!this.thingsById[id];
@@ -256,7 +269,7 @@ class IndexingCollection {
             while(currLimit && numSerialized >= currLimit) {
                 currLimit = this.limits[currLimitIndex];
                 currLimitIndex++;
-                logger.log("next limit", currLimitIndex+1, "/", this.limits.length, "for serializing", this.limits[currLimitIndex-1]);
+                //logger.log("next limit", currLimitIndex+1, "/", this.limits.length, "for serializing", this.limits[currLimitIndex-1]);
                 //check if we're out of limits, if so, stop serializing shit dummy
                 if (currLimitIndex >= (this.limits.length-1)) {
                     
@@ -268,35 +281,14 @@ class IndexingCollection {
             
         })
 
-
-        // let all = this.getAll();
-        // let numSerialized = 0;
-        // let currLimitIndex = 0;
-        // let num = all.length;
-        // for(let i=0;i<num;i++) {
-        //     //check if we're out of limits, if so, stop serializing shit dummy
-        //     if (currLimitIndex >= (this.limits.length-1)) {
-        //         logger.log("at the limit for serializing", this.limits[currLimitIndex-1]);
-        //         break;
-        //     }
-        //     //check if we're at this limit
-        //     let currLimit = this.limits[currLimitIndex];
-        //     if (numSerialized >= currLimit) {
-        //         currLimitIndex++; //go to next limit
-        //         i--;//redo last index
-        //         continue;
-        //     }
-        //     let thing = all[i];
-        //     //logger.log('serializing thing', thing.id, numSerialized, currLimit, currLimitIndex)
-        //     let serialized = thing.serialize(currLimitIndex+1);
-        //     arr.push(serialized);
-        //     numSerialized++;
-        // }
-        logger.log("serialized", numSerialized, "things")
-        return arr.join("∪");
+        //logger.log("serialized", numSerialized, "things")
+        return this.serializeSeperator + arr.join(this.serializeSeperator);
     }
     static deserialize(str, thingClass) {
-        let arr = str.split("∪");
+        let seperator = str.slice(0, 1);
+        str = str.substr(1);
+        //logger.log("deserialize", seperator, str);
+        let arr = str.split(seperator);
         let idField = arr.shift();
         let limits = arr.shift().split("Œ");
         let groups = [];
@@ -308,19 +300,23 @@ class IndexingCollection {
         }
         
         
+        //logger.log("items:", JSON.stringify(arr))
         let inst = new IndexingCollection(idField, groups, limits);
+        inst.serializeSeperator = seperator;
         //reverse items before putting them back in, to keep the lru order
         arr = arr.reverse();
         for(let i in arr) {
             let itemObj = arr[i];
             let item = thingClass.deserialize(itemObj);
+            //logger.log('adding thing', item.id)
             inst.add(item);
         }
         return inst;
     }
 }
 
-
+// global.profiler.registerClass(IndexingCollection,"IndexingCollection");
+// IndexingCollection.deserialize = global.profiler.registerFN(IndexingCollection.deserialize, "IndexingCollection.deserialize");
 
 const top = 0;
 const parent = i => ((i + 1) >>> 1) - 1;
@@ -407,8 +403,11 @@ class PriorityQueue {
 
 
 module.exports = {
-    IndexingCollection,
-    PriorityQueue,
+    classes: {
+        IndexingCollection,
+        PriorityQueue,
+    },
+    
 
     arrayContainsLoc: function(array, pos, debug) {
         for(var i in array) {

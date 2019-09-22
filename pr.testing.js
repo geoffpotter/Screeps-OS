@@ -14,9 +14,9 @@ logger = new logger("pr.testing");
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
-let CachedPath = global.utils.map.CachedPath;
-let Node = global.utils.pStar.Node;
-let Edge = global.utils.pStar.Edge;
+let CachedPath = global.utils.map.classes.CachedPath;
+let Node = global.utils.pStar.classes.Node;
+let Edge = global.utils.pStar.classes.Edge;
 //let pStar = global.utils.pStar.class;
 
 
@@ -77,7 +77,7 @@ class testProc extends processClass {
 
 
         
-        this.flags = new global.utils.array.IndexingCollection("id", ["pos.roomName", "color"], [3, 5, 8]);
+        this.flags = new global.utils.array.classes.IndexingCollection("id", ["pos.roomName", "color"], [3, 5, 8]);
     }
     initThreads() {
         return [
@@ -92,7 +92,7 @@ class testProc extends processClass {
     }
     init_onTick() {
         if (Memory.flags) {
-            this.flags = global.utils.array.IndexingCollection.deserialize(Memory.flags, serializeFlag);
+            //this.flags = global.utils.array.IndexingCollection.deserialize(Memory.flags, serializeFlag);
         }
         return threadClass.DONE;
     }
@@ -118,6 +118,9 @@ class testProc extends processClass {
     save() {
         this.flags._debugQueue();
         Memory.flags = this.flags.serialize();
+        logger.log("serialized flags: ", Memory.flags);
+        //let deseri = global.utils.array.IndexingCollection.deserialize(Memory.flags, serializeFlag)
+        //logger.log("same", JSON.stringify(deseri) == JSON.stringify(this.flags))
     }
     run() {
         logger.log(this.name, "init")
@@ -130,7 +133,7 @@ class testProc extends processClass {
 
     mapFlags() {
         //rebuild the network every tick
-        //global.utils.pStar.inst = new global.utils.pStar.class();
+        //global.utils.pStar.inst = new global.utils.pStar.classes.pStar();
         let num = 1;
         while(Game.flags["Flag" + num]) {
             let flag = Game.flags["Flag" + num];

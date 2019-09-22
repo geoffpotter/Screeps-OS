@@ -20,7 +20,7 @@ class pStarCostMatrix extends PathFinder.CostMatrix {
 
 
 }
-let cms = new global.utils.array.IndexingCollection("id", ["roomName", "type"]);
+let cms = new global.utils.array.classes.IndexingCollection("id", ["roomName", "type"], [1000,10000]);
 module.exports = {
     /**
      * 

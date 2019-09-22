@@ -17,7 +17,7 @@ let threadClass = require("INeRT.thread");
 let intelClass = require("pr.empire.intel");
 
 
-let stat = require("util.stat");
+let stat = require("util.stat").classes.stat;
 
 class flagwalker extends processClass {
     init() {
@@ -36,7 +36,7 @@ class flagwalker extends processClass {
         
         let spawn = Game.spawns['Spawn1'];
         let creeps = Game.creeps;
-        let numflagwalkers = 1;
+        let numflagwalkers = 100;
         logger.log("spawnin", Object.keys(creeps).length, numflagwalkers)
         if (Object.keys(creeps).length < numflagwalkers) {
             logger.log("not enough flagwalkers", spawn.spawning, spawn.room.energyAvailable)
@@ -79,12 +79,13 @@ class flagwalker extends processClass {
             //logger.log(creep.name, i, (i%2==0))
 
                 //logger.log(creep.name, "using pStar")
+            //creep.moveTo(roomCenter, {range:2})
             ret = global.utils.pStar.inst.moveTo(creep, {pos: roomCenter, range: 2});
 
             let used = Game.cpu.getUsed() - start;
             //logger.log(JSON.stringify(ret))
             logger.log(creep.name, "moved using", used, "cpu", ret.method);
-            logger.log(creep.name, "moved using", used, "cpu", i%2==0 ? "pstar" : "moveTo");
+            //logger.log(creep.name, "moved using", used, "cpu", i%2==0 ? "pstar" : "moveTo");
             //creep.say((i%2==0 ? "pStar" : "moveTo") + " " + used);
             
         }

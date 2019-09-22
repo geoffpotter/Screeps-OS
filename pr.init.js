@@ -34,14 +34,14 @@ class initProc extends processClass {
     run() {
         logger.log(this.name, "init")
         
-        let pStarProc = new pStarProcClass("pStar");
-        this.kernel.startProcess(pStarProc);
+        // let pStarProc = new pStarProcClass("pStar");
+        // this.kernel.startProcess(pStarProc);
         
-        let empireProc = new empireProcClass("empire");
-        this.kernel.startProcess(empireProc);
+        // let empireProc = new empireProcClass("empire");
+        // this.kernel.startProcess(empireProc);
 
-        let intel = new intelProcClass("intel");
-        this.kernel.startProcess(intel);
+        // let intel = new intelProcClass("intel");
+        // this.kernel.startProcess(intel);
         
         
         let statsProc = new statsProcClass("stats");
@@ -49,14 +49,14 @@ class initProc extends processClass {
         
         
 
-        // let pathingProc = new pathingProcClass("pathing");
-        // this.kernel.startProcess(pathingProc);
+        let pathingProc = new pathingProcClass("pathing");
+        this.kernel.startProcess(pathingProc);
 
-        // let flagwalkerProc = this.kernel.getProcess("flagwalker")
-        // if (!flagwalkerProc) {
-        //     flagwalkerProc = new flagwalkerClass("flagwalker");
-        //     this.kernel.startProcess(flagwalkerProc);
-        // }
+        let flagwalkerProc = this.kernel.getProcess("flagwalker")
+        if (!flagwalkerProc) {
+            flagwalkerProc = new flagwalkerClass("flagwalker");
+            this.kernel.startProcess(flagwalkerProc);
+        }
 
         // let testProc = new testingProcClass("testing");
         // this.kernel.startProcess(testProc);

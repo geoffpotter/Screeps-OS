@@ -41,6 +41,17 @@ module.exports = {
         this.circle(dest, "red");
         var roomVisuals = {};
         //logger.log(JSON.stringify(flow))
+        var charMap = {}
+        charMap[TOP] ="⬆";
+        charMap[TOP_LEFT] = "↖";
+        charMap[TOP_RIGHT] = "↗";
+        
+        charMap[LEFT] = "⬅";
+        charMap[RIGHT] ="➡";
+        charMap[BOTTOM] = "⬇";
+        charMap[BOTTOM_LEFT] ="↙";
+        charMap[BOTTOM_RIGHT] = "↘";
+        
         for (var roomName in flow) {
             if (!roomVisuals[roomName]) {
                 roomVisuals[roomName] = new RoomVisual(roomName)
@@ -50,16 +61,7 @@ module.exports = {
                 for(var y in flow[roomName][x]) {
                     var pos = new RoomPosition(x, y, roomName);
                     var dir = flow[roomName][x][y];
-                    var charMap = {}
-                    charMap[TOP] ="⬆";
-                    charMap[TOP_LEFT] = "↖";
-                    charMap[TOP_RIGHT] = "↗";
-                    
-                    charMap[LEFT] = "⬅";
-                    charMap[RIGHT] ="➡";
-                    charMap[BOTTOM] = "⬇";
-                    charMap[BOTTOM_LEFT] ="↙";
-                    charMap[BOTTOM_RIGHT] = "↘";
+
                     
                     //logger.log('here', roomName, x, y, dir, LEFT, charMap[dir], visual.circle)
                     //visual.circle(pos, {fill: 'transparent', radius: 0.55, stroke: 'red'})
@@ -89,7 +91,6 @@ module.exports = {
         }
 
         let lastPosition = path[0];
-        //this.circle(lastPosition, color);
         for (let position of path) {
             if (position.roomName === lastPosition.roomName) {
                 new RoomVisual(position.roomName)
@@ -108,7 +109,6 @@ module.exports = {
             var s = lines[i];
             viz.text(s, basePos.x, yS + i*1, {align:"left"});
         }
-        //logger.log(this.roomName, status);
         
     
     },
@@ -125,7 +125,6 @@ module.exports = {
             var s = lines[i];
             viz.text(s, basePos.x, yS + i*1, {align:"left"});
         }
-        //logger.log(this.roomName, status);
         
     
     },

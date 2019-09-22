@@ -60,28 +60,14 @@ class pStarProc extends processClass {
             let used = Game.cpu.getUsed() - start;
             logger.log("pStar deserialize.  CPU:", used, "Size:", Memory.pStarCache.length);
             //logger.log("wtf",JSON.stringify(global.utils.pStar.inst));
-
-            return;
-            //start a proc for each node
-            let allNodes = global.utils.pStar.inst.nodes.getAll();
-            logger.log("starting node procs")
-            for(let n in allNodes) {
-                let node = allNodes[n];
-                let nodeProcessName = "node-" + node.id;
-                if (!this.kernel.getProcess(nodeProcessName)) {
-                    logger.log("starting proc", nodeProcessName)
-                    let proc = new nodeProc(nodeProcessName, {nodeId: node.id});
-                    this.kernel.startProcess(proc);
-                }
-            }
-            //global.no()
         }
     }
     initThreads() {
         return [
+            this.createThread("refineRooms", "pathing"),
             //this.createThread("refineNodes", "nodes"),
             //this.createThread("refineEdges", "edges"),
-            this.createThread("displayEdges", "work"),
+            //this.createThread("displayEdges", "work"),
             this.createThread("pStarSave", "pathing")
         ];
     }
@@ -98,9 +84,17 @@ class pStarProc extends processClass {
         //this.init();
     }
 
+    refineRooms() {
+        logger.log(this.name, "refine/add rooms");
+
+        global.utils.pStar.inst.addRoomsToNetwork();
+
+        global.utils.pStar.inst.refineRooms();
+    }
+
     refineNodes() {
         logger.log(this.name, "refine nodes");
-        global.utils.pStar.inst.refineNodes();
+        //global.utils.pStar.inst.refineNodes();
     }
 
     refineEdges() {
@@ -115,7 +109,7 @@ class pStarProc extends processClass {
     }
 
     getNodeById(nodeId) {
-        return global.utils.pStar.inst.nodes.getById(nodeId);
+        return global.utils.pStar.inst.getNode(nodeId);
     }
     hasNode(node) {
         return global.utils.pStar.inst.hasNode(node);

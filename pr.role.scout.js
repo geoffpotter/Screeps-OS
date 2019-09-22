@@ -17,7 +17,7 @@ let threadClass = require("INeRT.thread");
 let intelClass = require("pr.empire.intel");
 
 
-let stat = require("util.stat");
+let stat = require("util.stat").classes.stat;
 
 class scout extends processClass {
     init() {

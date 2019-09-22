@@ -15,7 +15,7 @@ logger = new logger("pr.stats");
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
-let stat = require("util.stat");
+let stat = require("util.stat").classes.stat;
 
 class stats extends processClass {
     initThreads() {

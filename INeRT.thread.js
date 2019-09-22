@@ -12,7 +12,7 @@ logger = new logger("INeRT.thread");
 logger.enabled = false;
 logger.color = COLOR_GREY;
 
-let stat = require("util.stat");
+let stat = require("util.stat").classes.stat;
 //let processClass = require("INeRT.process");
 
 class thread {
@@ -35,7 +35,8 @@ class thread {
     
     static get DONE() { return "done" }
     static get TICKDONE() { return "tickdone" }
-    
+    static get HUNGRY() { return "hungry" }
+
     run(kernel) {
         logger.log("running", this.process.name, "->", this.method);
         if (!this.process[this.method]) {
@@ -52,6 +53,11 @@ class thread {
     
     toString() {
         return `${this.process.name}-${this.method}`;
+    }
+    toJSON() {
+        let obj = _.clone(this);
+        obj.process = this.process.name;
+        return obj;
     }
 }
 
