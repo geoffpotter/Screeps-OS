@@ -170,6 +170,7 @@ class IndexingCollection {
         let id = _.get(theThing, this.idField);
         if (!this.thingsById[id]) {
             //can't remove what's not there
+            logger.log(id, this.thingsById[id], this.has(theThing))
             throw new Error("Thing not in collection! -> " + id);
             
         } else {
@@ -203,7 +204,7 @@ class IndexingCollection {
                     this.groups[fieldPath][value] = _.remove(this.groups[fieldPath][value], (thisId) => id != thisId);
                     //logger.log("after remove", JSON.stringify(this.groups[fieldPath][value]))
                 } else {
-                    throw new Error("Object for removal isn't in all groupings.. I broke something, I'm sorry.");
+                    throw new Error("Object for removal isn't in all groupings.. I broke something, I'm sorry.", fieldPath, value, Object.keys(this.groups[fieldPath]));
                 }
             }
             

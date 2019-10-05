@@ -67,8 +67,8 @@ class Node {
 
     get id() {
         if (!this._id) {
-            this._id = this.pos.toWorldPosition().serialize(); //smaller ids
-            //this._id = `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`; //easier to debug
+            //this._id = this.pos.toWorldPosition().serialize(); //smaller ids
+            this._id = `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`; //easier to debug
         }
         return this._id;
     }
@@ -93,6 +93,7 @@ class Node {
      * A map of destNode.id => DestinationInfo 
      */
     get destinationsMap() {
+        this._destMap = false;
         if (!this._destMap) {
             let pStar = global.utils.pStar.inst;
             let destIds = pStar.distances.getGroupWithValue("origin.id", this.id); //list if ids
@@ -377,6 +378,7 @@ class Node {
 
     displayNode(showDests = false) {
         global.utils.visual.drawText(this.type, this.pos);
+        return;
 
         if (showDests) {
             let dests = this.destinations;
@@ -395,8 +397,8 @@ class Node {
     }
 
     serialize() {
-        let ser = this.pos.toWorldPosition().serialize() + '|' + this.type
-        //let ser = this.pos.x + "-" + this.pos.y + "-" + this.pos.roomName + '|' + this.type
+        //let ser = this.pos.toWorldPosition().serialize() + '|' + this.type
+        let ser = this.pos.x + "-" + this.pos.y + "-" + this.pos.roomName + '|' + this.type
         return ser;
     }
     /**
@@ -470,36 +472,408 @@ class Edge {
         }
         return otherRoom.nodes.thingsById[otherNodeId];
     }
-    refineEdge() {
+    edgeNeedsRefinement() {
+        return !this.path.path || this.lastUpdated == 0 || (Game.time - this.lastUpdated) >= global.utils.pStar.inst.edgeTicksValid;
+    }
 
-        if (!this.path.path || this.lastUpdated == 0 || (Game.time - this.lastUpdated) >= global.utils.pStar.inst.nodeTicksValid) {
-            //logger.log("refining edge", this.id);
+    checkIntersections() {
+        logger.log("refining edge", this.id);
 
-            if (!Game.rooms[this.node1Pos.roomName] || !Game.rooms[this.node2Pos.roomName]) {
-                //I can't see! bum ba dum dum dum dum WOOWOOOOO is meee!!
-                return false;
-                //I can't see!
+        // if (!Game.rooms[this.node1Pos.roomName] || !Game.rooms[this.node2Pos.roomName]) {
+        //     //I can't see! bum ba dum dum dum dum WOOWOOOOO is meee!!
+        //     return false;
+        //     //I can't see!
+        // }
+        
+        //invalidate connected nodes
+        let pStar = global.utils.pStar.inst;
+        let n1Room = pStar.getRoom(this.node1Pos.roomName);
+        let n2Room = pStar.getRoom(this.node2Pos.roomName);
+        if (!n1Room || !n2Room) {
+            return false;
+        }
+        if (!n1Room.getNode(this.node1Id) || !n2Room.getNode(this.node2Id)) {
+            return false;
+        }
+        n1Room.getNode(this.node1Id).lastUpdated = 0;
+        n2Room.getNode(this.node2Id).lastUpdated = 0;
+
+        // n1Room.removeEdgeFromPosMap(this);
+        // n2Room.removeEdgeFromPosMap(this);
+
+        if (n1Room.roomName == n2Room.roomName) {
+            //walk path and check for intersecting nodes and edges
+            let cm = global.utils.cm.getCM(this.node1Pos.roomName, "pStar");
+            let path = this.path.getPath();
+            let currentEdge = this;
+            let startNode = n1Room.getNode(currentEdge.node1Id);
+            for(let p in path) {
+                
+                let pos = path[p];
+
+                
+
+                let atEnds = p == 0 || p == path.length - 1;
+                let closeToEnds = p <= 1 || p >= path.length - 2;
+                
+                let intersectionNode = new Node(pos, Node.INTERSECTION);
+                let intersectingEdge = n1Room.getEdgeAtPos(pos);
+
+                cm.set(pos.x, pos.y, 1);
+                if (!n1Room.getEdgeAtPos(pos)) {
+                    n1Room.setEdgeAtPos(pos, this.id);
+                }
+
+                if (n1Room.hasNode(intersectionNode)) {
+                    //intersecting node
+                    if (intersectionNode.id == this.node1Id || intersectionNode.id == this.node2Id) {
+                        if (intersectionNode.id == this.node1Id) { //start node
+                            global.utils.visual.circle(pos, "#fff", 1, 0.5);
+                        } else {
+                            global.utils.visual.circle(pos, "#000", 1, 0.5);
+                        }
+                        
+                    } else {
+                        //valid intersection, bi-sect currect edge with node.
+                        logger.log("found Intersection node", intersectionNode.id, n1Room.nodes.hasId(intersectionNode.id))
+                        
+
+                        let ourNode1 = n1Room.getNode(currentEdge.node1Id);
+                        let ourNode2 = n1Room.getNode(currentEdge.node2Id);
+
+                        let ourEdge1 = new Edge(ourNode1, intersectionNode);
+                        let ourEdge2 = new Edge(ourNode2, intersectionNode);
+                        ourEdge1.lastUpdated = ourEdge2.lastUpdated = currentEdge.lastUpdated;
+
+                        let [ourPath1, ourPath2] = currentEdge.path.splitAtPos(intersectionNode.pos);
+                        if(!ourPath1) {
+                            continue;
+                        }
+                        ourEdge1.path = ourPath1;
+                        ourEdge2.path = ourPath2;
+
+
+                        if (global.utils.pStar.inst.edges.hasId(currentEdge.id)) {
+                            global.utils.pStar.inst.removeEdge(currentEdge);
+                        }
+                        n1Room.removeEdgeFromPosMap(currentEdge);
+
+
+                        global.utils.pStar.inst.edges.add(ourEdge1);
+                        global.utils.pStar.inst.edges.add(ourEdge2);
+
+                        
+
+                        if (startNode.id == ourNode1.id) {
+                            currentEdge = ourEdge2;
+                            n1Room.addEdgeToPosMap(ourEdge1);
+                        } else {
+                            currentEdge = ourEdge1;
+                            n1Room.addEdgeToPosMap(ourEdge2);
+                        }
+                        
+                        startNode = intersectionNode;
+
+                        global.utils.visual.circle(pos, "#00f", 1, 0.5);
+                    }
+                } else if (intersectingEdge && intersectingEdge.id != currentEdge.id) {
+                    
+                    let interNode1 = n1Room.getNode(intersectingEdge.node1Id);
+                    let interNode2 = n1Room.getNode(intersectingEdge.node2Id);
+
+                    let ourNode1 = n1Room.getNode(currentEdge.node1Id);
+                    let ourNode2 = n1Room.getNode(currentEdge.node2Id);
+
+                    let skipSpot = false;
+                    //look for edges that contain our starting node
+                    if (startNode.id == interNode1.id || startNode.id == interNode2.id) {
+                        
+                        let nextPos = path[Number.parseInt(p)+1];
+                        //logger.log(path.length, p, Number.parseInt(p)+1);
+                        if(nextPos) {
+                            //logger.log("nextpos", nextPos);
+                            let nextIntersectionNode = new Node(nextPos, Node.INTERSECTION);
+                            let nextIntersectingEdge = n1Room.getEdgeAtPos(nextPos);
+
+                            //if (!nextIntersectingEdge || (!n1Room.hasNode(nextIntersectionNode) && nextIntersectingEdge.id != intersectingEdge.id)) {
+                            if (!nextIntersectingEdge) {
+                                logger.log("diverging point", pos);
+                                //we have a diverging point!
+                                //global.utils.visual.circle(pos, "#fff", 1, 0.5);
+                                skipSpot = false;
+                            } else {
+                                logger.log('no diverging point!', nextIntersectingEdge.id);
+                                //no diverging point, skip till we find one
+                                skipSpot = true;
+                            }
+                        } else {
+                            logger.log("no next position, skip this spot cuz I dunno.. why not")
+                            skipSpot = true;
+                        }
+                    }
+
+                    if (skipSpot) {
+                        global.utils.visual.circle(pos, "#ff0", 1, 0.5);
+                        logger.log("skipping intersection")
+                        continue;
+                    }
+
+                    global.utils.visual.circle(pos, "#f00", 1, 0.5);
+                    //intersecting edge
+                    intersectingEdge.displayEdge("#f00", 0.5);
+
+                    //actuall do the swap
+                    logger.log("adding Intersection node", intersectionNode.id, n1Room.nodes.hasId(intersectionNode.id))
+                    
+                    
+
+
+
+                    //make new edges
+                    let interEdge1 = new Edge(interNode1, intersectionNode);
+                    let interEdge2 = new Edge(interNode2, intersectionNode);
+                    let ourEdge1 = new Edge(ourNode1, intersectionNode);
+                    let ourEdge2 = new Edge(ourNode2, intersectionNode);
+                    
+                    //extract/insert path info
+                    let [interPath1, interPath2] = intersectingEdge.path.splitAtPos(intersectionNode.pos);
+                    let [ourPath1, ourPath2] = currentEdge.path.splitAtPos(intersectionNode.pos);
+                    logger.log("splitting", intersectingEdge.id, "at", pos, JSON.stringify(interPath1), JSON.stringify(interPath2));
+                    
+                    if (!ourPath1 || ! interPath1) {
+                        continue;
+                    }
+
+                    interEdge1.path = interPath1;                    
+                    interEdge2.path = interPath2;
+
+
+                    ourEdge1.path = ourPath1;
+                    ourEdge2.path = ourPath2;
+
+                    interEdge1.lastUpdated = interEdge2.lastUpdated = intersectingEdge.lastUpdated;
+                    ourEdge1.lastUpdated = ourEdge2.lastUpdated = currentEdge.lastUpdated;
+                    
+
+                    //remove old edges
+                    global.utils.pStar.inst.removeEdge(intersectingEdge);
+                    if (global.utils.pStar.inst.edges.hasId(currentEdge.id)) {
+                        global.utils.pStar.inst.removeEdge(currentEdge);
+                    }
+
+                    //remove old edges from room's edge map
+                    n1Room.removeEdgeFromPosMap(intersectingEdge);
+                    n1Room.removeEdgeFromPosMap(currentEdge);
+
+                    n1Room.addNode(intersectionNode, false);
+
+                    global.utils.pStar.inst.edges.add(interEdge1);
+                    global.utils.pStar.inst.edges.add(interEdge2);
+                    global.utils.pStar.inst.edges.add(ourEdge1);
+                    global.utils.pStar.inst.edges.add(ourEdge2);
+                    
+                    
+                    n1Room.addEdgeToPosMap(interEdge2);
+                    n1Room.addEdgeToPosMap(interEdge1);
+
+                    //n1Room.addEdgeToPosMap(ourEdge2);
+
+                    if(startNode.id == ourNode1.id) {
+                        currentEdge = ourEdge2;
+                        n1Room.addEdgeToPosMap(ourEdge1);
+                    } else {
+                        currentEdge = ourEdge1;
+                        n1Room.addEdgeToPosMap(ourEdge2);
+                    }
+                    
+                    startNode = intersectionNode;
+                    
+
+                } else {
+                    //no intersection
+                    if(intersectingEdge.id == currentEdge.id) {
+                        global.utils.visual.circle(pos, "#f0f", 1, 0.5);
+                    } else {
+                        global.utils.visual.circle(pos, "#0f0", 1, 0.5);
+                    }
+                    
+                }
             }
+        }
+    }
+
+    refineEdge(skipNetworkRefinement=false) {
+        if (!this.path.path || this.lastUpdated == 0 || (Game.time - this.lastUpdated) >= global.utils.pStar.inst.edgeTicksValid) {
+            logger.log("refining edge", this.id);
+
+            // if (!Game.rooms[this.node1Pos.roomName] || !Game.rooms[this.node2Pos.roomName]) {
+            //     //I can't see! bum ba dum dum dum dum WOOWOOOOO is meee!!
+            //     return false;
+            //     //I can't see!
+            // }
             
             //invalidate connected nodes
             let pStar = global.utils.pStar.inst;
             let n1Room = pStar.getRoom(this.node1Pos.roomName);
-            n1Room.getNode(this.node1Id).lastUpdated = 0;
             let n2Room = pStar.getRoom(this.node2Pos.roomName);
+            if (!n1Room || !n2Room) {
+                return false;
+            }
+            if (!n1Room.getNode(this.node1Id) || !n2Room.getNode(this.node2Id)) {
+                return false;
+            }
+            n1Room.getNode(this.node1Id).lastUpdated = 0;
             n2Room.getNode(this.node2Id).lastUpdated = 0;
+
+            // n1Room.removeEdgeFromPosMap(this);
+            // n2Room.removeEdgeFromPosMap(this);
+
             
 
             //bake in path/cost
             let path = this.path.getPath();
+            logger.log('wtf is this path', path, JSON.stringify(path))
+            global.utils.visual.drawPath(path, "#00f");
             this.lastUpdated = Game.time;
 
+            if (skipNetworkRefinement) {
+                return true;
+            }
+
+            this.checkIntersections();
             //we got the path, add the positions to our cost matrix
             
-            let cm = global.utils.cm.getCM(this.node1Pos.roomName, "pStar");
-            for(let p in path) {
-                let pos = path[p];
-                cm.set(pos.x, pos.y, 1);
-            }
+            // let cm = global.utils.cm.getCM(this.node1Pos.roomName, "pStar");
+            
+            // for(let p in path) {
+                
+            //     let pos = path[p];
+
+                
+
+            //     let atEnds = p == 0 || p == path.length - 1;
+            //     let closeToEnds = p <= 1 || p >= path.length - 2;
+
+
+            //     if (n1Room.roomName == n2Room.roomName && !atEnds && pos.roomName == n1Room.roomName) {
+                    
+            //         if (!n1Room.getEdgeAtPos(pos)) {
+            //             n1Room.setEdgeAtPos(pos, this.id);
+            //         }
+
+            //         let intersectionNode = new Node(pos, Node.INTERSECTION);
+            //         if (n1Room.hasNode(intersectionNode)) {
+            //             let ourNode1 = n1Room.getNode(this.node1Id);
+            //             let ourNode2 = n1Room.getNode(this.node2Id);
+
+            //             if (intersectionNode.id == ourNode1.id || intersectionNode.id == ourNode2.id) {
+            //                 continue;
+            //             }
+
+            //             if (global.utils.pStar.inst.edges.hasId(this.id)) {
+            //                 global.utils.pStar.inst.removeEdge(this);
+            //                 global.utils.cm.clearPathFromCM(cm, this.path.path);
+            //             }
+                        
+            //             n1Room.removeEdgeFromPosMap(this);
+
+            //             global.utils.pStar.inst.addEdge(intersectionNode, ourNode1);
+            //             global.utils.pStar.inst.addEdge(intersectionNode, ourNode2);
+            //             global.utils.visual.circle(pos, "#00f", 1, 0.5);
+
+            //             return true;
+            //         } else {
+            //             // if (p <= 1 || p >= path.length - 2) {
+            //             //     continue;
+            //             // } 
+            //             let intersectingEdge = n1Room.getEdgeAtPos(pos);
+                        
+            //             if (intersectingEdge && intersectingEdge.id !== this.id) {
+            //                 //intersectingEdge.displayEdge("#f00");
+            //                 let interNode1 = n1Room.getNode(intersectingEdge.node1Id);
+            //                 let interNode2 = n1Room.getNode(intersectingEdge.node2Id);
+
+            //                 let ourNode1 = n1Room.getNode(this.node1Id);
+            //                 let ourNode2 = n1Room.getNode(this.node2Id);
+
+            //                 logger.log("found intersection", this.id, intersectingEdge.id);
+            //                 logger.log(ourNode1.id, ourNode2.id, interNode1.id, interNode2.id);
+            //                 logger.log(ourNode1.id == interNode1.id, ourNode1.id == interNode2.id)
+            //                 let skipSpot = false;
+            //                 if (ourNode1.id == interNode1.id || ourNode1.id == interNode2.id) {
+                                
+            //                     let nextPos = path[Number.parseInt(p)+1];
+            //                     logger.log(path.length, p, Number.parseInt(p)+1);
+            //                     if(nextPos) {
+            //                         logger.log("nextpos", nextPos);
+            //                         let nextIntersectingEdge = n1Room.getEdgeAtPos(nextPos);
+            //                         if (!nextIntersectingEdge) {
+            //                             logger.log("diverging point", pos);
+            //                             //we have a diverging point!
+            //                             global.utils.visual.circle(pos, "#fff", 1, 0.5);
+            //                             skipSpot = false;
+            //                         } else {
+            //                             logger.log('no diverging point!', nextIntersectingEdge.id);
+            //                             //no diverging point, skip till we find one
+            //                             skipSpot = true;
+            //                         }
+            //                     } else {
+            //                         logger.log("no next position, skip this spot cuz I dunno.. why not")
+            //                         skipSpot = true;
+            //                     }
+            //                 }
+
+            //                 if (skipSpot) {
+            //                     global.utils.visual.circle(pos, "#ff0", 1, 0.5);
+            //                     logger.log("skipping intersection")
+            //                     continue;
+            //                 }
+                            
+            //                 global.utils.visual.circle(pos, "#f00", 1, 0.5);
+
+
+            //                 logger.log("adding Intersection node", intersectionNode.id, n1Room.nodes.hasId(intersectionNode.id))
+            //                 n1Room.addNode(intersectionNode, false);
+
+            //                 //remove old edges
+            //                 global.utils.pStar.inst.removeEdge(intersectingEdge);
+            //                 global.utils.cm.clearPathFromCM(cm, intersectingEdge.path.path);
+                        
+            //                 if (global.utils.pStar.inst.edges.hasId(this.id)) {
+            //                     global.utils.pStar.inst.removeEdge(this);
+            //                     global.utils.cm.clearPathFromCM(cm, this.path.path);
+            //                 }
+            //                 //remove old edges from room's edge map
+            //                 n1Room.removeEdgeFromPosMap(intersectingEdge);
+            //                 n1Room.removeEdgeFromPosMap(this);
+
+            //                 global.utils.pStar.inst.addEdge(intersectionNode, ourNode1);
+            //                 global.utils.pStar.inst.addEdge(intersectionNode, ourNode2);
+            //                 global.utils.pStar.inst.addEdge(intersectionNode, interNode1);
+            //                 global.utils.pStar.inst.addEdge(intersectionNode, interNode2);
+            //                 let replacementEdgeId = Edge.makeEdgeId(intersectionNode.id, ourNode1.id);
+            //                 let replacementEdge = global.utils.pStar.inst.edges.getById(replacementEdgeId);
+            //                 logger.log(replacementEdgeId, replacementEdge);
+            //                 replacementEdge.refineEdge(true);
+            //                 replacementEdge.displayEdge("#0f0");
+
+                            
+
+            //                 return true;
+
+            //                 //logger.log(this.id, "found intersection", intersectingEdge.id)               
+            //             } else {
+            //                 global.utils.visual.circle(pos, "#0f0", 1, 0.5);
+            //             }
+            //         }
+            //     } else {
+            //         global.utils.visual.circle(pos, "#000", 1, 0.5);
+            //     }
+                
+            //     if (!closeToEnds) {
+            //         cm.set(pos.x, pos.y, 4);
+            //     }
+            // }
 
             return true;
         } else {
@@ -508,7 +882,9 @@ class Edge {
         return false;
     }
 
-    displayEdge(color = "#999", opacity = 1) {
+    
+
+    displayEdge(color = "#999", opacity = 0.5) {
         if ( this.path.length == 0) {
             //empty path?
             logger.log("empty path", this.id)
@@ -531,7 +907,7 @@ class Edge {
             //let color = "#" + global.utils.visual.rgbColor(150,150,150);
             //logger.log(JSON.stringify(this.path));
             
-            global.utils.visual.drawText(this.cost, this.path.path[Math.floor(this.path.path.length/2)]);
+            //global.utils.visual.drawText(this.cost, this.path.path[Math.floor(this.path.path.length/2)]);
             
             global.utils.visual.drawPath(this.path.path, color, style)
         }
@@ -598,12 +974,102 @@ class pStarRoom {
         this.lastUpdated = 0;
 
         this.exitsAdded = false;
+
+        /**
+         * RoomPosition => edgeId
+         */
+        this.posEdgeMap = new Map();
+    }
+
+    /**
+     * 
+     * @param {RoomPosition} pos
+     * 
+     * @returns {Edge} 
+     */
+    getEdgeAtPos(pos) {
+        let keys = this.posEdgeMap.keys();
+        for(const edgePos of keys) {
+            if (pos.isEqualTo(edgePos)) {
+                pos = edgePos;
+                break;
+            }
+        }
+
+        if (this.posEdgeMap.has(pos)) {
+            let edgeId = this.posEdgeMap.get(pos);
+            let edge = global.utils.pStar.inst.edges.getById(edgeId);
+            if (!edge) {
+                this.posEdgeMap.delete(pos);
+                return false;
+            }
+            return edge;
+        }
+        return false;
+    }
+
+    setEdgeAtPos(pos, edgeId) {
+        let keys = this.posEdgeMap.keys();
+        for(const edgePos of keys) {
+            if (pos.isEqualTo(edgePos)) {
+                pos = edgePos;
+                break;
+            }
+        }
+
+        //logger.log(pos, this.posEdgeMap.has(pos), edgeId, this.getEdgeAtPos(pos))
+        if (this.posEdgeMap.has(pos)) {
+            throw new Error("Pos already an edge");
+        }
+
+        this.posEdgeMap.set(pos, edgeId);
+    }
+    /**
+     * 
+     * @param {Edge} edge 
+     */
+    removeEdgeFromPosMap(edge) {
+        let keys = this.posEdgeMap.keys();
+        logger.log('removing edge', edge.id);
+        for(let pos of keys) {
+            //let pos = keys[k];
+            //logger.log("removing from edge map", pos, this.posEdgeMap.get(pos), edge.id)
+            if (this.posEdgeMap.get(pos) == edge.id) {
+                // let cm = global.utils.cm.getCM(this.roomName, "pStar");
+                // global.utils.cm.clearPathFromCM(cm, edge.path.path);
+                this.posEdgeMap.delete(pos);
+            }
+        }
+    }
+
+    /**
+     * 
+     * @param {Edge} edge 
+     */
+    addEdgeToPosMap(edge) {
+        let path = edge.path.path;
+        for(let p in path) {
+            let pos = path[p];
+            if (!this.getEdgeAtPos(pos)) {
+                this.setEdgeAtPos(pos, edge.id);
+            }
+            //this.posEdgeMap[pos] = edge.id;
+        }
+    }
+
+    displayPosMap() {
+        
+        this.posEdgeMap.forEach((edgeId, pos) => {
+            //logger.log("I'm prolly dumb.. wanna bet pos isn't a room position??", pos, pos.x, edgeId);
+            global.utils.visual.drawText("#", pos);    
+        });
     }
 
     displayRoom() {
         let center = new RoomPosition(25, 25, this.roomName);
         global.utils.visual.drawText(this.roomName + " " + Object.keys(this.nodes.thingsById).length, center);
         this.displayNodes();
+        this.displayPosMap();
     }
 
     displayNodes() {
@@ -656,10 +1122,17 @@ class pStarRoom {
         if (!(node instanceof Node)) {
             throw new Error("Adding invalid Node:", node);
         }
+        if(this.hasNode(node)) {
+            throw new Error("Already a node at this location");
+        }
         this.nodes.add(node);
         if (autoAddEdges) {
             this.addNodeEdges(node);
         }
+
+        //add to CM
+        //let cm = global.utils.cm.getCM(node.pos.roomName, "pStar");
+        //cm.set(node.pos.x, node.pos.y, 1);
         
     }
 
@@ -726,7 +1199,7 @@ class pStarRoom {
                 
 
                 let nodesConnected = 0;
-                let maxConnections = 10;
+                let maxConnections = 20;
                 
                 let ourNodes = _.filter(roomExitNodes, (nodeId) => {
                     if (nodeId == node.id) {
@@ -783,8 +1256,8 @@ class pStarRoom {
                     return dists[e.n.id+"-"+e.o.id]
                 });
                 //logger.log(JSON.stringify(edges))
-                let maxExitConns = 10;
-                let maxConns = 1;
+                let maxExitConns = 20;
+                let maxConns = 7;
                 let conns = 0;
                 let exitConns = 0;
                 for(let i=0;i<edges.length;i++) {
@@ -837,7 +1310,7 @@ class pStarRoom {
                 default:
                     throw new Error("invalid direction!" + exitDir)
             }
-            let groups = this.groupExits(exitPositions, byX, 7);
+            let groups = this.groupExits(exitPositions, byX, 15);
 
             //logger.log('adding exits', this.roomName, exitDir, groups.length);
             //logger.log(JSON.stringify(exitPositions))

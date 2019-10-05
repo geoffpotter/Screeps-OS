@@ -5,9 +5,40 @@
 var logger = require("screeps.logger");
 
 logger = new logger("util.map");
+
 //logger.enabled = false;
 
 
+/**
+ * a path containing both start and end poisitions
+ * @param {[RoomPosition]} path 
+ */
+function calcPathCost(path) {
+    let cost = 0;
+
+    let terrains = {};
+    getTerrainAt = (pos) => {
+        let roomName = pos.roomName;
+        if (!terrains[roomName]) {
+            terrains[roomName] = new Room.Terrain(pos.roomName);
+        }
+            
+        return terrains[roomName].get(pos.x, pos.y);
+    };
+
+    for(let p in path) {
+        let pos = path[p];
+        //logger.log(pos, path)
+        let terrain = getTerrainAt(pos);
+        if (terrain == TERRAIN_MASK_SWAMP) {
+            cost += 5;
+        } else {
+            cost += 1;
+        }
+    }
+
+    return cost;
+}
 
 
 
@@ -92,6 +123,51 @@ class CachedPath {
         }
     }
 
+    /**
+     * splits the cached path at a position along the path, returns two populated cachedPaths in an array?
+     * @param {RoomPosition} splitPos 
+     */
+    splitAtPos(splitPos) {
+        
+        let firstPath = [this.orgin];
+        let secondPath = [];
+
+        let splitFound = false;
+        let path = this.getPath();
+        logger.log("splitting path at pos", splitPos, JSON.stringify(path))
+        for(let p in path) {
+            let pos = path[p];
+            
+            if (pos.isEqualTo(splitPos)) {
+                splitFound = true;
+                firstPath.push(splitPos);
+            }
+
+            if (!splitFound) {
+                firstPath.push(pos);
+            } else {
+                secondPath.push(pos);
+            }
+
+        }
+
+        if (!splitFound) {
+            return [false, false];
+            //throw new Error("split position not found!");
+        }
+
+        let firstCP = new CachedPath(firstPath[0], firstPath[firstPath.length-1], this.opts);
+        let secondCP = new CachedPath(secondPath[0], secondPath[secondPath.length-1], this.opts);
+
+        firstCP.path = firstPath;
+        firstCP.pathCost = calcPathCost(firstPath);
+        
+        secondCP.path = secondPath;
+        secondCP.pathCost = calcPathCost(secondPath);
+
+        let ret = [firstCP, secondCP];
+        return ret;
+    }
 
     getPath() {
         //if we have a cached path, but no path, load it
@@ -117,7 +193,7 @@ class CachedPath {
         if (path.incomplete) {
             return [];
         }
-        this.pathCost = path.cost;
+        this.pathCost = calcPathCost(path.path);
         this.path = [this.orgin].concat(path.path);
         return this.path;
     }
@@ -204,8 +280,9 @@ class CachedPath {
         if (pathInfo.dest != destNode.id) {
             //destination changed!
             logger.log(creep.name, "destination changed, clear pathinfo");
-            pathInfo = {
+            creep.memory._cachedPath = pathInfo = {
                 stuck: 0,
+                s: false,
                 lp: creep.pos,
                 lpp: creep.pos,
                 idx: 0,
@@ -216,11 +293,15 @@ class CachedPath {
             };
         }
         
-        if (creep.pos.isEqualTo(pathInfo.lp)) {
+        //calculate stuck
+        if (creep.pos.isEqualTo(pathInfo.lp)) { //creep hasn't moved, increment stuck
             pathInfo.stuck++;
         } else {
+            //creep moved, clear stuck
             pathInfo.stuck = 0;
         }
+        //store last creep position
+        pathInfo.lp = creep.pos;
 
         if (creep.pos.inRangeTo(destNode.pos, destTolarance)) { //creep is already there, do nothing;
             pathInfo.done = true;
@@ -249,7 +330,7 @@ class CachedPath {
             
         }
         
-        //logger.log(creep.name, "moving to", destNode.id);
+        logger.log(creep.name, "moving to", destNode.id, pathInfo.idx);
         
         let path = _.clone(this.getPath());
         //if the destination if our orgin, follow the path backwards.
@@ -263,7 +344,7 @@ class CachedPath {
         let creepWpos = creep.pos.toWorldPosition();
         //for(let i in path) {
         //log("starting loop")
-        let startI = pathInfo.onPath ? Math.min(pathInfo.idx + 1, path.length) : pathInfo.idx;
+        let startI = Math.min(path.length, pathInfo.onPath ? pathInfo.idx + 1 : pathInfo.idx);
         for(let i = startI;i < path.length;i++) {
             //log('loop open', i)
             let pos = path[i];
@@ -297,9 +378,9 @@ class CachedPath {
                                   && posDist < creepWpos.getRangeTo(nextPos)); //next node isn't closer
             
             // if (creep.name == "scout0") {
-            //     logger.log(creep.pos, pos, nextPos)
-            //     logger.log(creepWpos.inRangeTo(pos, 1), creepWpos.getRangeTo(pos), creepWpos.getRangeTo(nextPos))
-            //     //logger.log(onPath, closeToPath)
+                logger.log(creep.pos, pos, nextPos)
+                logger.log(creepWpos.inRangeTo(pos, 1), creepWpos.getRangeTo(pos), creepWpos.getRangeTo(nextPos))
+                logger.log(onPath, closeToPath)
             // }
             //log("checked close to path", closeToPath)
             pathInfo.onPath = false;
@@ -309,15 +390,7 @@ class CachedPath {
                 pathInfo.onPath = onPath;
                 pathInfo.closeToPath = closeToPath;
                 
-                //calculate stuck
-                if (creep.pos.isEqualTo(pathInfo.lp)) { //creep hasn't moved, increment stuck
-                    pathInfo.stuck++;
-                } else {
-                    //creep moved, clear stuck
-                    pathInfo.stuck = 0;
-                }
-                //store last creep position
-                pathInfo.lp = creep.pos;
+                
 
                 //store our path index
                 pathInfo.idx = i;
@@ -434,8 +507,9 @@ class CachedPath {
         if (!pathInfo.onPath && !pathInfo.closeToPath || pathInfo.stuck > 3){
             //pathInfo.done = true;
             pathInfo.s = closestPos;
-            creep.say('off path!')
-            logger.log(creep.name, "not on path!", JSON.stringify(pathInfo));
+            creep.say('off path!');
+            //pathInfo.idx = 0;
+            logger.log(creep.name, "not on path!", closestPos, JSON.stringify(pathInfo));
             logger.log(closestPos)
         }
         creep.memory._cachedPath = pathInfo;
@@ -493,8 +567,8 @@ module.exports = {
     classes: {
         CachedPath,
     },
-    
 
+    calcPathCost,
 
     getExitPositions(roomName) {
         let terrain = Game.map.getRoomTerrain(roomName);
@@ -567,7 +641,6 @@ module.exports = {
         }
         return path;
     },
-
 
     /**
      * A path as returned by pathfiner, an array of room positions.

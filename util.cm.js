@@ -40,6 +40,18 @@ module.exports = {
     },
 
 
+    /**
+     * 
+     * @param {pStarCostMatrix} cm 
+     * @param {[RoomPosition]} path 
+     */
+    clearPathFromCM(cm, path) {
+        for(let p in path) {
+            let pos = path[p];
+            cm.set(pos.x, pos.y, 0);
+        }
+    },
+
     setInRange: function(matrix, x_in, y_in, range, cost) {
         var xStart = x_in - range;
         var yStart = y_in - range;

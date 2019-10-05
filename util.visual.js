@@ -89,12 +89,27 @@ module.exports = {
                 style[field] = styleOverride[field];
             }
         }
+        
+        var charMap = {};
+        charMap[TOP] ="⬆";
+        charMap[TOP_LEFT] = "↖";
+        charMap[TOP_RIGHT] = "↗";
+        
+        charMap[LEFT] = "⬅";
+        charMap[RIGHT] ="➡";
+        charMap[BOTTOM] = "⬇";
+        charMap[BOTTOM_LEFT] ="↙";
+        charMap[BOTTOM_RIGHT] = "↘";
 
         let lastPosition = path[0];
         for (let position of path) {
-            if (position.roomName === lastPosition.roomName) {
-                new RoomVisual(position.roomName)
-                    .line(position, lastPosition, style);
+            if (lastPosition == position) {
+                global.utils.visual.drawText("*", lastPosition, color, style);
+            } else if (position.roomName === lastPosition.roomName) {
+                let direction = lastPosition.getDirectionTo(position);
+                global.utils.visual.drawText(charMap[direction], lastPosition, color, style);
+                // new RoomVisual(position.roomName)
+                //     .line(position, lastPosition, style);
          
             }
             lastPosition = position;
@@ -128,8 +143,9 @@ module.exports = {
         
     
     },
-    drawText: function(t, pos) {
-        new RoomVisual(pos.roomName).text(t,pos.x-0.0, pos.y);
+    drawText: function(t, pos, color="#fff", style={}) {
+        style.color = color;
+        new RoomVisual(pos.roomName).text(t,pos.x-0.0, pos.y, style);
     },
     drawCross: function(t, pos, style) {
         if (!pos) 

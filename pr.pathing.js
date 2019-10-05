@@ -37,7 +37,7 @@ class pathingProc extends processClass {
     initThreads() {
         return [
             
-            this.createThread("init_load", "init"),
+            //this.createThread("init_load", "init"),
             this.createThread("init_onTick", "init"),
 
             this.createThread("updateNetwork", "taskFind"),
@@ -52,11 +52,13 @@ class pathingProc extends processClass {
     updateNetwork() {
         logger.log(this.name, "updating network!")
 
+        global.utils.pStar.inst.addRoomsToNetwork();
+
         global.utils.pStar.inst.refineEdges();
 
         let numRefined = global.utils.pStar.inst.refineRooms();
         if (numRefined > 0) { // if we did work, there's prolly more work to do!
-            return threadClass.HUNGRY;
+            //return threadClass.HUNGRY;
         }
     }
 
@@ -64,9 +66,9 @@ class pathingProc extends processClass {
         logger.log(this.name, "displaying network!")
         global.utils.pStar.inst.displayRooms();
 
-        global.utils.pStar.inst.displayNodes();
+        //global.utils.pStar.inst.displayNodes();
 
-        global.utils.pStar.inst.addRoomsToNetwork();
+        
     }
 
     init_load() {
@@ -175,9 +177,9 @@ class pathingProc extends processClass {
     
         let start, used;
         /** @type {Node} */
-        let src = this.nodeMap["Flag19"];
-        let src2 = this.nodeMap["Flag18"];
-        let dest = this.nodeMap["Flag17"];
+        let src = this.nodeMap["Flag1"];
+        let src2 = this.nodeMap["Flag2"];
+        let dest = this.nodeMap["Flag4"];
 
 
         // start = Game.cpu.getUsed();

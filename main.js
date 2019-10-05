@@ -16,7 +16,7 @@ logger = new logger("main");
 // _.each(Game.creeps, (c) => c.memory.task = false)
 //return;
 
-//_.each(Game.flags, (f) => f.remove());
+//_.each(Game.flags, (f) => logger.log(f.remove()));
 // Memory.creeps = {};
 // return;
 //Memory.rooms ={}
@@ -24,7 +24,7 @@ logger = new logger("main");
 // Memory.pStar = "";
 // return;
 // RawMemory.set("");
-//  return;
+// return;
 //prototype overrides
 require("proto.creep");
 require("proto.roomPosition");

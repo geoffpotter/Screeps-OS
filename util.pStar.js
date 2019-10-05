@@ -103,9 +103,10 @@ class pStar {
                 
                 continue;
             }
-            
-            let room = new pStarRoom(roomName);
-            this.rooms.add(room);
+            if (!this.rooms.hasId(roomName)) {
+                let room = new pStarRoom(roomName);
+                this.rooms.add(room);
+            }
             roomsAdded++;
         }
         if (excludedRooms.length > 0) {
@@ -161,12 +162,17 @@ class pStar {
             this.edges.add(edge);
         }
     }
+    removeEdge(edge) {
+        this.edges.remove(edge);
+    }
 
 
     refineEdges() {
-        let edges = _.shuffle(this.edges.getAll());
+        let edges = _.filter(this.edges.getAll(), (e) => e.edgeNeedsRefinement());
+        edges = _.sortBy(edges, (e) => e.cost);
         let edgesRefined = 0;
         for(let e in edges) {
+            /** @type {Edge} */
             let edge = edges[e];
             let refined = edge.refineEdge();
             if (refined) {
@@ -209,6 +215,7 @@ class pStar {
                 //if the room doesn't exist, and we're adding a base node, create the room and add it right quick
                 room = new pStarRoom(node.pos.roomName);
                 this.rooms.add(room);
+                room.refineRoom();
             } else {
                 //our room doesn't exist.. this prolly shouldn't happen..
                 logger.log(node.id, node.pos.roomName, this.rooms.has(node.pos.roomName))
@@ -255,7 +262,7 @@ class pStar {
             let edge = allEdges[e];
             //if (!edge.path._cachedPath) { //display all non cached paths
             //logger.log(JSON.stringify(edge))
-                edge.displayEdge("#999", 1);
+                edge.displayEdge("#999", 0.3);
             //}
         }
         logger.log("total edges:", Object.keys(this.edges.thingsById).length);
@@ -448,16 +455,22 @@ class pStar {
                 if (!edge) {
                     logger.log(edge, path, JSON.stringify(pathInfo))
                     logger.log(creep.name, "HAS NO EDGE TO FOLLOW!!! ------------- ERRRRRRRRRRRRROOOORRRRRRR");
-                    throw new Error("no edge defined!");
+                    //throw new Error("no edge defined!");
+                    pathInfo.method = "moveTo";
+                    creep.say("lost path");
+                    break;
                 }
                 //log("moving")
+
+                creep.say(pathInfo.pathStage);
+
                 //  ------------  preform the actual move ---------------------
                 if (pathInfo.pathStage == 0) {//-----------------------------get in range of first node
                     //try walking on edge
                     let nextNode = path[0];
                     
                     let ret = edge.path.moveOnPath(creep, nextNode, goal);
-                    //logger.log(creep.name, "moving on first edge", edge.id, JSON.stringify(ret));
+                    logger.log(creep.name, "moving on first edge", edge.id, JSON.stringify(ret));
                     if (ret.onPath || ret.closeToPath) {
                         edge.displayEdge(pStarColorOnPath);
                     } else {
@@ -502,7 +515,13 @@ class pStar {
 
                     //if we're still on pathStage == 1, then actually do the move
                     if (pathInfo.pathStage == 1) {
-                        //logger.log(creep.name, "moving to", nextNode.id, JSON.stringify(goal))
+                        logger.log(creep.name, "moving to", nextNode.id, edge);
+                        if (!edge.path) {
+                            //if this is undefined, then shit ain't right.
+                            pathInfo.method = "moveTo";
+                            creep.say("Lost path");
+                            break;
+                        }
                         let ret = edge.path.moveOnPath(creep, nextNode, goal);
                         //display edge when walkin on it
                         edge.displayEdge(pStarColorOnPath);
@@ -948,7 +967,7 @@ module.exports = {
             let nodeInfo = openNodes.pop();
             /** @type {Node} */
             let node = nodeInfo.node;
-            //logger.log("processing node", JSON.stringify(nodeInfo));
+            logger.log("processing node", JSON.stringify(nodeInfo));
             
 
             //process node
@@ -971,7 +990,7 @@ module.exports = {
                     logger.log("id error??", new Edge(parentNode, node).id == edgeId);
                     logger.log(this.inst.edges.getById(edgeId))
                     logger.log(this.inst.edges.thingsById[parentEdgeId]);
-                    
+                    continue;
                 }
 
                 let refined = parentEdge.refineEdge();

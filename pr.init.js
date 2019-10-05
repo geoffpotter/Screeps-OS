@@ -52,11 +52,11 @@ class initProc extends processClass {
         let pathingProc = new pathingProcClass("pathing");
         this.kernel.startProcess(pathingProc);
 
-        let flagwalkerProc = this.kernel.getProcess("flagwalker")
-        if (!flagwalkerProc) {
-            flagwalkerProc = new flagwalkerClass("flagwalker");
-            this.kernel.startProcess(flagwalkerProc);
-        }
+        // let flagwalkerProc = this.kernel.getProcess("flagwalker")
+        // if (!flagwalkerProc) {
+        //     flagwalkerProc = new flagwalkerClass("flagwalker");
+        //     this.kernel.startProcess(flagwalkerProc);
+        // }
 
         // let testProc = new testingProcClass("testing");
         // this.kernel.startProcess(testProc);
