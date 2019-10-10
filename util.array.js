@@ -144,9 +144,9 @@ class IndexingCollection {
         let id = _.get(theThing, this.idField);
 
         if (this.thingsById[id]) {
-            logger.log("before:", Object.keys(this.thingsById), id, theThing.id,  JSON.stringify(this.idField))
+            //logger.log("before:", Object.keys(this.thingsById), id, theThing.id,  JSON.stringify(this.idField))
             this.remove(theThing);
-            logger.log(Object.keys(this.thingsById).length)
+            //logger.log(Object.keys(this.thingsById).length)
         }
         //new thing!
 
@@ -170,7 +170,7 @@ class IndexingCollection {
         let id = _.get(theThing, this.idField);
         if (!this.thingsById[id]) {
             //can't remove what's not there
-            logger.log(id, this.thingsById[id], this.has(theThing))
+            //logger.log(id, this.thingsById[id], this.has(theThing))
             throw new Error("Thing not in collection! -> " + id);
             
         } else {
@@ -217,7 +217,7 @@ class IndexingCollection {
     }
     has(aThing) {
         let id = _.get(aThing, this.idField);
-        let has = !!this.thingsById[id];
+        let has = this.thingsById[id] != undefined; 
         if (has) {
             let info = this.nodeInfoById.get(id);
             //this._markUsed(info);

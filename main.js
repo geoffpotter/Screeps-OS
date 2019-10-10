@@ -20,7 +20,7 @@ logger = new logger("main");
 // Memory.creeps = {};
 // return;
 //Memory.rooms ={}
-//util classe
+//util classes
 // Memory.pStar = "";
 // return;
 // RawMemory.set("");

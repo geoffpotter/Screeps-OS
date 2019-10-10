@@ -17,6 +17,7 @@ let threadClass = require("INeRT.thread");
 let CachedPath = global.utils.map.classes.CachedPath;
 let Node = global.utils.pStar.classes.Node;
 let Edge = global.utils.pStar.classes.Edge;
+let pStarRoom = global.utils.pStar.classes.pStarRoom;
 //let pStar = global.utils.pStar.class;
 
 
@@ -37,7 +38,7 @@ class pathingProc extends processClass {
     initThreads() {
         return [
             
-            //this.createThread("init_load", "init"),
+            this.createThread("init_load", "init"),
             this.createThread("init_onTick", "init"),
 
             this.createThread("updateNetwork", "taskFind"),
@@ -52,13 +53,25 @@ class pathingProc extends processClass {
     updateNetwork() {
         logger.log(this.name, "updating network!")
 
-        global.utils.pStar.inst.addRoomsToNetwork();
+        if (this.kernel.cpuDefcon < 4) {
+            logger.log("not updating network because cpu defcon is", this.kernel.cpuDefcon);
+            return;
+        }
+        
 
-        global.utils.pStar.inst.refineEdges();
+        let numEdgesRefined = global.utils.pStar.inst.refineEdges();
 
         let numRefined = global.utils.pStar.inst.refineRooms();
-        if (numRefined > 0) { // if we did work, there's prolly more work to do!
-            //return threadClass.HUNGRY;
+
+        //if we're under 6k bucket, only update once
+        if (this.kernel.cpuDefcon < 6) {
+            return;
+        }
+
+        if (numRefined > 0 || numEdgesRefined > 0) { // if we did work, there's prolly more work to do!
+            return threadClass.HUNGRY;
+        } else {
+            global.utils.pStar.inst.addRoomsToNetwork(1);//add a max of one room at a time.
         }
     }
 
@@ -87,7 +100,7 @@ class pathingProc extends processClass {
         //global.utils.pStar.inst = new global.utils.pStar.classes.pStar();
 
         try {
-            this.mapFlags(true);    
+            this.mapFlags(true); 
             
                 // global.utils.pStar.inst.addRoomsToNetwork();//dumb
                 // global.utils.pStar.inst.refineRooms();//dumber
@@ -117,7 +130,7 @@ class pathingProc extends processClass {
                 // global.utils.pStar.inst.refineRooms();//dumber
                 // this.mapFlags(true); 
         } catch (error) {
-            
+            logger.log(error)
         }
         
 
@@ -177,9 +190,9 @@ class pathingProc extends processClass {
     
         let start, used;
         /** @type {Node} */
-        let src = this.nodeMap["Flag1"];
+        let src = this.nodeMap["Flag2"];
         let src2 = this.nodeMap["Flag2"];
-        let dest = this.nodeMap["Flag4"];
+        let dest = this.nodeMap["Flag6"];
 
 
         // start = Game.cpu.getUsed();
@@ -191,9 +204,9 @@ class pathingProc extends processClass {
         let refinePaths = true;
 
 
-        try {
-            // logger.log('doing pathing')
-            //        //pStar a*
+        //try {
+            logger.log('doing pathing')
+            //pStar a*
             // start = Game.cpu.getUsed();
             // let pStarPath = global.utils.pStar.findPath(src, dest, 1000, refinePaths);
             // used = Game.cpu.getUsed() - start;
@@ -202,24 +215,24 @@ class pathingProc extends processClass {
 
             // //this.displayNetwork();
 
-            // //pStar a*
-            // start = Game.cpu.getUsed();
-            // let pStarPath2 = global.utils.pStar.findPath(src2, dest, 1000, refinePaths);
-            // used = Game.cpu.getUsed() - start;
-            // logger.log(src2.id, dest.id, "cpu used2", used, JSON.stringify(pStarPath2))
-            // global.utils.pStar.inst.displayFindPath(pStarPath2.path, "#00f");
+            // // //pStar a*
+            // // start = Game.cpu.getUsed();
+            // // let pStarPath2 = global.utils.pStar.findPath(src2, dest, 1000, refinePaths);
+            // // used = Game.cpu.getUsed() - start;
+            // // logger.log(src2.id, dest.id, "cpu used2", used, JSON.stringify(pStarPath2))
+            // // global.utils.pStar.inst.displayFindPath(pStarPath2.path, "#00f");
 
             // // //normal path
             // start = Game.cpu.getUsed();
             // let path = PathFinder.search(src.pos, dest.pos, {maxOps:10000});
             // used = Game.cpu.getUsed() - start;
             // logger.log("cpu used", used, JSON.stringify(path)) 
-        } catch (error) {
-            logger.log("error doing pathin");
-            logger.log(error);
-            if (this.kernel.time > 11)
-                throw error;
-        }
+        // } catch (error) {
+        //     logger.log("error doing pathin");
+        //     logger.log(error);
+        //     if (this.kernel.time > 11)
+        //         throw error;
+        // }
 
 
         
@@ -275,8 +288,17 @@ class pathingProc extends processClass {
             // if (!this.edges.has(edge)) {
             //     this.edges.add(edge);
             // }
+            /** @type {pStarRoom} */
+            let room = global.utils.pStar.inst.getRoom(node.pos.roomName);
+            if (!room) {
+                room = new pStarRoom(node.pos.roomName);
+                global.utils.pStar.inst.rooms.add(room);
+                room.refineRoom();
+            }
+
             if (!global.utils.pStar.inst.hasNode(node)) {
                 logger.log("adding other flag", node.id, node.type);
+                
                 global.utils.pStar.inst.addNode(node);
                 this.nodeMap[otherFlag.name] = node;
                 //return;

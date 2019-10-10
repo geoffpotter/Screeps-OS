@@ -27,6 +27,9 @@ function calcPathCost(path) {
     };
 
     for(let p in path) {
+        // if (p == 0) {
+        //     continue;
+        // }
         let pos = path[p];
         //logger.log(pos, path)
         let terrain = getTerrainAt(pos);
@@ -36,8 +39,12 @@ function calcPathCost(path) {
             cost += 1;
         }
     }
-
-    return cost;
+    if (Number.isInteger(Number.parseInt(cost))) {
+        return cost;
+    } else {
+        return false;
+    }
+    
 }
 
 
@@ -97,7 +104,8 @@ class CachedPath {
     }
 
     get cost() {
-        if (this.pathCost) {
+        
+        if (this.pathCost && this.pathCost != "false") {
             return this.pathCost;
         } else if (this._cachedPath) {
             return this._cachedPath.length;  //pretty sure this won't happen, but meh 
@@ -129,12 +137,12 @@ class CachedPath {
      */
     splitAtPos(splitPos) {
         
-        let firstPath = [this.orgin];
+        let firstPath = [];
         let secondPath = [];
 
         let splitFound = false;
         let path = this.getPath();
-        logger.log("splitting path at pos", splitPos, JSON.stringify(path))
+        //logger.log("splitting path at pos", splitPos, JSON.stringify(path))
         for(let p in path) {
             let pos = path[p];
             
@@ -152,8 +160,8 @@ class CachedPath {
         }
 
         if (!splitFound) {
-            return [false, false];
-            //throw new Error("split position not found!");
+            //return [false, false];
+            throw new Error("split position not found!");
         }
 
         let firstCP = new CachedPath(firstPath[0], firstPath[firstPath.length-1], this.opts);
@@ -166,6 +174,7 @@ class CachedPath {
         secondCP.pathCost = calcPathCost(secondPath);
 
         let ret = [firstCP, secondCP];
+        //logger.log("path split:", firstCP.path, secondCP.path);
         return ret;
     }
 
@@ -185,7 +194,10 @@ class CachedPath {
         let opts = _.clone(this.opts);
         opts.plainCost = 2;
         opts.swampCost = 10;
-        opts.roomCallback = function(roomName) {
+        opts.roomCallback = (roomName) => {
+            if (roomName != this.orgin.roomName && roomName != this.goal.roomName) {
+                return false;
+            }
             let cm = global.utils.cm.getCM(roomName, "pStar");
             return cm;
         }

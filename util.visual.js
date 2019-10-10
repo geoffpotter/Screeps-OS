@@ -28,11 +28,7 @@ module.exports = {
      * @param opacity
      */
 
-    circle: function(pos, color, opacity, radius) {
-        if (!radius) 
-            radius = .45;
-        if (!opacity)
-            opacity = 1;
+    circle: function(pos, color, opacity = 1, radius = 0.45) {
         new RoomVisual(pos.roomName).circle(pos, {
             radius: radius, fill: "transparent", stroke: color, strokeWidth: .15, opacity: opacity});
     },

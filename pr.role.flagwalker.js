@@ -36,7 +36,7 @@ class flagwalker extends processClass {
         
         let spawn = Game.spawns['Spawn1'];
         let creeps = Game.creeps;
-        let numflagwalkers = 100;
+        let numflagwalkers = 1;
         logger.log("spawnin", Object.keys(creeps).length, numflagwalkers)
         if (Object.keys(creeps).length < numflagwalkers) {
             logger.log("not enough flagwalkers", spawn.spawning, spawn.room.energyAvailable)

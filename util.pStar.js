@@ -31,8 +31,8 @@ class pStar {
 
         this.nodeTicksValid = 10000;
         this.maxNodeUpdatesPerTick = 10;
-        this.edgeTicksValid = 10000;
-        this.maxEdgeUpdatesPerTick = 10;
+        this.edgeTicksValid = 100000;
+        this.maxEdgeUpdatesPerTick = 1;
 
         
     }
@@ -66,7 +66,7 @@ class pStar {
         return nodes;
     }
 
-    addRoomsToNetwork() {
+    addRoomsToNetwork(maxRoomsToAdd=0) {
         let roomsAdded = 0;
         
         let baseNodes = this.getNodesByType(Node.BASE)
@@ -89,7 +89,7 @@ class pStar {
             return minDist;
         };
         let excludedRooms = [];
-        let distanceLimit = 130;
+        let distanceLimit = 1500;
         //add rooms until we're out or reach our max for this tick
         while(this.roomAdditionQueue.length > 0 && roomsAdded < this.maxRoomAdditionsPerTick) {            
             let roomName = this.roomAdditionQueue.shift();
@@ -108,6 +108,9 @@ class pStar {
                 this.rooms.add(room);
             }
             roomsAdded++;
+            if (maxRoomsToAdd != 0 && roomsAdded >= maxRoomsToAdd) {
+                break;
+            }
         }
         if (excludedRooms.length > 0) {
             this.roomAdditionQueue = this.roomAdditionQueue.concat(excludedRooms);
@@ -155,19 +158,27 @@ class pStar {
         logger.log("displayed rooms.  Total rooms", rooms.length)
     }
 
+    /**
+     * 
+     * @param {Node} node1 
+     * @param {Node} node2 
+     */
     addEdge(node1, node2) {
         let edgeId = Edge.makeEdgeId(node1.id, node2.id);
         if (!this.edges.has(edgeId)) {
             let edge = new Edge(node1, node2);
             this.edges.add(edge);
+        } else {
+            throw new Error("adding edge that already exists!", edgeId)
         }
+        node1._destMap = false;
+        node2._destMap = false;
     }
     removeEdge(edge) {
         this.edges.remove(edge);
     }
 
-
-    refineEdges() {
+    refineEdges_old() {
         let edges = _.filter(this.edges.getAll(), (e) => e.edgeNeedsRefinement());
         edges = _.sortBy(edges, (e) => e.cost);
         let edgesRefined = 0;
@@ -182,7 +193,31 @@ class pStar {
                 break;
             }
         }
-        logger.log(edgesRefined, "edges refined")
+        logger.log(edgesRefined, "edges refined");
+        return edgesRefined;
+    }
+
+
+    refineEdges() {
+        let edges = _.filter(this.edges.getAll(), (e) => e.edgeNeedsRefinement());
+        edges = _.sortBy(edges, (e) => e.cost).reverse();
+        let edgesRefined = 0;
+        for(let e in edges) {
+            /** @type {Edge} */
+            let edge = edges[e];
+            //edge.
+            let {node1, node2} = edge.getNodes();
+            let path = global.utils.pStar.findPath(node1, node2);
+            let refined = path.ops > 0;
+            if (refined) {
+                edgesRefined++;
+            }
+            if (edgesRefined >= this.maxEdgeUpdatesPerTick) {
+                break;
+            }
+        }
+        logger.log(edgesRefined, "edges refined");
+        return edgesRefined;
     }
 
     hasNode(node) {
@@ -830,6 +865,34 @@ class pStar {
     }
 
 
+    logNetwork() {
+        logger.log("----------------------Network dump--------------------------")
+
+        let rooms = this.rooms.getAll();
+        for(let r in rooms) {
+            /** @type {pStarRoom} */
+            let room = rooms[r];
+            let nodes = room.nodes.getAll();
+            logger.log("room:", room.roomName, nodes.length);
+            for(let n in nodes) {
+                /** @type {Node} */
+                let node = nodes[n];
+                logger.log("--node:", node.id, node.type);
+            }
+            let output = "";
+            room.posEdgeMap.forEach((edgeId, pos) => {
+                output += `${pos.x}-${pos.y} ${edgeId}, `;
+            })
+            logger.log("edge map", output);
+        }
+        logger.log('------edges------')
+        let edges = this.edges.getAll();
+        for(let e in edges) {
+            /** @type {Edge} */
+            let edge = edges[e];
+            logger.log("edge:", edge.id, edge.path.path, edge.cost)
+        }
+    }
 
 
 
@@ -847,7 +910,7 @@ class pStar {
         logger.enabled = true;
         logger.log("total Rooms:", Object.keys(this.rooms.thingsById).length, Object.keys(this.rooms.thingsById));
         logger.log("total nodes in rooms:", _.reduce(this.rooms.thingsById, (res, room, roomName) => {
-            logger.log("tttt",room, roomName)
+            //logger.log("tttt",room, roomName)
             res += Object.keys(room.nodes.thingsById).length;
             return res;
         }, 0));
@@ -903,6 +966,7 @@ module.exports = {
         pStar,
         Node,
         Edge,
+        pStarRoom
     },
     inst,
 
@@ -929,7 +993,7 @@ module.exports = {
      * @param {Node} endNode 
      * @param {IndexingCollection} allNodes 
      */
-    findPath(startNode, endNode, maxOps=100, refinePath=true) {
+    findPath(startNode, endNode, maxOps=100, refinePath=true, recursing=false) {
         let start = Game.cpu.getUsed();
         let log = (...args) => {
             let usedNow = Game.cpu.getUsed();
@@ -952,7 +1016,7 @@ module.exports = {
             parent: false,
             h:heuristic(startNode, endNode),//heuristic to goal node
             g:0,//shortest distance to source node
-            f:0,//g+h, fscore for this node
+            f:0,//g+h, fscore for this node, best possible distance to goal
             closed: false,
         };
         nodeInfoLookup[startNode.id] = startNodeInfo;
@@ -967,7 +1031,8 @@ module.exports = {
             let nodeInfo = openNodes.pop();
             /** @type {Node} */
             let node = nodeInfo.node;
-            logger.log("processing node", JSON.stringify(nodeInfo));
+            //logger.log("processing node", JSON.stringify(nodeInfo));
+            
             
 
             //process node
@@ -979,46 +1044,72 @@ module.exports = {
                 let parentEdgeId = Edge.makeEdgeId(node.id, parentNode.id);
                 /** @type {Edge} */
                 let parentEdge = global.utils.pStar.inst.edges.getById(parentEdgeId);
+
+                
+
                 //let parentEdge = node.getNodeEdge(parentNode);
                 if (!parentEdge) {
                     //network is broken!
-                    logger.log('network broken, missing parent edge')
-                    logger.log(node.id, parentNode.id);
-                    logger.log(parentEdge, parentEdgeId);
-                    let edgeId = Edge.makeEdgeId(node.id, parentNode.id);
-                    logger.log(edgeId);
-                    logger.log("id error??", new Edge(parentNode, node).id == edgeId);
-                    logger.log(this.inst.edges.getById(edgeId))
-                    logger.log(this.inst.edges.thingsById[parentEdgeId]);
+                    // logger.log('network broken, missing parent edge')
+                    // logger.log(node.id, parentNode.id);
+                    // logger.log(parentEdge, parentEdgeId);
+                    // let edgeId = Edge.makeEdgeId(node.id, parentNode.id);
+                    // logger.log(edgeId);
+                    // logger.log("id error??", new Edge(parentNode, node).id == edgeId);
+                    // logger.log(this.inst.edges.getById(edgeId))
+                    // logger.log(this.inst.edges.thingsById[parentEdgeId]);
+                    let parentNodeInfo = nodeInfoLookup[parentNode.id];
+                    logger.log("clearly we are lost, the network has changed. Re-add our parent into open nodes", node.id, parentNode.id, JSON.stringify(parentNodeInfo));
+                    parentNodeInfo.closed = false;
+                    openNodes.push(parentNodeInfo);
+                    delete nodeInfoLookup[node.id];
                     continue;
                 }
 
                 let refined = parentEdge.refineEdge();
-                //logger.log(node.id, "has parent, edge refined?", refined);
+                logger.log(node.id, "has parent, edge refined?", refined);
                 if (refined) {
+                    parentNodeInfo = nodeInfoLookup[parentNode.id];
+                    logger.log(nodeInfoLookup[parentNode.id])
+                    logger.log("wtf")
+                    logger.log("edge refined, re-opening parent node incase path is gone", node.id, parentNode.id, JSON.stringify(parentNodeInfo_stupid));
+                    parentNodeInfo_stupid.closed = false;
+                    openNodes.push(parentNodeInfo_stupid);
+                    delete nodeInfoLookup[node.id];
+                    continue;
+
                     //if the edge was refined, recalc the scores for this node and add it back into the queue and skip to next node
                     //recalc g score
                     //logger.log(parentEdge.id, 'edge refined', node.id, "going back into queue")
                     //logger.log(JSON.stringify(nodeInfo))
                     let parentNodeInfo = nodeInfoLookup[parentNode.id];
+                    if (!parentNodeInfo) {
+                        logger.log("Lost parent info, skipping node")
+                        continue;
+                    }
                     nodeInfo.g = Number.parseInt(parentNodeInfo.g) + Number.parseInt(parentEdge.cost);
                     nodeInfo.f = nodeInfo.g + nodeInfo.h;
                     openNodes.push(nodeInfo);
                     continue;
                 }
             } else if (refinePath) {
-                logger.log(node.id, "has no parent set.. is it the initial node, cuz otherwise you're a dumbass")
+                //logger.log(node.id, "has no parent set.. is it the initial node, cuz otherwise you're a dumbass")
             }
 
 
             //logger.log(node.id, "closed", JSON.stringify(nodeInfo))
             //logger.log(node.destinationsMap[endNode.id] ? node.destinationsMap[endNode.id].travelCost : "node has no stored path" + nodeInfo.g)
             //by this point the edge to our parent is refined, and we are not the target node.  Do normal A* action and mark this node closed
+            //logger.log(node.id, "closed", nodeInfo.g)
+            if (!(nodeInfo.g == 0 || nodeInfo.g > 0)) {
+                throw new Error("g is null!?!? " + nodeInfo);
+            }
+            
             nodeInfo.closed = true;
             
             //wait until after parent edge has been updated to say we've reached the goal.
             if (node.pos.isEqualTo(endNode.pos)) {
-                logger.log("found path!", startNode.id, endNode.id);
+                //logger.log("found path!", startNode.id, endNode.id);
                 //logger.log(JSON.stringify(nodeInfo));
                 //get the actual path
                 let path = [];
@@ -1035,7 +1126,7 @@ module.exports = {
                         //cost is total path cost, minus the g score of this node
                         let thisCost = nodeInfo.g - thisNodeInfo.g;
                         let dest = new DestinationInfo(node, endNode, lastNode, thisCost);
-                        logger.log(node.id, "adding destination", JSON.stringify(dest))
+                        //logger.log(node.id, "adding destination", JSON.stringify(dest))
                         node.addDestination(dest);
                     }
                     if (thisNodeInfo.parent) {
@@ -1060,8 +1151,8 @@ module.exports = {
             
 
             let neighborEdges;
-            if (true && node.destinationsMap[endNode.id]) {
-                logger.log('found a node that knows the way', node.id, endNode.id, node.destinationsMap[endNode.id].serialize())
+            if (node.destinationsMap[endNode.id]) {
+                //logger.log('found a node that knows the way', node.id, endNode.id, node.destinationsMap[endNode.id].serialize())
                 //this node already knows the shortest path to the destination, so don't add it's neighbors because they suck
                 /** @type {DestinationInfo} */
                 let destInfo = node.destinationsMap[endNode.id];
@@ -1069,7 +1160,7 @@ module.exports = {
                 let path = node.findNodePathTo(endNode);
                 let thisNodeInfo = nodeInfo;
                 let lastNode = false;
-                while(thisNodeInfo != false) {
+                while(!!thisNodeInfo) {
                     let node = thisNodeInfo.node;
                     
 
@@ -1081,7 +1172,7 @@ module.exports = {
                         //cost is total path cost, minus the g score of this node, plus path cost
                         let thisCost = nodeInfo.g - thisNodeInfo.g + path.cost;
                         let dest = new DestinationInfo(node, endNode, lastNode, thisCost);
-                        logger.log(node.id, "adding destination", JSON.stringify(dest))
+                        //logger.log(node.id, "adding destination", JSON.stringify(dest))
                         node.addDestination(dest);
                     }
                     if (thisNodeInfo.parent) {
@@ -1094,7 +1185,7 @@ module.exports = {
                 }
                 path.ops = opts;
                 path.cost = path.cost + nodeInfo.g;
-                logger.log(node.id, "knows the path, only adding next node's edge", JSON.stringify(path));
+                //logger.log(node.id, "knows the path, only adding next node's edge", JSON.stringify(path));
                 
                 return path;
             } else {
@@ -1121,7 +1212,8 @@ module.exports = {
                     let neighbor = edgeToNode.getOtherNode(node);
                 let neighborInfo = nodeInfoLookup[neighbor.id];
                 let newGScore = Number.parseInt(nodeInfo.g) + Number.parseInt(edgeToNode.cost);
-                //logger.log(node.id, "checking neighbor", neighbor.id, newGScore, edgeToNode);
+                //logger.log(node.id, "checking neighbor", neighbor.id, newGScore, edgeToNode.cost, nodeInfo.g);
+                //logger.log(JSON.stringify(edgeToNode.path))
                 if (!neighborInfo) {
                     //logger.log('adding new node', neighbor.id)
                     //new node!
@@ -1159,9 +1251,22 @@ module.exports = {
             //log(nodeInfo.node.id, "friends added")
         }
 
-        logger.log("we're dumb, and didn't find a path.. one prolly exists tho.. stupid head.");
+        logger.log("we're dumb, and didn't find a path.. one prolly exists tho.. stupid head.", startNode.pos, endNode.pos);
         logger.log(JSON.stringify(nodeInfoLookup));
-        //throw new Error("invalid path!" + opts)
+        
+        //wtf do we do here??
+        //let's try adding an edge between these nodes and then returning a failed path.  Then later, the edge we added should make this not fail, and result in the edge we added being refined into the network, in case it's redundant.
+        //maybe add edge, then recursivly call ourselves?
+        this.inst.addEdge(startNode, endNode);
+        
+        //throw new Error("invalid path!" + startNode.pos + " " + endNode.pos);
+        if (!recursing) {
+            return this.findPath(startNode, endNode, maxOps, refinePath, true);
+        } else {
+            throw new Error("I think I broke some shit.. or you did.  I'ma blame you, cool?");
+            //Game.cpu.halt();
+        }
+        
         return {
             path: [],
             incomplete: true,

@@ -6,6 +6,8 @@ logger = new logger("util.pStar.room");
 //logger.enabled = false;
 logger.color = COLOR_CYAN;
 
+let CachedPath = global.utils.map.classes.CachedPath;
+
 class DestinationInfo {
     constructor(originNode, goalNode, nextNode, cost) {
         this.origin = originNode;
@@ -67,8 +69,8 @@ class Node {
 
     get id() {
         if (!this._id) {
-            //this._id = this.pos.toWorldPosition().serialize(); //smaller ids
-            this._id = `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`; //easier to debug
+            this._id = this.pos.toWorldPosition().serialize(); //smaller ids
+            //this._id = `${this.pos.x}-${this.pos.y}-${this.pos.roomName}`; //easier to debug
         }
         return this._id;
     }
@@ -93,7 +95,7 @@ class Node {
      * A map of destNode.id => DestinationInfo 
      */
     get destinationsMap() {
-        this._destMap = false;
+        //this._destMap = false;
         if (!this._destMap) {
             let pStar = global.utils.pStar.inst;
             let destIds = pStar.distances.getGroupWithValue("origin.id", this.id); //list if ids
@@ -371,7 +373,7 @@ class Node {
         return {
             path,
             incomplete,
-            cost: this.destinationsMap[destNode.id].travelCost,
+            cost: Number.parseInt(this.destinationsMap[destNode.id].travelCost),
             hops: hops + 1
         }
     }
@@ -397,8 +399,8 @@ class Node {
     }
 
     serialize() {
-        //let ser = this.pos.toWorldPosition().serialize() + '|' + this.type
-        let ser = this.pos.x + "-" + this.pos.y + "-" + this.pos.roomName + '|' + this.type
+        let ser = this.pos.toWorldPosition().serialize() + '|' + this.type
+        //let ser = this.pos.x + "-" + this.pos.y + "-" + this.pos.roomName + '|' + this.type
         return ser;
     }
     /**
@@ -434,10 +436,18 @@ class Edge {
     get cost() {
         return this.path.cost;
     }
+    /**
+     * 
+     * @param {Node} node1 
+     * @param {Node} node2 
+     */
     constructor(node1, node2) {
-        
         if (!node1 || !node2) {
             throw new Error("invalid nodes passed!" + node1 + " " + node2)
+        }
+
+        if (node1.pos.roomName != node2.pos.roomName && (node1.type != Node.ROOM_EXIT || node2.type != Node.ROOM_EXIT)) {
+            throw new Error("Invalid Inter-room Edge!" + node1.id + " " + node2.id)
         }
         //check if we should swap the nodes so that node1 and node2 are in a constant direction
         if (node1.id < node2.id) {
@@ -460,6 +470,16 @@ class Edge {
         //this.cost = this.node1Pos.getRangeTo(this.node2Pos);
         this.lastUpdated = 0;
     }
+    getNodes() {
+        let n1Room = global.utils.pStar.inst.getRoom(this.node1Pos.roomName);
+        let node1 = n1Room.getNode(this.node1Id);
+        let n2Room = global.utils.pStar.inst.getRoom(this.node2Pos.roomName);
+        let node2 = n2Room.getNode(this.node2Id);
+        return {
+            node1,
+            node2
+        }
+    }
     getOtherNode(node) {
         let otherRoom;
         let otherNodeId;
@@ -476,8 +496,23 @@ class Edge {
         return !this.path.path || this.lastUpdated == 0 || (Game.time - this.lastUpdated) >= global.utils.pStar.inst.edgeTicksValid;
     }
 
+    /**
+     * 
+     * @param {CachedPath} in_path 
+     */
+    overridePath(in_path) {
+        if (this.node1Pos.isEqualTo(in_path.orgin)) {
+            this.path.path = in_path.path;
+        } else if (this.node1Pos.isEqualTo(in_path.goal)) {
+            this.path.path = in_path.path.reverse();
+        } else {
+            throw new Error("wtf are you doing, path makes no sense mofo")
+        }
+        this.path.pathCost = Number.parseInt(in_path.pathCost);
+    }
+
     checkIntersections() {
-        logger.log("refining edge", this.id);
+        logger.log("refining network for edge", this.id);
 
         // if (!Game.rooms[this.node1Pos.roomName] || !Game.rooms[this.node2Pos.roomName]) {
         //     //I can't see! bum ba dum dum dum dum WOOWOOOOO is meee!!
@@ -505,11 +540,13 @@ class Edge {
             //walk path and check for intersecting nodes and edges
             let cm = global.utils.cm.getCM(this.node1Pos.roomName, "pStar");
             let path = this.path.getPath();
-            let currentEdge = this;
-            let startNode = n1Room.getNode(currentEdge.node1Id);
+            let remainingEdge = this;
+            let startNode = n1Room.getNode(remainingEdge.node1Id);
             for(let p in path) {
-                
                 let pos = path[p];
+                pos = n1Room.getEdgeMapPosObj(pos);
+                //logger.log("looking at pos", pos);
+
 
                 
 
@@ -517,46 +554,60 @@ class Edge {
                 let closeToEnds = p <= 1 || p >= path.length - 2;
                 
                 let intersectionNode = new Node(pos, Node.INTERSECTION);
+                
                 let intersectingEdge = n1Room.getEdgeAtPos(pos);
 
-                cm.set(pos.x, pos.y, 1);
+                if (pos.roomName == this.node1Pos.roomName) {
+                    let terrain = new Room.Terrain(pos.roomName);
+                    let mask = terrain.get(pos.x, pos.y);
+                    if (mask === TERRAIN_MASK_SWAMP) {
+                        cm.set(pos.x, pos.y, 9);
+                    } else {
+                        cm.set(pos.x, pos.y, 1);
+                    }
+                    
+                }
+                //cm.set(pos.x, pos.y, 1);
                 if (!n1Room.getEdgeAtPos(pos)) {
-                    n1Room.setEdgeAtPos(pos, this.id);
+                    n1Room.setEdgeAtPos(pos, remainingEdge.id);
                 }
 
                 if (n1Room.hasNode(intersectionNode)) {
+                    intersectionNode = n1Room.getNode(intersectionNode.id);
+                    //logger.log("intersecting node", intersectionNode.id, intersectionNode.type);
+                    
                     //intersecting node
                     if (intersectionNode.id == this.node1Id || intersectionNode.id == this.node2Id) {
-                        if (intersectionNode.id == this.node1Id) { //start node
-                            global.utils.visual.circle(pos, "#fff", 1, 0.5);
+                        if (intersectionNode.id == startNode.id) { //start node
+                            //global.utils.visual.circle(pos, "#fff", 1, 0.5);
                         } else {
-                            global.utils.visual.circle(pos, "#000", 1, 0.5);
+                            //global.utils.visual.circle(pos, "#000", 1, 0.5);
                         }
                         
                     } else {
                         //valid intersection, bi-sect currect edge with node.
-                        logger.log("found Intersection node", intersectionNode.id, n1Room.nodes.hasId(intersectionNode.id))
-                        
+                        //logger.log("found Intersection node", intersectionNode.id, n1Room.nodes.hasId(intersectionNode.id))
+                        //global.utils.pStar.inst.logNetwork();
 
-                        let ourNode1 = n1Room.getNode(currentEdge.node1Id);
-                        let ourNode2 = n1Room.getNode(currentEdge.node2Id);
+                        let ourNode1 = n1Room.getNode(remainingEdge.node1Id);
+                        let ourNode2 = n1Room.getNode(remainingEdge.node2Id);
 
                         let ourEdge1 = new Edge(ourNode1, intersectionNode);
                         let ourEdge2 = new Edge(ourNode2, intersectionNode);
-                        ourEdge1.lastUpdated = ourEdge2.lastUpdated = currentEdge.lastUpdated;
+                        ourEdge1.lastUpdated = ourEdge2.lastUpdated = remainingEdge.lastUpdated;
 
-                        let [ourPath1, ourPath2] = currentEdge.path.splitAtPos(intersectionNode.pos);
+                        let [ourPath1, ourPath2] = remainingEdge.path.splitAtPos(intersectionNode.pos);
                         if(!ourPath1) {
                             continue;
                         }
-                        ourEdge1.path = ourPath1;
-                        ourEdge2.path = ourPath2;
+                        ourEdge1.overridePath(ourPath1);
+                        ourEdge2.overridePath(ourPath2);
 
 
-                        if (global.utils.pStar.inst.edges.hasId(currentEdge.id)) {
-                            global.utils.pStar.inst.removeEdge(currentEdge);
+                        if (global.utils.pStar.inst.edges.hasId(remainingEdge.id)) {
+                            global.utils.pStar.inst.removeEdge(remainingEdge);
                         }
-                        n1Room.removeEdgeFromPosMap(currentEdge);
+                        n1Room.removeEdgeFromPosMap(remainingEdge);
 
 
                         global.utils.pStar.inst.edges.add(ourEdge1);
@@ -565,65 +616,77 @@ class Edge {
                         
 
                         if (startNode.id == ourNode1.id) {
-                            currentEdge = ourEdge2;
+                            remainingEdge = ourEdge2;
                             n1Room.addEdgeToPosMap(ourEdge1);
                         } else {
-                            currentEdge = ourEdge1;
+                            remainingEdge = ourEdge1;
                             n1Room.addEdgeToPosMap(ourEdge2);
                         }
+
                         
                         startNode = intersectionNode;
 
-                        global.utils.visual.circle(pos, "#00f", 1, 0.5);
+                        //global.utils.pStar.inst.logNetwork();
+                        //logger.log("intersected node!", startNode.id, remainingEdge.id);
+                        //global.utils.visual.circle(pos, "#00f", 1, 0.5);
                     }
-                } else if (intersectingEdge && intersectingEdge.id != currentEdge.id) {
+                } else if (intersectingEdge && intersectingEdge.id != remainingEdge.id) {
+                    
+                    //logger.log('found intersecting edge', intersectingEdge.id);
                     
                     let interNode1 = n1Room.getNode(intersectingEdge.node1Id);
                     let interNode2 = n1Room.getNode(intersectingEdge.node2Id);
 
-                    let ourNode1 = n1Room.getNode(currentEdge.node1Id);
-                    let ourNode2 = n1Room.getNode(currentEdge.node2Id);
+                    let ourNode1 = n1Room.getNode(remainingEdge.node1Id);
+                    let ourNode2 = n1Room.getNode(remainingEdge.node2Id);
 
                     let skipSpot = false;
                     //look for edges that contain our starting node
                     if (startNode.id == interNode1.id || startNode.id == interNode2.id) {
-                        
                         let nextPos = path[Number.parseInt(p)+1];
+                        nextPos = n1Room.getEdgeMapPosObj(nextPos);
                         //logger.log(path.length, p, Number.parseInt(p)+1);
                         if(nextPos) {
                             //logger.log("nextpos", nextPos);
                             let nextIntersectionNode = new Node(nextPos, Node.INTERSECTION);
+                            nextIntersectionNode = n1Room.getNode(nextIntersectionNode.id);
                             let nextIntersectingEdge = n1Room.getEdgeAtPos(nextPos);
-
-                            //if (!nextIntersectingEdge || (!n1Room.hasNode(nextIntersectionNode) && nextIntersectingEdge.id != intersectingEdge.id)) {
-                            if (!nextIntersectingEdge) {
-                                logger.log("diverging point", pos);
+                            let endNode = remainingEdge.getOtherNode(startNode);
+                            let nextNodeIsDest = nextIntersectionNode && nextIntersectionNode.id == endNode.id;
+                            if (!nextIntersectionNode && (!nextIntersectingEdge || (nextIntersectingEdge.id != intersectingEdge.id))) {
+                            //if (!nextIntersectingEdge) {
+                                //logger.log("diverging point", pos);
                                 //we have a diverging point!
-                                //global.utils.visual.circle(pos, "#fff", 1, 0.5);
+                                //global.utils.visual.circle(pos, "#999", 1, 0.5);
                                 skipSpot = false;
                             } else {
-                                logger.log('no diverging point!', nextIntersectingEdge.id);
+                                //logger.log('no diverging point!', nextIntersectingEdge.id);
                                 //no diverging point, skip till we find one
                                 skipSpot = true;
                             }
                         } else {
-                            logger.log("no next position, skip this spot cuz I dunno.. why not")
+                            //global.utils.visual.circle(pos, "#00f", 1, 0.5);
+                            //logger.log("no next position, skip this spot cuz I dunno.. why not")
                             skipSpot = true;
                         }
+                    } else {
+                        //global.utils.visual.circle(pos, "#0f0", 1, 0.5);
+                        //global.utils.visual.drawText(intersectingEdge.id, pos);
                     }
 
                     if (skipSpot) {
-                        global.utils.visual.circle(pos, "#ff0", 1, 0.5);
-                        logger.log("skipping intersection")
+                        //global.utils.visual.circle(pos, "#ff0", 1, 0.5);
+                        ///logger.log("skipping intersection")
                         continue;
                     }
 
-                    global.utils.visual.circle(pos, "#f00", 1, 0.5);
+                    //global.utils.pStar.inst.logNetwork();
+                    //global.utils.visual.circle(pos, "#f00", 1, 0.5);
                     //intersecting edge
-                    intersectingEdge.displayEdge("#f00", 0.5);
+                    //intersectingEdge.displayEdge("#f00", 0.5);
 
                     //actuall do the swap
-                    logger.log("adding Intersection node", intersectionNode.id, n1Room.nodes.hasId(intersectionNode.id))
+                    //logger.log("adding Intersection node", intersectionNode.id, n1Room.nodes.hasId(intersectionNode.id))
                     
                     
 
@@ -637,33 +700,33 @@ class Edge {
                     
                     //extract/insert path info
                     let [interPath1, interPath2] = intersectingEdge.path.splitAtPos(intersectionNode.pos);
-                    let [ourPath1, ourPath2] = currentEdge.path.splitAtPos(intersectionNode.pos);
-                    logger.log("splitting", intersectingEdge.id, "at", pos, JSON.stringify(interPath1), JSON.stringify(interPath2));
+                    let [ourPath1, ourPath2] = remainingEdge.path.splitAtPos(intersectionNode.pos);
+                    //logger.log("splitting", intersectingEdge.id, "at", pos, JSON.stringify(interPath1), JSON.stringify(interPath2));
                     
                     if (!ourPath1 || ! interPath1) {
                         continue;
                     }
 
-                    interEdge1.path = interPath1;                    
-                    interEdge2.path = interPath2;
+                    interEdge1.overridePath(interPath1);
+                    interEdge2.overridePath(interPath2);
 
 
-                    ourEdge1.path = ourPath1;
-                    ourEdge2.path = ourPath2;
+                    ourEdge1.overridePath(ourPath1);
+                    ourEdge2.overridePath(ourPath2);
 
                     interEdge1.lastUpdated = interEdge2.lastUpdated = intersectingEdge.lastUpdated;
-                    ourEdge1.lastUpdated = ourEdge2.lastUpdated = currentEdge.lastUpdated;
+                    ourEdge1.lastUpdated = ourEdge2.lastUpdated = remainingEdge.lastUpdated;
                     
 
                     //remove old edges
                     global.utils.pStar.inst.removeEdge(intersectingEdge);
-                    if (global.utils.pStar.inst.edges.hasId(currentEdge.id)) {
-                        global.utils.pStar.inst.removeEdge(currentEdge);
+                    if (global.utils.pStar.inst.edges.hasId(remainingEdge.id)) {
+                        global.utils.pStar.inst.removeEdge(remainingEdge);
                     }
 
                     //remove old edges from room's edge map
                     n1Room.removeEdgeFromPosMap(intersectingEdge);
-                    n1Room.removeEdgeFromPosMap(currentEdge);
+                    n1Room.removeEdgeFromPosMap(remainingEdge);
 
                     n1Room.addNode(intersectionNode, false);
 
@@ -679,22 +742,23 @@ class Edge {
                     //n1Room.addEdgeToPosMap(ourEdge2);
 
                     if(startNode.id == ourNode1.id) {
-                        currentEdge = ourEdge2;
+                        remainingEdge = ourEdge2;
                         n1Room.addEdgeToPosMap(ourEdge1);
                     } else {
-                        currentEdge = ourEdge1;
+                        remainingEdge = ourEdge1;
                         n1Room.addEdgeToPosMap(ourEdge2);
                     }
                     
                     startNode = intersectionNode;
-                    
+                    //global.utils.pStar.inst.logNetwork();
+                    //logger.log("intersected edge!", startNode.id, remainingEdge.id);
 
                 } else {
                     //no intersection
-                    if(intersectingEdge.id == currentEdge.id) {
-                        global.utils.visual.circle(pos, "#f0f", 1, 0.5);
+                    if(intersectingEdge.id == remainingEdge.id) {
+                        //global.utils.visual.circle(pos, "#f0f", 1, 0.5);
                     } else {
-                        global.utils.visual.circle(pos, "#0f0", 1, 0.5);
+                        //global.utils.visual.circle(pos, "#0f0", 1, 0.5);
                     }
                     
                 }
@@ -732,8 +796,8 @@ class Edge {
 
             //bake in path/cost
             let path = this.path.getPath();
-            logger.log('wtf is this path', path, JSON.stringify(path))
-            global.utils.visual.drawPath(path, "#00f");
+            //logger.log('wtf is this path', path, JSON.stringify(path))
+            //global.utils.visual.drawPath(path, "#00f");
             this.lastUpdated = Game.time;
 
             if (skipNetworkRefinement) {
@@ -909,7 +973,7 @@ class Edge {
             
             //global.utils.visual.drawText(this.cost, this.path.path[Math.floor(this.path.path.length/2)]);
             
-            global.utils.visual.drawPath(this.path.path, color, style)
+            //global.utils.visual.drawPath(this.path.path, color, style)
         }
     }
     
@@ -970,7 +1034,7 @@ class pStarRoom {
         this.nodes = new global.utils.array.classes.IndexingCollection("id", ["pos.roomName", "type"], [100000, 1000000]);
         this.nodes.serializeSeperator = "ʭ";
 
-        this.ticksValid = 1000;
+        this.ticksValid = 10000;
         this.lastUpdated = 0;
 
         this.exitsAdded = false;
@@ -1008,7 +1072,7 @@ class pStarRoom {
         return false;
     }
 
-    setEdgeAtPos(pos, edgeId) {
+    getEdgeMapPosObj(pos) {
         let keys = this.posEdgeMap.keys();
         for(const edgePos of keys) {
             if (pos.isEqualTo(edgePos)) {
@@ -1016,6 +1080,11 @@ class pStarRoom {
                 break;
             }
         }
+        return pos;
+    }
+
+    setEdgeAtPos(pos, edgeId) {
+        pos = this.getEdgeMapPosObj(pos);
 
         //logger.log(pos, this.posEdgeMap.has(pos), edgeId, this.getEdgeAtPos(pos))
         if (this.posEdgeMap.has(pos)) {
@@ -1050,9 +1119,11 @@ class pStarRoom {
         let path = edge.path.path;
         for(let p in path) {
             let pos = path[p];
-            if (!this.getEdgeAtPos(pos)) {
-                this.setEdgeAtPos(pos, edge.id);
+            pos = this.getEdgeMapPosObj(pos);
+            if (!this.posEdgeMap.has(pos)) {
+                this.setEdgeAtPos(pos, edge.id);    
             }
+            
             //this.posEdgeMap[pos] = edge.id;
         }
     }
@@ -1069,7 +1140,7 @@ class pStarRoom {
         let center = new RoomPosition(25, 25, this.roomName);
         global.utils.visual.drawText(this.roomName + " " + Object.keys(this.nodes.thingsById).length, center);
         this.displayNodes();
-        this.displayPosMap();
+        //this.displayPosMap();
     }
 
     displayNodes() {
@@ -1113,7 +1184,7 @@ class pStarRoom {
     }
     hasNode(node) {
         if (!(node instanceof Node)) {
-            throw new Error("Adding invalid Node:", node);
+            throw new Error("Checking for invalid Node:", node);
         }
         return this.nodes.has(node);
     }
@@ -1199,7 +1270,7 @@ class pStarRoom {
                 
 
                 let nodesConnected = 0;
-                let maxConnections = 20;
+                let maxConnections = 200;
                 
                 let ourNodes = _.filter(roomExitNodes, (nodeId) => {
                     if (nodeId == node.id) {
@@ -1310,7 +1381,7 @@ class pStarRoom {
                 default:
                     throw new Error("invalid direction!" + exitDir)
             }
-            let groups = this.groupExits(exitPositions, byX, 15);
+            let groups = this.groupExits(exitPositions, byX, 10);
 
             //logger.log('adding exits', this.roomName, exitDir, groups.length);
             //logger.log(JSON.stringify(exitPositions))
