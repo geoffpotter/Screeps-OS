@@ -34,6 +34,8 @@ class pathingProc extends processClass {
         
         
         this.nodeMap = {};
+
+        this.totalEdgesRefined = 0;
     }
     initThreads() {
         return [
@@ -42,7 +44,7 @@ class pathingProc extends processClass {
             this.createThread("init_onTick", "init"),
 
             this.createThread("updateNetwork", "taskFind"),
-            this.createThread("displayNetwork", "work"),
+            //this.createThread("displayNetwork", "work"),
             this.createThread("run", "empire"),
             this.createThread("save", "edges")
         ];
@@ -58,21 +60,26 @@ class pathingProc extends processClass {
             return;
         }
         
-
+        logger.log("doing update", Game.cpu.getUsed())
         let numEdgesRefined = global.utils.pStar.inst.refineEdges();
-
+        this.totalEdgesRefined += numEdgesRefined;
+        logger.log("edges refined", Game.cpu.getUsed(), this.totalEdgesRefined);
         let numRefined = global.utils.pStar.inst.refineRooms();
-
+        logger.log("update done", Game.cpu.getUsed());
         //if we're under 6k bucket, only update once
         if (this.kernel.cpuDefcon < 6) {
             return;
         }
-
-        if (numRefined > 0 || numEdgesRefined > 0) { // if we did work, there's prolly more work to do!
+        logger.log('add rooms?');
+        
+        if (numRefined > 0 || (numEdgesRefined > 0 && this.totalEdgesRefined < 10)) { // if we did work, there's prolly more work to do!
             return threadClass.HUNGRY;
         } else {
             global.utils.pStar.inst.addRoomsToNetwork(1);//add a max of one room at a time.
+            logger.log("Rooms added", Game.cpu.getUsed());
         }
+        
+        
     }
 
     displayNetwork() {
@@ -96,7 +103,7 @@ class pathingProc extends processClass {
     }
 
     init_onTick() {
-        
+        this.totalEdgesRefined = 0;
         //global.utils.pStar.inst = new global.utils.pStar.classes.pStar();
 
         try {

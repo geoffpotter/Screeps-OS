@@ -261,6 +261,11 @@ class IndexingCollection {
         let numSerialized = 0;
         let currLimitIndex = 0;
         this.forEach((thing) => {
+
+            if (currLimitIndex >= (this.limits.length-1)) {
+                //logger.log("not serializing anymore", numSerialized)
+                return;
+            }
             //logger.log('serializing thing', thing.id, numSerialized, currLimit, currLimitIndex)
             let serialized = thing.serialize(currLimitIndex+1);
             arr.push(serialized);
@@ -270,10 +275,10 @@ class IndexingCollection {
             while(currLimit && numSerialized >= currLimit) {
                 currLimit = this.limits[currLimitIndex];
                 currLimitIndex++;
-                //logger.log("next limit", currLimitIndex+1, "/", this.limits.length, "for serializing", this.limits[currLimitIndex-1]);
+                logger.log("next limit", currLimitIndex+1, "/", this.limits.length, "for serializing", this.limits[currLimitIndex-1]);
                 //check if we're out of limits, if so, stop serializing shit dummy
                 if (currLimitIndex >= (this.limits.length-1)) {
-                    
+                    logger.log("not serializing anymore", numSerialized)
                     return;
                 }
             }

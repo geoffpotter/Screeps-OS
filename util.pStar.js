@@ -18,9 +18,9 @@ let IndexingCollection = global.utils.array.classes.IndexingCollection;
 class pStar {
     constructor() {
         
-        this.edges = new IndexingCollection("id", ["node1Id", "node2Id"], [2000, 200000, 1000000]);
+        this.edges = new IndexingCollection("id", ["node1Id", "node2Id"], [20000, 200000, 1000000]);
         
-        this.distances = new IndexingCollection("id", ["origin.id", "goal.id"], [2000, 1000000]);
+        this.distances = new IndexingCollection("id", ["origin.id", "goal.id"], [1000, 1000000]);
 
         this.rooms = new IndexingCollection("roomName", [], [1000, 3000]);
         this.roomAdditionQueue = [];
@@ -106,6 +106,7 @@ class pStar {
             if (!this.rooms.hasId(roomName)) {
                 let room = new pStarRoom(roomName);
                 this.rooms.add(room);
+                this.edgeQueueRefreshed = 0;
             }
             roomsAdded++;
             if (maxRoomsToAdd != 0 && roomsAdded >= maxRoomsToAdd) {
@@ -198,10 +199,58 @@ class pStar {
     }
 
 
+    getEdgeRefineQueue() {
+        
+        if (!this.edgeRefineQueue || !this.edgeQueueRefreshed || (this.edgeRefineQueue.length == 0 && Game.time - this.edgeQueueRefreshed > 10)) {
+            let allEdges = this.edges.getAll();
+            let edges = _.filter(allEdges, (e) => e.edgeNeedsRefinement());
+            edges = _.sortBy(edges, (e) => e.cost).reverse();
+            //logger.log('got edges to refine:', JSON.stringify(edges))
+            this.edgeRefineQueue = edges;
+            this.edgeQueueRefreshed = Game.time;
+        }
+        
+        //logger.log("get edge", allEdges.length, this.edgeRefineQueue.length, Game.time - this.edgeQueueRefreshed)
+        return this.edgeRefineQueue;
+    }
     refineEdges() {
+        let start = Game.cpu.getUsed();
+
+        let edges = this.getEdgeRefineQueue();
+        
+        let edgesRefined = 0;
+        logger.log("after filter", Game.cpu.getUsed() - start);
+        
+        let edge;
+        //for(let e in edges) {
+        while(edge = edges.shift()) {
+            /** @type {Edge} */
+            // if (!edge.edgeNeedsRefinement()) {
+            //     continue;
+            // }
+            //edge.
+            let {node1, node2} = edge.getNodes();
+            let path = global.utils.pStar.findPath(node1, node2);
+            let refined = path.ops > 0;
+            if (refined) {
+                edgesRefined++;
+            }
+            if (edgesRefined >= this.maxEdgeUpdatesPerTick) {
+                break;
+            }
+        }
+        logger.log("after loop", Game.cpu.getUsed() - start);        
+        logger.log(edgesRefined, "edges refined, ", edges.length, "remaining");
+        return edgesRefined;
+    }
+
+    refineEdges_old() {
+        let start = Game.cpu.getUsed();
+
         let edges = _.filter(this.edges.getAll(), (e) => e.edgeNeedsRefinement());
         edges = _.sortBy(edges, (e) => e.cost).reverse();
         let edgesRefined = 0;
+        logger.log("after filter", Game.cpu.getUsed() - start);        
         for(let e in edges) {
             /** @type {Edge} */
             let edge = edges[e];
@@ -216,6 +265,7 @@ class pStar {
                 break;
             }
         }
+        logger.log("after loop", Game.cpu.getUsed() - start);        
         logger.log(edgesRefined, "edges refined");
         return edgesRefined;
     }
@@ -1067,14 +1117,14 @@ module.exports = {
                 }
 
                 let refined = parentEdge.refineEdge();
-                logger.log(node.id, "has parent, edge refined?", refined);
+                //logger.log(node.id, "has parent, edge refined?", refined);
                 if (refined) {
-                    parentNodeInfo = nodeInfoLookup[parentNode.id];
-                    logger.log(nodeInfoLookup[parentNode.id])
-                    logger.log("wtf")
-                    logger.log("edge refined, re-opening parent node incase path is gone", node.id, parentNode.id, JSON.stringify(parentNodeInfo_stupid));
-                    parentNodeInfo_stupid.closed = false;
-                    openNodes.push(parentNodeInfo_stupid);
+                    let parentNodeInfo = nodeInfoLookup[parentNode.id];
+                    //logger.log(nodeInfoLookup[parentNode.id])
+                    //logger.log("wtf")
+                    //logger.log("edge refined, re-opening parent node incase path is gone", node.id, parentNode.id, JSON.stringify(parentNodeInfo));
+                    parentNodeInfo.closed = false;
+                    openNodes.push(parentNodeInfo);
                     delete nodeInfoLookup[node.id];
                     continue;
 
@@ -1082,15 +1132,15 @@ module.exports = {
                     //recalc g score
                     //logger.log(parentEdge.id, 'edge refined', node.id, "going back into queue")
                     //logger.log(JSON.stringify(nodeInfo))
-                    let parentNodeInfo = nodeInfoLookup[parentNode.id];
-                    if (!parentNodeInfo) {
-                        logger.log("Lost parent info, skipping node")
-                        continue;
-                    }
-                    nodeInfo.g = Number.parseInt(parentNodeInfo.g) + Number.parseInt(parentEdge.cost);
-                    nodeInfo.f = nodeInfo.g + nodeInfo.h;
-                    openNodes.push(nodeInfo);
-                    continue;
+                    // let parentNodeInfo = nodeInfoLookup[parentNode.id];
+                    // if (!parentNodeInfo) {
+                    //     logger.log("Lost parent info, skipping node")
+                    //     continue;
+                    // }
+                    // nodeInfo.g = Number.parseInt(parentNodeInfo.g) + Number.parseInt(parentEdge.cost);
+                    // nodeInfo.f = nodeInfo.g + nodeInfo.h;
+                    // openNodes.push(nodeInfo);
+                    // continue;
                 }
             } else if (refinePath) {
                 //logger.log(node.id, "has no parent set.. is it the initial node, cuz otherwise you're a dumbass")
