@@ -291,9 +291,13 @@ class IndexingCollection {
         return this.serializeSeperator + arr.join(this.serializeSeperator);
     }
     static deserialize(str, thingClass) {
+        logger.log("deserializin")
+        if (!str) {
+            throw new Error("wtf are you doin bro")
+        }
         let seperator = str.slice(0, 1);
         str = str.substr(1);
-        //logger.log("deserialize", seperator, str);
+        logger.log("deserialize", seperator, str);
         let arr = str.split(seperator);
         let idField = arr.shift();
         let limits = arr.shift().split("Œ");

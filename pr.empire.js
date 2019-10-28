@@ -28,6 +28,8 @@ class empire extends processClass {
         // this.kernel.startProcess(this.intel);
         this.gclProgress = new stat();
         this.gclProgressChange = new stat();
+
+        this.username = Game.spawns[Object.keys(Game.spawns)[0]].owner.username;
     }
     
     initThreads() {

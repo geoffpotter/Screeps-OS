@@ -20,7 +20,7 @@ class INeRTQueues {
     constructor() { // class constructor
         this.queueNames = [
             "init",
-            
+            "intel",
             "jobCreate",
             "jobFind",
             "taskCreate",

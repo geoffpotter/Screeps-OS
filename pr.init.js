@@ -18,7 +18,7 @@ let threadClass = require("INeRT.thread");
 let statsProcClass = require("pr.stats");
 
 let empireProcClass = require("pr.empire");
-let intelProcClass = require("pr.empire.intel");
+let intelProcClass = require("pr.intel");
 
 let pStarProcClass = require("pr.pStar");
 let pathingProcClass = require("pr.pathing");
@@ -26,6 +26,9 @@ let pathingProcClass = require("pr.pathing");
 let testingProcClass = require("pr.testing");
 
 let flagwalkerClass = require("pr.role.flagwalker");
+
+let scoutClass = require("pr.role.scout");
+
 
 class initProc extends processClass {
     initThreads() {
@@ -40,8 +43,8 @@ class initProc extends processClass {
         // let empireProc = new empireProcClass("empire");
         // this.kernel.startProcess(empireProc);
 
-        // let intel = new intelProcClass("intel");
-        // this.kernel.startProcess(intel);
+        let intel = new intelProcClass("intel");
+        this.kernel.startProcess(intel);
         
         
         let statsProc = new statsProcClass("stats");
@@ -51,6 +54,11 @@ class initProc extends processClass {
 
         let pathingProc = new pathingProcClass("pathing");
         this.kernel.startProcess(pathingProc);
+
+        // let scoutProc = new scoutClass("scouts");
+        // this.kernel.startProcess(scoutProc);
+
+
 
         // let flagwalkerProc = this.kernel.getProcess("flagwalker")
         // if (!flagwalkerProc) {

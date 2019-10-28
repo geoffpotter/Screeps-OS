@@ -36,8 +36,8 @@ class scout extends processClass {
         
         let spawn = Game.spawns['Spawn1'];
         let creeps = Game.creeps;
-        let numScouts = 100;
-        logger.log("spawnin", Object.keys(creeps).length, numScouts)
+        let numScouts = 30;
+        logger.log("spawnin?", Object.keys(creeps).length, numScouts)
         if (Object.keys(creeps).length < numScouts) {
             logger.log("not enough scouts", spawn.spawning, spawn.room.energyAvailable)
             if (!spawn.spawning && spawn.room.energyAvailable >= 50) {
@@ -57,11 +57,12 @@ class scout extends processClass {
         for(let creepName in creeps) {
             let start = Game.cpu.getUsed();
             let creep = creeps[creepName];
+            logger.log("runnin scout", creepName, creep);
             
             if (creep.room.name == creep.memory.targetRoom && (new RoomPosition(25, 25, creep.memory.targetRoom)).getRangeTo(creep.pos) < 23) {
                 creep.memory.targetRoom = false;
             } 
-            
+            logger.log("1?")
             let targetRoom = creep.memory.targetRoom;
             if (!targetRoom) {
 
@@ -76,9 +77,11 @@ class scout extends processClass {
                 targetRoom = randomExit;
             }
             creep.memory.targetRoom = targetRoom;
-            
+            logger.log("2?" + targetRoom)
             let roomCenter = new RoomPosition(25, 25, targetRoom);
-            let i = creepName.substr(5);
+            logger.log("here?")
+            //let i = creepName.substr(5);
+            logger.log("how about here?")
             let ret;
             //logger.log(creep.name, i, (i%2==0))
 
