@@ -20,6 +20,9 @@ let statsProcClass = require("pr.stats");
 let empireProcClass = require("pr.empire");
 let intelProcClass = require("pr.intel");
 
+let creepManagerProcClass = require("pr.creepManager");
+
+
 let pStarProcClass = require("pr.pStar");
 let pathingProcClass = require("pr.pathing");
 
@@ -40,8 +43,7 @@ class initProc extends processClass {
         // let pStarProc = new pStarProcClass("pStar");
         // this.kernel.startProcess(pStarProc);
         
-        // let empireProc = new empireProcClass("empire");
-        // this.kernel.startProcess(empireProc);
+        
 
         let intel = new intelProcClass("intel");
         this.kernel.startProcess(intel);
@@ -50,10 +52,15 @@ class initProc extends processClass {
         let statsProc = new statsProcClass("stats");
         this.kernel.startProcess(statsProc);
         
+        let creepManagerProc = new creepManagerProcClass("creepManager");
+        this.kernel.startProcess(creepManagerProc);
+
+        let empireProc = new empireProcClass("empire");
+        this.kernel.startProcess(empireProc);
         
 
-        let pathingProc = new pathingProcClass("pathing");
-        this.kernel.startProcess(pathingProc);
+        // let pathingProc = new pathingProcClass("pathing");
+        // this.kernel.startProcess(pathingProc);
 
         // let scoutProc = new scoutClass("scouts");
         // this.kernel.startProcess(scoutProc);

@@ -37,6 +37,8 @@ global.utils.visual = require("util.visual");
 global.utils.map = require("util.map");
 global.utils.pStar = require("util.pStar");
 global.utils.cm = require("util.cm");
+global.utils.intel = require("util.intel");
+global.utils.creep = require("util.creep");
 
 for(let u in global.utils) {
 	let util = global.utils[u];

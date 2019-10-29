@@ -68,6 +68,13 @@ class kernel {
         this.profile = true;
 
         global.kernel = this;
+
+
+        if (this.profile) {
+            profiler.registerClass(threadClass, "thread");
+            profiler.registerClass(queuesClass, "queues");
+            profiler.registerClass(queueClass, "baseQueue");
+        }
     }
     
     startProcess(process, parentProcess) {
@@ -88,6 +95,7 @@ class kernel {
 
         this.procTable[process.name] = process;
         
+        /** @type {kernel} */
         process.kernel = this;
         
         process.init(this);
@@ -152,7 +160,14 @@ class kernel {
     }
     
     run() {
-        
+        let start = Game.cpu.getUsed();
+        let log = (...args) => {
+            let usedNow = Game.cpu.getUsed();
+            let used = usedNow - start;
+            logger.log("cpu used:", used, ...args);
+            start = usedNow;
+        };
+
         if(this.cpuBucketRecoverTicks > 0 && Game.cpu.bucket < 10000) {
             logger.log("skipping tick", this.cpuBucketRecoverTicks, "ticks left.");
             this.cpuBucketRecoverTicks--;
@@ -192,7 +207,7 @@ class kernel {
         }
         this.threadCpu = 0;
         let threadsRun = 0;
-        
+        log('setup done')
         //handle memory
         let memoryCPUUsed = 0;
         let memoryCPUStart = Game.cpu.getUsed();
@@ -215,7 +230,9 @@ class kernel {
         let thread = false;
         //while we've got threads to run, run em
         logger.log("Starting kernel run")
+        log("init tick done")
         while(thread = this.queues.getNextThread()) {
+            //log("got thread to run" + thread)
             let cpuStart = Game.cpu.getUsed();
             
             //handle cpu limit
@@ -243,6 +260,9 @@ class kernel {
             
             //logger.log('ran', thread.process.name, "func", thread.method, "got", ret);
             if (ret === threadClass.DONE || ret === threadClass.HUNGRY) {
+                if (ret === threadClass.DONE) {
+                    thread.finished = true;
+                }
                 let queueName = thread.targetQueue;
                 this.queues.removeThread(thread);
                 /** @type {queueClass} */
@@ -257,8 +277,9 @@ class kernel {
             }
             
             threadsRun++;
+            //log("thread done")
         }
-        
+        log("threads done")
         //do end tick
         this.queues.endTick();
         
@@ -266,7 +287,8 @@ class kernel {
         if (this.time % 100 == 0) {
             this.gc();
         }
-        
+        log('end tick done')
+
         this.killFinishedProcs();
         
         //handle memory endtick
@@ -274,6 +296,7 @@ class kernel {
         this.commitMemory();
         memoryCPUUsed += Game.cpu.getUsed() - memoryCPUStart;
         
+        log("cleanup done")
 
         for(let procName in cpuByProc) {
             let cpuThisProc = cpuByProc[procName];
@@ -308,6 +331,7 @@ class kernel {
         this.lastTick = Game.time;
         
         logger.log(Game.cpu.getUsed() - this.cpuAtStart);
+        log("stats done");
     }
     
     
@@ -322,7 +346,7 @@ class kernel {
                 let thread = proc.threads[t];
                 //logger.log(proc.name, thread.method);
             }
-            if (proc.threads.length == 0 || proc.killed) {
+            if (!proc.threads || proc.threads.length == 0 || proc.killed) {
                 logger.log(proc.name, proc.killed ? "proc killed, removin" : "proc has no running threads, killing");
                 this.destroyProcess(proc);
             }
@@ -390,6 +414,28 @@ class kernel {
     inSimMode() {
         return Object.keys(Game.rooms)[0] ==="sim"
     }
-}
 
+
+    /**
+     * Creates/updates a process for every object in arrayOfStuff, using the callbacks provided to get values
+     * @param {any} arrayOfStuff 
+     * @param {process} processClass 
+     * @param {Function} procNameFN 
+     * @param {Function} procDataFN 
+     */
+    manageProcArray(arrayOfStuff, processClass, procNameFN, procDataFN) {
+        for(let i in arrayOfStuff) {
+            let thing = arrayOfStuff[i];
+            let procName = procNameFN(thing);
+            let procData = procDataFN(thing);
+            let proc = this.getProcess(procName);
+            if (!proc) {
+                proc = new processClass(procName, procData);
+                this.startProcess(proc);
+            }
+            proc.data = procData;
+        }
+    }
+}
+global.kernelClass = kernel;
 module.exports = kernel;

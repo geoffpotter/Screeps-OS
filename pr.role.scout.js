@@ -14,7 +14,7 @@ logger = new logger("pr.role.scout");
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
-let intelClass = require("pr.empire.intel");
+//let intelClass = require("pr.empire.intel");
 
 
 let stat = require("util.stat").classes.stat;
@@ -33,10 +33,10 @@ class scout extends processClass {
     
     run() {
         logger.log("in scout run()")
-        
+        return;
         let spawn = Game.spawns['Spawn1'];
         let creeps = Game.creeps;
-        let numScouts = 30;
+        let numScouts = 1;
         logger.log("spawnin?", Object.keys(creeps).length, numScouts)
         if (Object.keys(creeps).length < numScouts) {
             logger.log("not enough scouts", spawn.spawning, spawn.room.energyAvailable)

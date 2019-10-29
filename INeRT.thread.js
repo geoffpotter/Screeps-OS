@@ -29,6 +29,7 @@ class thread {
         this.cpuUsed = new stat();
         this.lastTickRun = false;
         this.suspend = false;
+        this.finished = false;
     }
     
     //return codes
@@ -44,7 +45,7 @@ class thread {
         }
         let ret = this.process[this.method](kernel);
         logger.log(this.process.name,"got",ret);
-        this.lastTIckRun = Game.time;
+        this.lastTickRun = Game.time;
         if (Number.isInteger(ret)) {
             this.suspend = ret;
         }

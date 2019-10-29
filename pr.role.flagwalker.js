@@ -14,7 +14,7 @@ logger = new logger("pr.role.flagwalker");
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
-let intelClass = require("pr.empire.intel");
+//let intelClass = require("pr.empire.intel");
 
 
 let stat = require("util.stat").classes.stat;

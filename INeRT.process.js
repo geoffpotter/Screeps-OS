@@ -15,8 +15,10 @@ logger.color = COLOR_GREY;
 let stat = require("util.stat").classes.stat;
 let threadClass = require("INeRT.thread");
 
+let kernelClass = global.kernelClass;
 class process {
     constructor(name, data = {}) { // class constructor
+        /** @type {kernelClass} */
         this.kernel=false; //set by kernel
         //handled by the kernel, not this class
         this.threads = [];

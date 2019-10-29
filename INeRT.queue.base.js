@@ -9,7 +9,7 @@
 
 let logger = require("screeps.logger");
 logger = new logger("INeRT.queue.base");
-logger.enabled = false;
+//logger.enabled = false;
 logger.color = COLOR_GREY;
 
 let stat = require("util.stat").classes.stat;
@@ -63,15 +63,19 @@ class queue {
     }
     
     getNextThread() {
-        if (this.name == "init") {
-            logger.log(this.name, "getting thread", this.cpuLimit, this.runEveryX, this.cpuTickBucket);
-            logger.log(this.currentIndex, JSON.stringify(this.threads));
+        if (this.threads.length <= this.currentIndex) {
+            //there's nothing here, don't do work
+            //logger.log(this.name, "no threads left, gtfo", this.threads.length, this.currentIndex)
+            return false;
         }
+
         if (this.cpuLimit !== false && this.cpuLimit <= this.cpuTickBucket) {
             //over cpu limit, pretend we're done
             logger.log(this.name, "OVER QUEUE CPU LIMIT", this.cpuTickBucket, this.cpuLimit)
             return false;
         }
+
+        
         
         let thread = this.threads[this.currentIndex];
         this.currentIndex += this.runEveryX;
@@ -85,7 +89,7 @@ class queue {
     initTick() {
         this.currentIndex = Game.time % this.runEveryX;
         //sort procs by last time they were run
-        this.threads = _.sortBy(this.threads, (t) => t.lastTickRun - Game.time);
+        //this.threads = _.sortBy(this.threads, (t) => t.lastTickRun - Game.time);
         
         this.cpuTickBucket = 0;
     }

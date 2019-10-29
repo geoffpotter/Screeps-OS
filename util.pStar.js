@@ -93,6 +93,8 @@ class pStar {
         //add rooms until we're out or reach our max for this tick
         while(this.roomAdditionQueue.length > 0 && roomsAdded < this.maxRoomAdditionsPerTick) {            
             let roomName = this.roomAdditionQueue.shift();
+            if (!roomName) continue;
+            logger.log(roomName);
             let center = new RoomPosition(25, 25, roomName);
             let DistToBase = minDistToBaseNode(center);
             logger.log("should we add this room?", roomName, center, DistToBase)

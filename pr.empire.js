@@ -14,9 +14,11 @@ logger = new logger("pr.empire");
 let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
-let intelClass = require("pr.empire.intel");
+let intelClass = require("pr.intel");
 
 let scoutClass = require("pr.role.scout");
+
+let roomManagerClass = require("pr.roomManager");
 
 let stat = require("util.stat").classes.stat;
 
@@ -30,15 +32,38 @@ class empire extends processClass {
         this.gclProgressChange = new stat();
 
         this.username = Game.spawns[Object.keys(Game.spawns)[0]].owner.username;
+        /** @type {intelClass} */
+        this.intelProc = this.kernel.getProcess("intel");
+
+        /** @type {empire} */
+        global.empire = this;
     }
     
     initThreads() {
         return [
+            this.createThread("setupRoomManagers", "init"),
             this.createThread("run", "empire"),
             this.createThread("endTick", "work"),
             ];
     }
     
+    setupRoomManagers() {
+        let allIntel = this.intelProc.getAllIntel();
+        for(let roomName in allIntel) {
+            let roomIntel = allIntel[roomName];
+            let procName = roomName + "_manager";
+            let roomManagerProc = this.kernel.getProcess(procName);
+            let data = {
+                roomName: roomName,
+                intel: roomIntel
+            }
+            if (!roomManagerProc) {
+                roomManagerProc = new roomManagerClass(procName, data);
+                this.kernel.startProcess(roomManagerProc);
+            }
+            roomManagerProc.data = data;
+        }
+    }
     
     run() {
         //logger.log(this.kernel, this.kernel.getProcess)
@@ -58,6 +83,7 @@ class empire extends processClass {
         let lastProgress = this.gclProgress.current;
         this.gclProgress.current = Game.gcl.progress;
         this.gclProgressChange.current = this.gclProgress.current - lastProgress;
+
     }
     
     getIntelProc() {
