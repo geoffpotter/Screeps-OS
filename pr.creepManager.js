@@ -106,6 +106,9 @@ class creepManager extends processClass {
     getSpawnQueue(spawn, distLimit=150) {
         let safeReqs = [];
         this.creepQueue.forEach((r) => {
+            if (!spawn.pos || !r.pos) {
+                throw new Error("happened after restart, wtf")
+            }
             if (global.utils.pStar.findDistance(spawn.pos, r.pos) <= distLimit && this.intel.getRoomIntel(r.pos.roomName).status.defcon == 0) {
                 let reqInfo = {
                     req: r,

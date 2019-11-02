@@ -16,6 +16,14 @@ Creep.prototype.isHostile = function() {
         && this.owner.username != "leonyx");
     //logger.log(this, this.owner, this.owner.username, notFriend)
     return notFriend
-        
-        
+}
+
+Creep.prototype.numParts = function(partType) {
+    let count = 0;
+    _.each(this.body, (part) => {
+        if (part.type == partType) {
+            count ++;
+        }
+    });
+    return count;
 }

@@ -199,6 +199,7 @@ class workerClass extends baseCreepClass {
         this.requiredBody = [WORK, CARRY, MOVE, MOVE];
         this.extendedBody = [WORK, CARRY, MOVE, MOVE];
     }
+    
 }
 
 class minerClass extends baseCreepClass {

@@ -207,7 +207,7 @@ class kernel {
         }
         this.threadCpu = 0;
         let threadsRun = 0;
-        log('setup done')
+        //log('setup done')
         //handle memory
         let memoryCPUUsed = 0;
         let memoryCPUStart = Game.cpu.getUsed();
@@ -230,7 +230,7 @@ class kernel {
         let thread = false;
         //while we've got threads to run, run em
         logger.log("Starting kernel run")
-        log("init tick done")
+        //log("init tick done")
         while(thread = this.queues.getNextThread()) {
             //log("got thread to run" + thread)
             let cpuStart = Game.cpu.getUsed();
@@ -279,7 +279,7 @@ class kernel {
             threadsRun++;
             //log("thread done")
         }
-        log("threads done")
+        //log("threads done")
         //do end tick
         this.queues.endTick();
         
@@ -287,7 +287,7 @@ class kernel {
         if (this.time % 100 == 0) {
             this.gc();
         }
-        log('end tick done')
+        //log('end tick done')
 
         this.killFinishedProcs();
         
@@ -296,7 +296,7 @@ class kernel {
         this.commitMemory();
         memoryCPUUsed += Game.cpu.getUsed() - memoryCPUStart;
         
-        log("cleanup done")
+        //log("cleanup done")
 
         for(let procName in cpuByProc) {
             let cpuThisProc = cpuByProc[procName];
@@ -331,7 +331,7 @@ class kernel {
         this.lastTick = Game.time;
         
         logger.log(Game.cpu.getUsed() - this.cpuAtStart);
-        log("stats done");
+        //log("stats done");
     }
     
     
