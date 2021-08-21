@@ -1,0 +1,33 @@
+  {
+    "compilerOptions": {
+      "module": "es6",
+      "lib": ["es6"],
+      "target": "es2015",
+      "moduleResolution": "Node",
+      "outDir": "build/step2-rollup/",
+      "rootDir": "src",
+      "baseUrl": "src",
+      "sourceMap": false,
+      "strict": true,
+      "allowJs": true,
+      "checkJs": true,
+      "removeComments": true,
+      "experimentalDecorators": true,
+      "noImplicitReturns": true,
+      "allowSyntheticDefaultImports": true,
+      "allowUnreachableCode": false,
+      "paths": {
+        "*": ["*", "shared/*"]
+      }
+    },
+    "include": [
+      "src/**/*.ts",
+      "src/**/**/*.ts",
+        //"shared/**/*"
+    ],
+    "exclude": [
+      "node_modules",
+      "dist",
+      "build"
+    ]
+  }

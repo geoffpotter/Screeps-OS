@@ -1,2 +1,1 @@
-
-global.SCRIPT_VERSION = 0
+//build system appends version here
