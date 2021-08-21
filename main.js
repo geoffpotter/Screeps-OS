@@ -23,8 +23,8 @@ logger = new logger("main");
 //util classes
 // Memory.pStar = "";
 // return;
-// RawMemory.set("");
-// return;
+//RawMemory.set("");
+//return;
 //prototype overrides
 require("proto.creep");
 require("proto.roomPosition");
@@ -39,6 +39,8 @@ global.utils.pStar = require("util.pStar");
 global.utils.cm = require("util.cm");
 global.utils.intel = require("util.intel");
 global.utils.creep = require("util.creep");
+global.utils.action = require("util.action");
+
 
 for(let u in global.utils) {
 	let util = global.utils[u];

@@ -20,10 +20,10 @@ class INeRTQueues {
     constructor() { // class constructor
         this.queueNames = [
             "init",
-            "taskCreate",
             "military",
             "empire",
             "rooms",
+            "actionSearch",
             "creepAct",
             "creepMove",
             "pathing",

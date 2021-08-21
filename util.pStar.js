@@ -34,6 +34,8 @@ class pStar {
         this.edgeTicksValid = 100000;
         this.maxEdgeUpdatesPerTick = 1;
 
+
+        this.maxDistanceToBaseNodeForRooms = 100;
         
     }
 
@@ -89,16 +91,15 @@ class pStar {
             return minDist;
         };
         let excludedRooms = [];
-        let distanceLimit = 1500;
         //add rooms until we're out or reach our max for this tick
         while(this.roomAdditionQueue.length > 0 && roomsAdded < this.maxRoomAdditionsPerTick) {            
             let roomName = this.roomAdditionQueue.shift();
             if (!roomName) continue;
-            logger.log(roomName);
+            //logger.log(roomName);
             let center = new RoomPosition(25, 25, roomName);
             let DistToBase = minDistToBaseNode(center);
-            logger.log("should we add this room?", roomName, center, DistToBase)
-            if (DistToBase > distanceLimit) {
+            //logger.log("should we add this room?", roomName, center, DistToBase)
+            if (DistToBase > this.maxDistanceToBaseNodeForRooms) {
                 if (DistToBase == 9999999999) {
                     excludedRooms.push(roomName);
                 }
@@ -221,7 +222,7 @@ class pStar {
         let edges = this.getEdgeRefineQueue();
         
         let edgesRefined = 0;
-        logger.log("after filter", Game.cpu.getUsed() - start);
+        //logger.log("after filter", Game.cpu.getUsed() - start);
         
         let edge;
         //for(let e in edges) {
@@ -241,36 +242,11 @@ class pStar {
                 break;
             }
         }
-        logger.log("after loop", Game.cpu.getUsed() - start);        
-        logger.log(edgesRefined, "edges refined, ", edges.length, "remaining");
+        //logger.log("after loop", Game.cpu.getUsed() - start);        
+        //logger.log(edgesRefined, "edges refined, ", edges.length, "remaining");
         return edgesRefined;
     }
 
-    refineEdges_old() {
-        let start = Game.cpu.getUsed();
-
-        let edges = _.filter(this.edges.getAll(), (e) => e.edgeNeedsRefinement());
-        edges = _.sortBy(edges, (e) => e.cost).reverse();
-        let edgesRefined = 0;
-        logger.log("after filter", Game.cpu.getUsed() - start);        
-        for(let e in edges) {
-            /** @type {Edge} */
-            let edge = edges[e];
-            //edge.
-            let {node1, node2} = edge.getNodes();
-            let path = global.utils.pStar.findPath(node1, node2);
-            let refined = path.ops > 0;
-            if (refined) {
-                edgesRefined++;
-            }
-            if (edgesRefined >= this.maxEdgeUpdatesPerTick) {
-                break;
-            }
-        }
-        logger.log("after loop", Game.cpu.getUsed() - start);        
-        logger.log(edgesRefined, "edges refined");
-        return edgesRefined;
-    }
 
     hasNode(node) {
         if (!(node instanceof Node)) {
@@ -312,6 +288,7 @@ class pStar {
             
         }
         room.addNode(node);
+        closestNodeLookup = {};
     }
 
     /**
@@ -479,7 +456,7 @@ class pStar {
                 goal: goal.pos,
             };
             pathInfo = creep.memory.pStarPath
-            logger.log(pathInfo.nextNode);
+            //logger.log(pathInfo.nextNode);
         }
 
         //log("init done")
@@ -488,7 +465,7 @@ class pStar {
         //initial state.  search for path
         if (pathInfo.method == "") {
             let path = this.findPath(creep.pos, goal.pos);
-            logger.log(creep.name, "path", JSON.stringify(path));
+            //logger.log(creep.name, "path", JSON.stringify(path));
             if (path && !path.incomplete) {
                 pathInfo.method = "pStar";
                 pathInfo.path = this.serializeFindPath(path.path);
@@ -589,7 +566,7 @@ class pStar {
                         //at next node, go to next leg or skip to next stage
                         if (path.length < 2) { //at the end of the node path, go to next stage
                             //leave existing path in memory so we can stil load the nodes
-                            logger.log(creep.name, nextNode.id);
+                            //logger.log(creep.name, nextNode.id);
                             pathInfo.pathStage = 2;
                         } else {
                             //at next leg, get next edge and update pathinfo's path as well
@@ -602,7 +579,7 @@ class pStar {
 
                     //if we're still on pathStage == 1, then actually do the move
                     if (pathInfo.pathStage == 1) {
-                        logger.log(creep.name, "moving to", nextNode.id, edge);
+                        //logger.log(creep.name, "moving to", nextNode.id, edge);
                         if (!edge.path) {
                             //if this is undefined, then shit ain't right.
                             pathInfo.method = "moveTo";
@@ -656,201 +633,6 @@ class pStar {
     }
 
 
-    // moveTo_old(creep, goal, opts) {
-    //     // let path = this.findPath(creep.pos, goal.pos);
-    //     // logger.log(creep.name, "path", JSON.stringify(path));
-    //     // creep.moveTo(goal.pos, {range:goal.range});
-    //     // return;
-    //     //creep.memory.pStarPath = false;
-    //     let pathInfo = creep.memory.pStarPath || {
-    //         currentNode: false,
-    //         nextNode: false,
-    //         destNode: false,
-    //         edgeId: false,
-    //         walking: false,
-    //         done: false,
-    //         goal: goal.pos,
-    //         stuck: 0,
-    //     }
-    //     //check for goal change
-    //     if (!goal.pos.isEqualTo(new RoomPosition(pathInfo.goal.x, pathInfo.goal.y, pathInfo.goal.roomName))) {
-    //         logger.log(creep.name, "goal changed", goal.pos, JSON.stringify(pathInfo.goal), goal.pos.isEqualTo(pathInfo.goal))
-    //         creep.memory.pStarPath = {
-    //             currentNode: false,
-    //             nextNode: false,
-    //             destNode: false,
-    //             edgeId: false,
-    //             walking: false,
-    //             done: false,
-    //             goal: goal.pos,
-    //             stuck: 0,
-    //         };
-    //         pathInfo = creep.memory.pStarPath
-    //         logger.log(pathInfo.nextNode)
-    //     }
-        
-
-    //     //check for final path completion
-    //     if (creep.pos.inRangeTo(goal.pos, goal.range)) {
-    //         pathInfo.nextNode = false;
-    //         pathInfo.destNode = false;
-    //         pathInfo.edgeId = false;
-    //         pathInfo.done = true;
-    //         pathInfo.walking = false;
-    //         pathInfo.stuck = 0;
-    //         creep.memory.pStarPath = false;
-    //         logger.log("creep already at destination, be better!");
-    //         return pathInfo;
-    //     }
-    //     //logger.log(creep.name, "moving too", goal.pos, JSON.stringify(pathInfo.goal));
-
-
-    //     /** @type {Node} */
-    //     let nextNode = this.getNode(pathInfo.nextNode);
-    //     /** @type {Node} */
-    //     let destNode = this.getNode(pathInfo.destNode);
-    //     /** @type {Edge} */
-    //     let edge = this.getNode(pathInfo.edgeId);
-        
-
-    //     //no stored path. decide what to do
-    //     if (!nextNode) {
-    //         let startNode = this.findClosestNode(creep.pos);
-    //         let endNode = this.findClosestNode(goal.pos);
-    //         //logger.log(creep.name, startNode, endNode);
-            
-    //         //if the creep is as close or closer to the goal as the first node is, might as well walk. 
-    //         let betterToWalk = false;
-    //         if (startNode.id == endNode.id) {
-    //             betterToWalk = creep.pos.toWorldPosition().getRangeTo(goal.pos) <= startNode.pos.toWorldPosition().getRangeTo(goal.pos);
-    //             //logger.log("walking calk", creep.name, startNode.id, creep.pos.toWorldPosition().getRangeTo(goal.pos), startNode.pos.toWorldPosition().getRangeTo(goal.pos), betterToWalk);
-    //         }
-            
-    //         if (startNode && endNode && !betterToWalk) {
-    //             //logger.log(creep.name, "found path", startNode.id, endNode.id)
-    //             //path found!
-    //             nextNode = startNode;
-    //             destNode = endNode;
-    //             pathInfo.nextNode = startNode.id;
-    //             pathInfo.currentNode = startNode.id;
-    //             pathInfo.destNode = endNode.id;
-                
-    //         } else {
-    //             //logger.log(creep.name, "no path, using moveto", startNode, endNode)
-    //             //can't find a start node, use creep.moveTo
-    //             pathInfo.walking = true;
-                
-    //         }
-    //     }
-    //     //check for node network path complete, and path segment complete
-    //     if (creep.pos.inRangeTo(nextNode, 1)) {
-    //         pathInfo.currentNode = nextNode.id;
-    //         if (destNode.id == nextNode.id && destNode.pos.isEqualTo(goal.pos)) { 
-    //             //last node in path, and final destination
-    //             pathInfo.nextNode = false;
-    //             pathInfo.destNode = false;
-    //             pathInfo.edgeId = false;
-    //             pathInfo.done = true;
-    //             creep.memory.pStarPath = pathInfo;
-    //             //logger.log(creep.name, "at final dest node", destNode.id);
-
-    //             return pathInfo;
-    //         } else if(destNode.id == nextNode.id) {
-    //             //we're at the final node, but not the final location, walk to that pos
-    //             pathInfo.walking = true;
-    //             //logger.log(creep.name, "at final dest node, need to walk", destNode.id);
-    //         } else {
-    //             //logger.log(creep.name, "next to node, doing stuff", pathInfo.currentNode)
-    //             if (false && nextNode.id == pathInfo.currentNode) { //this'll happen when starting a path.. skip?
-    //                 logger.log("starting path");
-
-    //             } else {
-    //                 //logger.log("move to next node")
-    //                 //end of edge, invalidate and find next node
-    //                 pathInfo.edgeId = false;
-    //                 let nextNodeInPath = nextNode.findClosestNeighborToDestination(destNode);
-    //                 //nextNode.displayNode(true)
-    //                 if (!nextNodeInPath) {
-    //                     nextNode.lastUpdated = false;
-    //                     //nextNode.refineNode();//see if this helps next tick I guess
-    //                     creep.say("no path")
-    //                     logger.log('---------------ERROR no path-----------------')
-    //                     logger.log(nextNode.id, destNode.id, nextNodeInPath, pathInfo.currentNode);
-    //                     pathInfo.nextNode = false;
-    //                     pathInfo.destNode = false;
-    //                     pathInfo.edgeId = false;
-    //                     creep.memory.pStarPath = pathInfo;
-    //                     return pathInfo;
-    //                 }
-    //                 pathInfo.currentNode = nextNode.id;
-    //                 //logger.log(creep.name, "reached a node", nextNode.id, ", next node in path:", nextNodeInPath.id)
-    //                 pathInfo.nextNode = nextNodeInPath.id;
-    //                 nextNode = nextNodeInPath;
-    //             }
-    //         }
-    //     }
-
-    //     //logger.log("checking for edge", !edge, !pathInfo.walking)
-    //     if (!edge && !pathInfo.walking) {
-    //         pathInfo.walking = true;
-    //         let currentNode = this.getNode(pathInfo.currentNode);
-            
-    //         //get edge
-    //         //let nextNodeInPath = nextNode.findClosestNeighborToDestination(destNode);
-    //         //logger.log(currentNode.id, nextNode.id)
-    //         let edgeId = Edge.makeEdgeId(currentNode.id, nextNode.id);
-    //         edge = this.edges.getById(edgeId);
-    //         pathInfo.edgeId = edge.id;
-    //         //logger.log("found edge to walk", edge)
-    //     }
-
-        
-
-            
-            
-        
-
-    //     //check for bad path
-    //     if (!nextNode || !destNode) {
-    //         creep.say("bad path")
-    //         logger.log("-----------------ERROR bad next/dest node----------------", nextNode, destNode);
-    //         logger.log(pathInfo.nextNode, pathInfo.destNode);
-    //                pathInfo.nextNode = false;
-    //                pathInfo.destNode = false;
-    //                pathInfo.edgeId = false;
-    //     }
-
-
-    //     //save pathinfo back to creep
-    //     creep.memory.pStarPath = pathInfo;
-        
-    //     //handle walking, just use moveTo
-    //     if (pathInfo.walking || !edge) {
-    //         creep.say("moveTo");
-    //         let placeToMove = (nextNode && destNode && nextNode.id != destNode.id) ? nextNode.pos: goal.pos;
-    //         let ret = creep.moveTo(goal.pos, {range: goal.range, visualizePathStyle:{stroke:"#f0f"}});
-    //         //logger.log(pathInfo.walking)
-    //         //logger.log(creep.name, "Walking to dest", goal.pos, "ret", ret);
-    //         return pathInfo;
-    //     }
-
-    //     //display the path we're walking
-    //     edge.displayEdge("#0f0", 0.5);
-
-    //     //have stored path, walk it
-    //     //logger.log(creep.name, "moving by edge", edge.id);
-    //     let res = edge.path.moveOnPath(creep, nextNode, goal);
-    //     if (res.done && !res.onPath && !res.closeToPath) {
-    //         //failure walking path.. umm... walkmode!
-    //         creep.say("Off path!")
-    //         pathInfo.walking = true;
-    //         creep.memory.pStarPath = pathInfo;
-    //     }
-
-    //     //logger.log(creep.name, "moved", JSON.stringify(res))
-    //     return pathInfo;
-    // }
-
 
     /**
      * Find the node closest to a room position(by range), only searches in same and adjecent rooms.
@@ -865,21 +647,18 @@ class pStar {
             logger.log("cpu used:", used, ...args);
             start = usedNow;
         }
+        //logger.log("find closest node", pos)
         let closestNode = false;
         let roomsToCheck = [pos.roomName];
         
-        let exits = Game.map.describeExits(pos.roomName);
-        for(let dir in exits) {
-            let exitRoomName = exits[dir];
-            roomsToCheck.push(exitRoomName);
-        }
+        
         //log("got rooms")
         
         let cheapestNode = false;
         let cheapestCost = 1000000;
-
-        for (let r in roomsToCheck) {
-            let roomName = roomsToCheck[r];
+        
+        while(roomsToCheck.length > 0) {
+            let roomName = roomsToCheck.shift();
             
 
             let pStarRoom = this.rooms.thingsById[roomName];
@@ -894,7 +673,7 @@ class pStar {
                 for(let n in roomNodes) {
                     let node = roomNodes[n];
                     //logger.log(node.id, node, node.pos, pStarRoom.roomName)
-                    global.utils.visual.circle(node.pos, "#f00", 1, 0.5)
+                    //global.utils.visual.circle(node.pos, "#f00", 1, 0.5)
                     let nodeCost;
                     //logger.log(node, node.pos, pos);
                     if (pos.roomName == node.pos.roomName) {
@@ -906,6 +685,16 @@ class pStar {
                         cheapestNode = node;
                         cheapestCost = nodeCost;
                     }
+                }
+            }
+            //log("checked room: " + roomName + " " + (roomName == pos.roomName))
+            if (roomName == pos.roomName && cheapestNode === false) {
+                //logger.log("not found yet, adding neighbors", cheapestNode);
+
+                let exits = Game.map.describeExits(pos.roomName);
+                for(let dir in exits) {
+                    let exitRoomName = exits[dir];
+                    roomsToCheck.push(exitRoomName);
                 }
             }
         }
@@ -1013,6 +802,8 @@ class pStar {
 
 let inst = new pStar();
 
+let closestNodeLookup = new Map();
+
 module.exports = {
     classes: {
         pStar,
@@ -1024,20 +815,60 @@ module.exports = {
 
 
     findDistance(startPos, endPos, maxOps = 1000, refinePath = false) {
-        let startNode = this.inst.findClosestNode(startPos);
-        let endNode = this.inst.findClosestNode(endPos);
+        let start = Game.cpu.getUsed();
+        let log = (...args) => {
+            let usedNow = Game.cpu.getUsed();
+            let used = usedNow - start;
+            logger.log("cpu used:", used, ...args);
+            start = usedNow;
+        }
+        let startNode;
+        let endNode;
+        if (closestNodeLookup[startPos]) {
+            startNode = closestNodeLookup[startPos];
+        } else {
+            startNode = this.inst.findClosestNode(startPos);
+            closestNodeLookup[startPos] = startNode;
+        }
+        if (closestNodeLookup[endPos]) {
+            endNode = closestNodeLookup[endPos];
+        } else {
+            endNode = this.inst.findClosestNode(endPos);
+            closestNodeLookup[endPos] = endNode;
+        } 
+        
+        //logger.log(closestNodeLookup[startPos]);
+        //logger.log(closestNodeLookup[endPos]);
+        //log('got start nodes')
+        //logger.log("wtf", startNode, endNode)
         if (!startNode || !endNode) {
             return false;
         }
-        let path = this.findPath(startNode, endNode, maxOps, refinePath);
-        logger.log(startNode.id, endNode.id, JSON.stringify(path))
-        if (path.incomplete) {
-            return false;
+
+        let pathCost;
+        if ((startNode._destMap && startNode._destMap[endNode.id]) || (endNode._destMap && endNode._destMap[startNode.id])) {
+            if (startNode._destMap && startNode._destMap[endNode.id]) {
+                pathCost = startNode._destMap[endNode.id].travelCost;
+            } else {
+                pathCost = endNode._destMap[startNode.id].travelCost;
+            }
+        } else {
+            let path = this.findPath(startNode, endNode, maxOps, refinePath);
+            if (path.incomplete) {
+                return false;
+            }
+            pathCost = path.cost;
         }
+        
+        
+
+
+
         let startDist = startNode.pos.toWorldPosition().getRangeTo(startPos);
         let endDist = endNode.pos.toWorldPosition().getRangeTo(endPos);
-        logger.log(startDist, path.cost, endDist)
-        return Number.parseInt(startDist) + Number.parseInt(path.cost) + Number.parseInt(endDist);
+        let range = Number.parseInt(startDist) + Number.parseInt(pathCost) + Number.parseInt(endDist);
+        //log("got full range:" + range)
+        return range;
     },
      /**
      * find a path through the pStar network using A*.. maybe.. 

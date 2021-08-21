@@ -204,6 +204,7 @@ class IndexingCollection {
                     this.groups[fieldPath][value] = _.remove(this.groups[fieldPath][value], (thisId) => id != thisId);
                     //logger.log("after remove", JSON.stringify(this.groups[fieldPath][value]))
                 } else {
+                    logger.log(fieldPath, value, JSON.stringify(Object.keys(this.groups[fieldPath])))
                     throw new Error("Object for removal isn't in all groupings.. I broke something, I'm sorry.", fieldPath, value, Object.keys(this.groups[fieldPath]));
                 }
             }

@@ -9,6 +9,9 @@ let baseRoleClass = require("pr.role.base");
 
 
 
+let actionTypes = global.utils.action.classes.actionTypes;
+let actionOptIn = global.utils.action.classes.actionOptIn;
+
 
 class worker extends baseRoleClass {
 
@@ -19,6 +22,15 @@ class worker extends baseRoleClass {
         this.requiredParts = {
             WORK: 10,
         }
+
+
+        let defaultRange = 150;
+        this.actionOptIns = [
+            new actionOptIn(actionTypes.PICKUP, defaultRange, 1),
+            new actionOptIn(actionTypes.MINE, defaultRange, 1),
+            new actionOptIn(actionTypes.DROPOFF_SPAWN, defaultRange, 1),
+            new actionOptIn(actionTypes.PRAISE, defaultRange, 1),
+        ];
     }
 
     initThreads() {

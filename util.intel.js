@@ -313,6 +313,16 @@ class RoomIntel {
                 this.tombstones.add(objIntel);
             }
         }
+
+        this.droppedResources = new IndexingCollection(this.droppedResources.idField, this.droppedResources.groupByFields, this.droppedResources.limits);
+        let droppedResources = room.find(FIND_DROPPED_RESOURCES);
+        for(let r in droppedResources) {
+            let droppedResource = droppedResources[r];
+            if (!this.droppedResources.hasId(droppedResource.id)) {
+                let objIntel = new RoomObjectIntel(droppedResource.id, droppedResource.pos, "droppedResource");
+                this.droppedResources.add(objIntel);
+            }
+        }
     }
 
     /**
@@ -326,7 +336,7 @@ class RoomIntel {
         let enemyCreeps = [];
         for(let c in allCreeps) {
             let creep = allCreeps[c];
-            if (creep.owner != global.empire.username) {
+            if (creep.owner != (global.empire ? global.empire.username : Game.spawns[Object.keys(Game.spawns)[0]].owner.username)) {
                 enemyCreeps.push(creep);
             }
         }

@@ -32,6 +32,10 @@ let flagwalkerClass = require("pr.role.flagwalker");
 
 let scoutClass = require("pr.role.scout");
 
+let actionManagerClass = require("pr.actionManager");
+
+let pathManagerClass = require("pr.pathManager");
+
 
 class initProc extends processClass {
     initThreads() {
@@ -54,6 +58,13 @@ class initProc extends processClass {
         
         let creepManagerProc = new creepManagerProcClass("creepManager");
         this.kernel.startProcess(creepManagerProc);
+
+        let actionManagerProc = new actionManagerClass("actionManager");
+        this.kernel.startProcess(actionManagerProc);
+
+        
+        let pathManagerProc = new pathManagerClass("pathManager");
+        this.kernel.startProcess(pathManagerProc);
 
         let empireProc = new empireProcClass("empire");
         this.kernel.startProcess(empireProc);

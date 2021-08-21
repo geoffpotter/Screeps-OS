@@ -324,14 +324,14 @@ class CachedPath {
         //log('init done')
         //if we have a start pos(.s) set, then just move there and return;
         if (pathInfo.s) {
-            destTolarance = 0; //if we're going to the start position, go all the way there
+            destTolarance = 1; //if we're going to the start position, go all the way there
             let pos = new RoomPosition(pathInfo.s.x, pathInfo.s.y, pathInfo.s.roomName);
             if (creep.pos.inRangeTo(pos, destTolarance)) {
                 pathInfo.s = false; // continue on path, should be in range now
                 //log("at start pos")
             } else {
                 let ret = creep.moveTo(pos, {range: destTolarance, visualizePathStyle:{stroke:"#f0f"}})
-                logger.log(creep.name, "moving to path", pos, ret);
+                //logger.log(creep.name, "moving to path", pos, ret);
                 if (ret == ERR_NO_PATH) {
                     pathInfo.done = true;
                 }
@@ -342,7 +342,7 @@ class CachedPath {
             
         }
         
-        logger.log(creep.name, "moving to", destNode.id, pathInfo.idx);
+        //logger.log(creep.name, "moving to", destNode.id, pathInfo.idx);
         
         let path = _.clone(this.getPath());
         //if the destination if our orgin, follow the path backwards.
@@ -390,9 +390,9 @@ class CachedPath {
                                   && posDist < creepWpos.getRangeTo(nextPos)); //next node isn't closer
             
             // if (creep.name == "scout0") {
-                logger.log(creep.pos, pos, nextPos)
-                logger.log(creepWpos.inRangeTo(pos, 1), creepWpos.getRangeTo(pos), creepWpos.getRangeTo(nextPos))
-                logger.log(onPath, closeToPath)
+                //logger.log(creep.pos, pos, nextPos)
+                //logger.log(creepWpos.inRangeTo(pos, 1), creepWpos.getRangeTo(pos), creepWpos.getRangeTo(nextPos))
+                //logger.log(onPath, closeToPath)
             // }
             //log("checked close to path", closeToPath)
             pathInfo.onPath = false;
@@ -447,7 +447,7 @@ class CachedPath {
                     //go from original startPos that was selected to original moveDir, then to try dir
                     let try1Pos = creepWpos.moveInDir(try1).toRoomPosition();
                     let try2Pos = creepWpos.moveInDir(try2).toRoomPosition();
-                    logger.log(creep.name, moveDir, try1, try2);
+                    //logger.log(creep.name, moveDir, try1, try2);
 
                     //order trys by range to nextPos
                     let tries = [try1Pos, try2Pos];

@@ -358,13 +358,15 @@ class Node {
         while(currentNode.id != destNode.id) {
             let nextNode = currentNode.findClosestNeighborToDestination(destNode);
             //logger.log("next closest node:", currentNode.id, nextNode ? nextNode.id : "no node!!");
-            path.push(nextNode);
+            
             if (!nextNode) {
-                throw new Error("I can't find no path mofo:" + this.id + " to " + destNode.id);
+                //throw new Error("I can't find no path mofo:" + this.id + " to " + destNode.id);
+            } else {
+                path.push(nextNode);
             }
             currentNode = nextNode;
             
-            if (hops > hopsLimit) {
+            if (hops > hopsLimit || !nextNode) {
                 incomplete = true;
                 break;
             }
@@ -973,7 +975,7 @@ class Edge {
             
             //global.utils.visual.drawText(this.cost, this.path.path[Math.floor(this.path.path.length/2)]);
             
-            //global.utils.visual.drawPath(this.path.path, color, style)
+            global.utils.visual.drawPath(this.path.path, color, style)
         }
     }
     

@@ -6,18 +6,24 @@ let processClass = require("INeRT.process");
 let threadClass = require("INeRT.thread");
 
 
+let actionManager = require("pr.actionManager");
 let roomObjectClass = require("pr.roomObject");
 
 let workerRoleClass = require("pr.role.worker");
-
+let minerRoleClass = require("pr.role.miner");
 
 let roomIntel = global.utils.intel.classes.RoomIntel;
 let roomStatus = global.utils.intel.classes.RoomStatus;
 let roomObjectIntel = global.utils.intel.classes.RoomObjectIntel;
+let actionTypes = global.utils.action.classes.actionTypes;
+
 
 class roomManager extends processClass {
     init() {
         this.mainThread = false;
+
+        /** @type {actionManager} */
+        this.actionManager = this.kernel.getProcess("actionManager");
     }
 
     get roomName() {
@@ -76,9 +82,29 @@ class roomManager extends processClass {
                 intel: o
             };
         };
+        let sources = this.intel.sources.getAll();
         this.kernel.manageProcArray(this.intel.structures.getAll(), roomObjectClass, nameFN, dataFN);
-        this.kernel.manageProcArray(this.intel.sources.getAll(), roomObjectClass, nameFN, dataFN);
+        this.kernel.manageProcArray(this.intel.droppedResources.getAll(), roomObjectClass, nameFN, dataFN);
+        this.kernel.manageProcArray(sources, roomObjectClass, nameFN, dataFN);
 
+        //logger.log("here??", this.intel.sources)
+        
+        for(let s in sources) {
+            let source = sources[s];
+            let minerProcName = source.id + "-miner";
+            let data = {
+                roomName: this.roomName,
+                sourceId: source.id,
+                pos: source.pos
+            }
+            
+            let minerProc = this.kernel.getProcess(minerProcName);
+            logger.log('setting up miner proc', minerProcName, minerProc)
+            if (!minerProc) {
+                minerProc = new minerRoleClass(minerProcName, data);
+                this.kernel.startProcess(minerProc);
+            }
+        }
 
         let workerRoleProcName = this.roomName + "-workers";
         let data = {
@@ -91,9 +117,20 @@ class roomManager extends processClass {
             this.kernel.startProcess(workerProc);
         }
         workerProc.data = data;
+
+        this.manageController();
     }
 
 
+
+    manageController() {
+        if (!this.praiseAction) {
+            let amts = {};
+            amts[RESOURCE_ENERGY] = 10000;
+            this.praiseAction = global.utils.action.createAction(actionTypes.PRAISE, this.intel.controller.id, this.intel.controller.pos, amts);
+            this.actionManager.addAction(this.praiseAction);
+        }
+    }
 
 
 
