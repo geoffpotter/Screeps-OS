@@ -265,8 +265,9 @@ class baseAction {
                 logger.log(creep, this.id);
                 this.assignments.forEach((a) => {
                     logger.log(a.id)
-                })
-                throw new Error("trying to assign a shit creep when there's better options already, fix yo shit")
+                });
+                return false;
+                //throw new Error("trying to assign a shit creep when there's better options already, fix yo shit")
             }
 
             let shitAssignments = assignmentsByPriority[lowestPriority];

@@ -33,7 +33,7 @@ class scout extends processClass {
     
     run() {
         logger.log("in scout run()")
-        return;
+        //return;
         let spawn = Game.spawns['Spawn1'];
         let creeps = Game.creeps;
         let numScouts = 1;

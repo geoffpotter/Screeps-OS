@@ -120,7 +120,7 @@ let mainLoop = function () {
     });
 };
 if (Object.keys(Game.rooms)[0] !="sim") {
-    mainLoop = wrapLoop(mainLoop);
+    //mainLoop = wrapLoop(mainLoop);
 }
 module.exports.loop = mainLoop;
 

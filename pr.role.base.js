@@ -145,6 +145,7 @@ class baseRole extends processClass {
             if (action) {
                 creep.say("got action")
                 let priority = optinLookup[action.actionType].priority;
+                logger.log(creep, "got action", action, priority)
                 action.assignCreep(creep, priority);
             } else {
                 //creep can't find an action

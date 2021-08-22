@@ -79,6 +79,7 @@ class roomObject extends processClass {
         let target = this.getObject();
         logger.log('setting up dropped shit action', target, )
         if (!target) {
+            this.actionManager.removeAction(this.getAction(actionTypes.PICKUP))
             return threadClass.DONE;
         }
 
