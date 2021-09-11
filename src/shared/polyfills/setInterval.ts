@@ -1,5 +1,5 @@
 import { queueTask, queueMicroTask } from "./tasks"
-import { settings } from "utils/settings"
+import {getSettings} from "shared/utils/settings"
 import { uuid } from "uuid";
 import { profile, profiler } from "profiler";
 
@@ -21,7 +21,7 @@ function processIntervals() {
   let profilerName = "setInterval:processIntervals";
   profiler.startCall(profilerName);
 
-
+  let settings = getSettings();
   for (let intervalId in intervals) {
     let interval = intervals[intervalId];
     if (!intervals[intervalId]) {
@@ -79,7 +79,7 @@ export function setInterval(callback: Function, ticks: number) {
     id: intervalId,
     func: callback,
     ticks: ticks,
-    startTick: settings.getTick(),
+    startTick: getSettings().getTick(),
     cpuUsed: 0,
   } as intervalInstance;
   profiler.endCall(profilerName);

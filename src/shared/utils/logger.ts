@@ -7,6 +7,18 @@
  * mod.thing == 'a thing'; // true
  */
 
+const COLOR_RED = 1;
+const COLOR_PURPLE = 2;
+const COLOR_BLUE = 3;
+const COLOR_CYAN = 4;
+const COLOR_GREEN = 5;
+const COLOR_YELLOW = 6;
+const COLOR_ORANGE = 7;
+const COLOR_BROWN = 8;
+const COLOR_GREY = 9;
+const COLOR_WHITE = 10;
+
+
 var colorMap:string[] = [];
 colorMap[COLOR_RED] = "red";
 colorMap[COLOR_PURPLE] = "purple";
@@ -33,23 +45,27 @@ export default class logger {
   log(item:any, item2:any, item3:any, item4:any, item5:any, item6:any):void;
   log(item:any, item2:any, item3:any, item4:any, item5:any):void;
   log(item:any, item2:any, item3:any, item4:any):void;
-  log(item:any, item2:any, item3:any):void;  
+  log(item:any, item2:any, item3:any):void;
   log(item:any, item2:any):void;
   log(item:any):void;
   log():void {
     if (!this.enabled)
       return;
-    var line = module + " ";
+    var line = this.module + " ";
     for (var i in arguments) {
-      line += arguments[i] + " ";
+      if(typeof arguments[i] == "object")
+        line += JSON.stringify(arguments[i]) + " ";
+      else
+        line += arguments[i] + " ";
     }
     console.log(this.colorize(line, this.color));
   }
   colorize(line: string, color: any): any {
-    if(typeof color == "number") {
-      return "<font color='" + colorMap[color] + "'>" + line + "</font>"
-    } else {
-      return "<font color='" + color + "'>" + line + "</font>"
-    }
+    return line;
+    // if(typeof color == "number") {
+    //   return "<font color='" + colorMap[color] + "'>" + line + "</font>"
+    // } else {
+    //   return "<font color='" + color + "'>" + line + "</font>"
+    // }
   }
 }

@@ -1,73 +1,105 @@
-interface settingsObject {
-  [x: string]: Function | string | number | boolean | settingsObject;
+import {
+  // @ts-ignore  type needs to be updated
+  getTicks, getCpuTime, getRange, getObjectById
+
+} from 'game/utils';
+//@ts-ignore
+import { text } from "game/visual";
+
+export interface FakeGameObject {
+  exists: boolean;
+  run?(): void;
+  moveTo?(pos: any):number|undefined;
+  id:string,
+  x: number,
+  y: number
+}
+
+export interface Location{
+  x:number,
+  y:number
 }
 
 
-class settingsController {
-  settings: Map<string, Function | boolean | string | number> = new Map();
+export interface Settings {
+  getCpu(): number
 
-  constructor() {
+  getTick(): number
 
-  };
+  getMemory(): object
 
-  getCpu(): number {
-    if (this.settings.has('getCpu')) {
-      let func = this.settings.get("getCpu");
-      if (typeof func == "function") {
-        return func();
-      }
-    }
-    console.log("getCpu not in settings! using date()");
-    return new Date().valueOf();
+  /**
+   * get the range between two objects/positions
+   * @param obj1
+   * @param obj2
+   * @returns
+   */
+  getRange(obj1:Location, obj2:Location): number
+
+  /**
+   * get the path based distance between two objects/positions
+   * @param obj1
+   * @param obj2
+   * @returns
+   */
+  getDistance(obj1:Location, obj2:Location): number
+
+
+  getObjectById(id:string): FakeGameObject|null
+
+  drawText(text:string, pos:Location, style?:object): void
+}
+
+let mem = {};
+export class defaultSettings implements Settings {
+  getCpu() {
+    return getCpuTime();
+  }
+  getTick(){
+    throw new Error("override me!");
+    return getTicks();
+  }
+  getMemory() {
+    return mem;
+  }
+  getRange(obj1:Location, obj2:Location) {
+    return getRange(obj1, obj2);
   }
 
-  getTick(): number {
-    if (this.settings.has('getTick')) {
-      let func = this.settings.get("getTick");
-      if (typeof func == "function") {
-        return func();
-      }
+  drawText(txt: string, pos: Location, style={}) {
+    //@ts-ignore
+    if(!style.font) {
+      //@ts-ignore
+      style.font = 1;
     }
-    throw new TypeError("getTick not defined in Settings!")
+    text(txt, pos, style)
   }
-
-  getMemory(): object {
-    if (this.settings.has('getMemory')) {
-      let func = this.settings.get("getMemory");
-      if (typeof func == "function") {
-        return func();
-      }
-    }
-    throw new TypeError("getMemory not defined in Settings!")
+  getDistance(pos1:Location, pos2:Location) {
+    return getRange(pos1, pos2)
   }
-
-  getSetting(settingName: string) {
-    if (this.settings.has(settingName)) {
-      return this.settings.get(settingName);
-    }
-    return false;
-    //throw new Error(`Accessing undefined setting: ${settingName}`);
-  }
-
-
-  setSetting(settingName: string, value: Function | string | number | boolean) {
-    this.settings.set(settingName, value);
-  }
-
-  setSettings(settingsObject: settingsObject, baseName: string | boolean = false) {
-    for (let settingName in settingsObject) {
-      let value = settingsObject[settingName];
-      let name = settingName;
-      if (baseName) {
-        name = baseName + "." + settingName;
-      }
-      if (typeof value == "object") {
-        this.setSettings(value, name);
-      } else {
-        this.setSetting(settingName, value);
-      }
-    }
+  getObjectById(id:string) {
+    //@ts-ignore
+    return getObjectById<FakeGameObject>(id);
   }
 }
 
-export let settings = new settingsController();
+class holder {
+  settings:Settings|false = false;
+}
+
+let settingsHolder = new holder();
+
+
+export function getSettings() {
+  if(!settingsHolder.settings) {
+    console.log("---------------------------------------using default settings!!!------------------------")
+    settingsHolder.settings = new defaultSettings();
+    return settingsHolder.settings;
+  }
+  return settingsHolder.settings;
+}
+
+export function overrideSettings(newSettingsObj:Settings) {
+  console.log("---------------------------------------using Custom settings!!!------------------------")
+  settingsHolder.settings = newSettingsObj;
+}

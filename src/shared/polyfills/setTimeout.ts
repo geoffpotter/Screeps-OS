@@ -1,5 +1,5 @@
 import { queueTask, queueMicroTask } from "./tasks"
-import { settings } from "utils/settings"
+import { getSettings } from "shared/utils/settings"
 import { uuid } from "uuid";
 import { profile, profiler } from "profiler";
 
@@ -21,7 +21,7 @@ function processTimeouts() {
   let profilerName = "setTimeout:processTimeouts";
   profiler.startCall(profilerName);
 
-
+  let settings = getSettings();
   for (let timeoutId in timeouts) {
     let timeout = timeouts[timeoutId];
     if (!timeouts[timeoutId]) {
@@ -78,7 +78,7 @@ export function setTimeout(callback: Function, ticks: number) {
     id: timeoutId,
     func: callback,
     ticks: ticks,
-    startTick: settings.getTick(),
+    startTick: getSettings().getTick(),
     cpuUsed: 0,
   } as timeoutInstance;
   profiler.endCall(profilerName);

@@ -1,28 +1,33 @@
-import { baseGoal, idType, goals } from "subsystems/goal";
+import { baseGoal, idType, goals, Goal } from "subsystems/goal";
 
 import { Creep } from "game/prototypes";
 import { Flag } from "arena/prototypes";
 import { getObjectsByPrototype } from "game/utils";
 import { defendLocation } from "./defendLocation";
 import { attackLocation } from "./attackLocation";
-
-export class winCTF extends baseGoal {
+import { FakeGameObject, getSettings } from "shared/utils/settings";
+let settings = getSettings();
+export class winCTF extends baseGoal implements Goal {
   static type = "winCTF";
 
   defenseGoals: defendLocation[];
   attackGoals: attackLocation[];
 
-  constructor(id: idType, parent: baseGoal | false = false) {
-    super(id, parent);
+  constructor() {
+    let id = "winCTF"
+    super(id, false);
 
     this.defenseGoals = [];
     this.attackGoals = [];
-  };
+
+  }
+
   /**
    * check all the flags, make sure we've got a goal for each one
    */
   runGoal(): void {
-    this.setupChildGoals();
+    //console.log('running goal', this.id)
+    //this.setupChildGoals();
     this.runChildGoals();
   };
 
@@ -30,26 +35,48 @@ export class winCTF extends baseGoal {
     for(let goal of this.defenseGoals) {
       goal.runGoal()
     }
-    
+
     for(let goal of this.attackGoals) {
       goal.runGoal()
     }
   }
 
-  // reassignCreeps() {
-  //   let creeps = getObjectsByPrototype(Creep);
-  //   let ranged:Creep[] = [];
-  //   let attack:Creep[] = [];
-  //   let heal:Creep[] = [];
-  //   for(let creep of creeps) {
-  //     // if(creep.body.some((part) => part.type == ATTACK))
-  //     //   attack.push(creep);
-  //   }
-  // }
+  assignCreep(creep:Creep) {
+    //console.log(this.id, "checking creep", creep.id)
+    for(let dGoal of this.defenseGoals) {
+      if(dGoal.assignCreep(creep))
+        return true;
+    }
+    for(let aGoal of this.attackGoals) {
+      if(aGoal.assignCreep(creep))
+        return true;
+    }
+    return false;
+  }
+
+  assignTarget(target: FakeGameObject): boolean {
+    let distToOurFlag = settings.getRange(this.defenseGoals[0], target);
+    //console.log(this.id, "checking target", target.id, target.constructor.name, distToOurFlag);
+    if(distToOurFlag < 10) {
+      for(let dGoal of this.defenseGoals) {
+        if(dGoal.assignTarget(target))
+          return true;
+      }
+    } else {
+      for(let aGoal of this.attackGoals) {
+        if(aGoal.assignTarget(target))
+          return true;
+      }
+    }
+
+
+    return false;
+  };
+
 
   setupChildGoals() {
     let flags = getObjectsByPrototype(Flag);
-    
+    console.log("checking flags", flags.length)
     for (let flag of flags) {
       console.log("setting up child goals", this.id)
       if (flag.my) {
@@ -66,6 +93,7 @@ export class winCTF extends baseGoal {
           console.log("Making attack goal", flag)
           let attackGoal = new attackLocation(goalId, this, flag.x, flag.y);
           this.attackGoals.push(attackGoal);
+          attackGoal.assignTarget(flag);
         }
       }
     }

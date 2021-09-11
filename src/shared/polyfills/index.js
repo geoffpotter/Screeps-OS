@@ -1,6 +1,4 @@
-import {
-  settings as setObj
-} from "utils/settings";
+
 import {
   startTick as start,
   endTick as end
@@ -23,5 +21,4 @@ export let setInterval = setInt;
 export let clearInterval = clearInt;
 export let startTick = start;
 export let endTick = end;
-export let settings = setObj;
 export let Promise = pf

@@ -1,3 +1,6 @@
+
+import { get, set } from "utils/fakeDash";
+
 import { default as logClass } from "utils/logger";
 let logger = new logClass("indexingCollection");
 
@@ -26,6 +29,7 @@ export class IndexingCollection<T> {
   serializeSeperator: string;
   constructor(idField: string = "id", groupByFields: string[] = [], limits: number[] | false = false) {
     if (!limits) {
+      //10 full items, 10 more partial items, 30 max
       limits = [10, 20, 30];
     }
     if (!idField) {
@@ -56,7 +60,7 @@ export class IndexingCollection<T> {
 
 
   _markUsed(thingInfo: LRUInfo<T>) {
-    //if we have a newer and older then we're 
+    //if we have a newer and older then we're
     if (this.head && thingInfo.id == this.head.id) {
       //logger.log(thingInfo.id, "already most recently used")
       return;
@@ -97,7 +101,7 @@ export class IndexingCollection<T> {
     }
     //logger.log("marked", thingInfo.id, "as used.  older? ", thingInfo.older ? thingInfo.older.id : "none", "pref?", thingInfo.newer ? thingInfo.newer.id : "none")
 
-    //this._debugQueue();  
+    //this._debugQueue();
   }
 
   _enforceLimit() {
@@ -160,8 +164,8 @@ export class IndexingCollection<T> {
     logger.log('internal queue:', out);
   }
 
-  add(theThing: any) {
-    let id: string = _.get(theThing, this.idField);
+  add(theThing: T) {
+    let id: string = get(theThing, this.idField);
 
     if (this.thingsById[id]) {
       //logger.log("before:", Object.keys(this.thingsById), id, theThing.id,  JSON.stringify(this.idField))
@@ -173,7 +177,7 @@ export class IndexingCollection<T> {
     this.thingsById[id] = theThing;
     for (let f in this.groupByFields) {
       let fieldPath = this.groupByFields[f];
-      let value: any = _.get(theThing, fieldPath);
+      let value: any = get(theThing, fieldPath);
       if (!this.groups[fieldPath][value]) {
         this.groups[fieldPath][value] = [];
       }
@@ -187,7 +191,7 @@ export class IndexingCollection<T> {
   }
 
   remove(theThing: T) {
-    let id: string = _.get(theThing, this.idField);
+    let id: string = get(theThing, this.idField);
     if (!this.thingsById[id]) {
       //can't remove what's not there
       //logger.log(id, this.thingsById[id], this.has(theThing))
@@ -222,11 +226,11 @@ export class IndexingCollection<T> {
 
       for (let f in this.groupByFields) {
         let fieldPath = this.groupByFields[f];
-        let value: any = _.get(theThing, fieldPath);
+        let value: any = get(theThing, fieldPath);
         //logger.log("removing", theThing.id, "from", fieldPath, "value", value);
         if (this.groups[fieldPath][value]) {
           //logger.log("before remove", JSON.stringify(this.groups[fieldPath][value]))
-          this.groups[fieldPath][value] = _.remove(this.groups[fieldPath][value], (thisId) => id != thisId);
+          this.groups[fieldPath][value] = this.groups[fieldPath][value].filter((thisId) => id == thisId)
           //logger.log("after remove", JSON.stringify(this.groups[fieldPath][value]))
         } else {
           logger.log("grouping error:", fieldPath, value, Object.keys(this.groups[fieldPath]))
@@ -241,8 +245,8 @@ export class IndexingCollection<T> {
     let has = !!this.thingsById[id];
     return has;
   }
-  has(aThing: any) {
-    let id:any = _.get(aThing, this.idField);
+  has(aThing: T) {
+    let id: any = get(aThing, this.idField);
     let has = this.thingsById[id] != undefined;
     if (has) {
       let info = this.nodeInfoById.get(id);
@@ -250,15 +254,15 @@ export class IndexingCollection<T> {
     }
     return has;
   }
-  getAll() {
-    return _.values(this.thingsById);
+  getAll():T[] {
+    return Object.values(this.thingsById);
   }
   getById(id: string) {
     if (!this.thingsById[id]) {
       return false;
     }
     let info = this.nodeInfoById.get(id);
-    if(info)
+    if (info)
       this._markUsed(info);
     return this.thingsById[id];
   }
@@ -277,7 +281,7 @@ export class IndexingCollection<T> {
   }
 
   serialize() {
-    let arr:any[] = [];
+    let arr: any[] = [];
     //add the id field, then groups, then a false, then the things
     arr.push(this.idField);
     arr.push(this.limits.join("Œ"))
@@ -328,13 +332,13 @@ export class IndexingCollection<T> {
     let arr = str.split(seperator);
     let idField = arr.shift();
     let limitStr = arr.shift();
-    let limits:any[] = [];//number[] :(
-    if(limitStr) {
+    let limits: any[] = [];//number[] :(
+    if (limitStr) {
       limits = limitStr.split("Œ");
     }
-    
-    let groups:string[] = [];
-    let group:string|boolean = true;
+
+    let groups: string[] = [];
+    let group: string | boolean = true;
     while (group != "false") {
       group = arr.shift() || false;
       if (typeof group == "string" && group != "false")

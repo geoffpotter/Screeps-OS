@@ -1,4 +1,11 @@
+import { Creep } from "game/prototypes";
+import { FakeGameObject } from "shared/utils/settings";
 
+declare module "game/prototypes" {
+  interface Creep {
+    goalId:string
+  }
+}
 
 
 export type idType = string;
@@ -72,11 +79,17 @@ export class baseJob extends planComponent {
     jobs.set(id, this);
   }
   /**
-   * performs the jobs per tick stuff
+   * performs the job's per tick stuff
    */
   runJob(): void {
     throw new TypeError("runJob not implemented")
   }
+}
+
+export interface Goal {
+  assignCreep(creep:Creep):boolean;
+  assignTarget(target:FakeGameObject):boolean;
+  runGoal(): void;
 }
 
 export class baseGoal extends planComponent {
@@ -88,11 +101,5 @@ export class baseGoal extends planComponent {
       throw new TypeError(`goalId already exists! ${id}`)
     }
     goals.set(id, this);
-  }
-  /**
-   * performs the goals per tick stuff
-   */
-   runGoal(): void {
-    throw new TypeError("runGoal not implemented")
   }
 }

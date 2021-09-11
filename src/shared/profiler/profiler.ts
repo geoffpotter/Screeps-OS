@@ -1,4 +1,6 @@
-
+//import _ from "lodash";
+import {getSettings} from "shared/utils/settings";
+let settings = getSettings();
 
 interface Memory {
   [profiler: string]: ProfilerMemory;
@@ -29,7 +31,7 @@ const __PROFILER_ENABLED__: boolean = true;
 
 let MemoryObject: Memory;
 function init() {
-  MemoryObject = profiler.getMemory();
+  MemoryObject = settings.getMemory();
   if (!MemoryObject.profiler) {
     resetMemory();
   }
@@ -37,17 +39,17 @@ function init() {
 }
 
 function resetMemory(): void {
-  MemoryObject = profiler.getMemory();
+  MemoryObject = settings.getMemory();
   MemoryObject.profiler = {
     data: {},
     ticks: 0,
   };
-  console.log(JSON.stringify(profiler.getMemory()));
+  console.log(JSON.stringify(settings.getMemory()));
 }
 
 function updateTicks(): void {
-  MemoryObject = profiler.getMemory();
-  let currentTick = profiler.getTick();
+  MemoryObject = settings.getMemory();
+  let currentTick = settings.getTick();
   let start = MemoryObject.profiler.start || currentTick
   let ticks = currentTick - start;
   MemoryObject.profiler.ticks += ticks;
@@ -55,7 +57,7 @@ function updateTicks(): void {
 }
 
 function getProfile(name: string): ProfilerData {
-  MemoryObject = profiler.getMemory();
+  MemoryObject = settings.getMemory();
   if (!MemoryObject.profiler) {
     //instead of complaining that init hasn't been called(I forgot to export it anyway lol)
     //let's just call it now eh?
@@ -74,7 +76,7 @@ function getProfile(name: string): ProfilerData {
 
 function isProfilingEnabled() {
   if (!__PROFILER_ENABLED__) return false;
-  MemoryObject = profiler.getMemory();
+  MemoryObject = settings.getMemory();
   return MemoryObject.profiler.start ? true : false;
 }
 
@@ -94,7 +96,7 @@ interface OutputData {
 function outputProfilerData(): string {
   if (!__PROFILER_ENABLED__) return '';
 
-  MemoryObject = profiler.getMemory();
+  MemoryObject = settings.getMemory();
   let totalTicks = MemoryObject.profiler.ticks;
   if (MemoryObject.profiler.start) {
     totalTicks += Game.time - MemoryObject.profiler.start + 1;
@@ -169,17 +171,6 @@ class Profiler {
 
   stack: Array<string> = [];
 
-  //Functions meant to be overriden in main.js
-  getMemory(): Memory {
-    return Memory;
-  }
-  getTick(): number {
-    return Game.time;
-  }
-  getCpu(): number {
-    return Game.cpu.getUsed();
-  }
-
 
   //helper functions
   wrapFunction(fn: Function, name: string | false = false, className: string | false = false): Function {
@@ -245,10 +236,10 @@ class Profiler {
   };
   start(ticksToProfile: number | boolean = false): string {
     if (!__PROFILER_ENABLED__) return "Profiler disabled, set __PROFILER_ENABLED__ = true in your build system to profile.";
-    MemoryObject = profiler.getMemory();
+    MemoryObject = settings.getMemory();
     console.log(MemoryObject);
-    console.log(JSON.stringify(profiler.getMemory()))
-    MemoryObject.profiler.start = profiler.getTick();
+    console.log(JSON.stringify(settings.getMemory()))
+    MemoryObject.profiler.start = settings.getTick();
     if (ticksToProfile) {
       MemoryObject.profiler.ticksToRun = Number(ticksToProfile);
       //TODO: setInterval with function to call stop after this many ticks
@@ -257,7 +248,7 @@ class Profiler {
   };
   stop(doOutput = true): string {
     if (!__PROFILER_ENABLED__) return "Profiler disabled, set __PROFILER_ENABLED__ = true in your build system to profile.";
-    MemoryObject = profiler.getMemory();
+    MemoryObject = settings.getMemory();
     updateTicks();
     delete MemoryObject.profiler.start;
     delete MemoryObject.profiler.ticksToRun;
@@ -294,7 +285,7 @@ class Profiler {
   startCall(name: string): void {
     if (!__PROFILER_ENABLED__) return;
     let data: ProfilerData = getProfile(name);
-    data.startCpu = profiler.getCpu();
+    data.startCpu = settings.getCpu();
   }
 
   pauseCall(name: string | false = false): void {
@@ -310,7 +301,7 @@ class Profiler {
       //oh yeah, we'd just be updating the time part, but not calls, which makes sense.
       //profiler.startCall(name);
     }
-    data.startPauseCpu = profiler.getCpu();
+    data.startPauseCpu = settings.getCpu();
   }
 
   resumeCall(name: string | false = false): void {
@@ -323,13 +314,13 @@ class Profiler {
     let pauseCpu = data.startPauseCpu;
     if (!pauseCpu) {
       //this call was never started...  so, never paused either
-      //we have no start cpu to compare to.. with pause, we can assume it was at the start of the funciton, 
+      //we have no start cpu to compare to.. with pause, we can assume it was at the start of the funciton,
       // or at least the start of what they want to profile for the tick.
       //I can't make any sense of calling this function in this state, error seems worth it here.
       throw new Error("Can't resume profiling on a call that hasn't started, that's just crazy talk.")
     }
     //add cpu to pauseTime, DO NOT increment calls
-    data.pauseTime += profiler.getCpu() - pauseCpu;
+    data.pauseTime += settings.getCpu() - pauseCpu;
     delete data.startPauseCpu;
   }
 
@@ -339,7 +330,7 @@ class Profiler {
     let startCpu = data.startCpu;
     if (!startCpu) {
       //this call was never started...  so, never paused either
-      //we have no start cpu to compare to.. with pause, we can assume it was at the start of the funciton, 
+      //we have no start cpu to compare to.. with pause, we can assume it was at the start of the funciton,
       // or at least the start of what they want to profile for the tick.
       //I can't make any sense of calling this function in this state, error seems worth it here.
       throw new Error(`Can't end profiling on a call to ${name} that hasn't started, that's just crazy talk.` +
@@ -351,7 +342,7 @@ class Profiler {
       profiler.resumeCall(name);
     }
     //add cpu to time, increment calls
-    data.time += profiler.getCpu() - startCpu;
+    data.time += settings.getCpu() - startCpu;
     data.calls++;
     delete data.startCpu;
   }
