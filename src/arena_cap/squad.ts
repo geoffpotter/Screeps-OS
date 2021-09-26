@@ -178,11 +178,11 @@ export class Squad {
 
 
     maxFormationSize_attackers_min:number = 2;
-    maxFormationSize_attackers_max:number = 3;
-    maxFormationSize_ranged_min:number = 1;
-    maxFormationSize_ranged_max:number = 3;
+    maxFormationSize_attackers_max:number = 4;
+    maxFormationSize_ranged_min:number = 2;
+    maxFormationSize_ranged_max:number = 4;
     maxFormationSize_healers_min:number = 0;
-    maxFormationSize_healers_max:number = 2;
+    maxFormationSize_healers_max:number = 3;
 
     private path:PathStep[]|false;
     private currentPathIndex: number;

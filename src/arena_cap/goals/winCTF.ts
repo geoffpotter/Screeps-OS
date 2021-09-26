@@ -1,4 +1,4 @@
-import { baseGoal, idType, goals, Goal } from "subsystems/goal";
+import { BaseGoal, idType, goals, Goal } from "shared/subsystems/planning/goal";
 
 import { Creep } from "game/prototypes";
 import { Flag } from "arena/prototypes";
@@ -6,8 +6,8 @@ import { getObjectsByPrototype } from "game/utils";
 import { defendLocation } from "./defendLocation";
 import { attackLocation } from "./attackLocation";
 import { FakeGameObject, getSettings } from "shared/utils/settings";
-let settings = getSettings();
-export class winCTF extends baseGoal implements Goal {
+
+export class winCTF extends BaseGoal implements Goal {
   static type = "winCTF";
 
   defenseGoals: defendLocation[];
@@ -55,6 +55,7 @@ export class winCTF extends baseGoal implements Goal {
   }
 
   assignTarget(target: FakeGameObject): boolean {
+    let settings = getSettings();
     let distToOurFlag = settings.getRange(this.defenseGoals[0], target);
     //console.log(this.id, "checking target", target.id, target.constructor.name, distToOurFlag);
     if(distToOurFlag < 10) {

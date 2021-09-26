@@ -9,12 +9,12 @@ import { findClosestByPath, findClosestByRange, findPath, getObjectsByPrototype,
 //@ts-ignore
 import { text } from "game/visual";
 import { FakeGameObject, getSettings } from "shared/utils/settings";
-import { baseGoal, Goal, idType } from "subsystems/goal";
+import { BaseGoal, Goal, idType } from "shared/subsystems/planning/goal";
 import { winCTF } from "./winCTF";
 let attackPath;
 
 
-export class attackLocation extends baseGoal implements Goal {
+export class attackLocation extends BaseGoal implements Goal {
 
   static type = "attackLocation";
   x: number;

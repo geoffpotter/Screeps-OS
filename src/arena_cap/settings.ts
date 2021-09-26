@@ -1,16 +1,18 @@
 
+import { searchPath } from 'game/path-finder';
 import {
   // @ts-ignore  type needs to be updated
-  getTicks, getCpuTime, getRange, getObjectById
+  getTicks, getCpuTime, getRange, getObjectById, getTerrainAt
 
 } from 'game/utils';
 let mem = {};
 //@ts-ignore
 import { text } from "game/visual";
-import {FakeGameObject, Location, Settings} from "shared/utils/settings"
+import { hasLocation, Location } from 'shared/utils/map/Location';
+import {defaultSettings, Settings} from "shared/utils/settings"
 
 
-class settings implements Settings {
+class settings extends defaultSettings implements Settings {
   getCpu() {
     return getCpuTime();
   }
@@ -20,7 +22,7 @@ class settings implements Settings {
   getMemory() {
     return mem;
   }
-  getRange(obj1:Location, obj2:Location) {
+  getRange(obj1:hasLocation, obj2:hasLocation) {
     return getRange(obj1, obj2);
   }
 
@@ -32,14 +34,18 @@ class settings implements Settings {
     }
     text(txt, pos, style)
   }
-  getDistance(pos1:Location, pos2:Location) {
-    return getRange(pos1, pos2)
+
+  getPath(obj1:hasLocation, obj2:hasLocation, opts?:PathFinderOpts|FindPathOpts) {
+    return searchPath(obj1, obj2, opts);
   }
-  getObjectById(id:string) {
+  getTerrainAt(pos:hasLocation) {
+    return getTerrainAt(pos)
+  }
+  getObjectById<T>(id:string) {
     //@ts-ignore
-    return getObjectById<FakeGameObject>(id);
+    return getObjectById<T>(id);
   }
 
 }
-
-export default new settings();
+let runtimeSettings = new settings();
+export default runtimeSettings;

@@ -1,0 +1,219 @@
+===============================starting test==============================
+------------------------------------begin Test------------------------------------------------ 1000 0
+    1000     0-0tasks? - fifo array (current) with done-: 0.403ms
+res: made: 1000 dummy = 1000
+    1000     0-0------------------fifo array (current)-: 0.278ms
+res: made: 1000 dummy = 1000
+    1000     0-0----------fifo set (current) with done-: 0.329ms
+res: made: 1000 dummy = 1000
+    1000     0-0--------------------fifo set (current)-: 0.252ms
+res: made: 1000 dummy = 1000
+//---------------------------------------------------------------------------------------------------------
+    1000     0-0-----------fifo array (full) with done-: 0.511ms
+res: made: 1000 dummy = 1000
+    1000     0-0-----------micros? - fifo array (full)-: 0.277ms
+res: made: 1000 dummy = 1000
+    1000     0-0-------------fifo set (full) with done-: 0.321ms
+res: made: 1000 dummy = 1000
+    1000     0-0-----------------------fifo set (full)-: 0.253ms
+res: made: 1000 dummy = 1000
+------------------------------------begin Test------------------------------------------------ 10000 0
+   10000     0-0tasks? - fifo array (current) with done-: 2.565ms
+res: made: 10000 dummy = 10000
+   10000     0-0------------------fifo array (current)-: 1.387ms
+res: made: 10000 dummy = 10000
+   10000     0-0----------fifo set (current) with done-: 2.472ms
+res: made: 10000 dummy = 10000
+   10000     0-0--------------------fifo set (current)-: 1.674ms
+res: made: 10000 dummy = 10000
+//---------------------------------------------------------------------------------------------------------
+   10000     0-0-----------fifo array (full) with done-: 7.583ms
+res: made: 10000 dummy = 10000
+   10000     0-0-----------micros? - fifo array (full)-: 1.393ms
+res: made: 10000 dummy = 10000
+   10000     0-0-------------fifo set (full) with done-: 2.188ms
+res: made: 10000 dummy = 10000
+   10000     0-0-----------------------fifo set (full)-: 1.689ms
+res: made: 10000 dummy = 10000
+------------------------------------begin Test------------------------------------------------ 100000 0
+  100000     0-0tasks? - fifo array (current) with done-: 15.755ms
+res: made: 100000 dummy = 100000
+  100000     0-0------------------fifo array (current)-: 18.044ms
+res: made: 100000 dummy = 100000
+  100000     0-0----------fifo set (current) with done-: 22.126ms
+res: made: 100000 dummy = 100000
+  100000     0-0--------------------fifo set (current)-: 48.504ms
+res: made: 100000 dummy = 100000
+//---------------------------------------------------------------------------------------------------------
+  100000     0-0-----------fifo array (full) with done-: 36.943ms
+res: made: 100000 dummy = 100000
+  100000     0-0-----------micros? - fifo array (full)-: 4.907ms
+res: made: 100000 dummy = 100000
+  100000     0-0-------------fifo set (full) with done-: 37.382ms
+res: made: 100000 dummy = 100000
+  100000     0-0-----------------------fifo set (full)-: 17.231ms
+res: made: 100000 dummy = 100000
+------------------------------------begin Test------------------------------------------------ 1000000 0
+ 1000000     0-0tasks? - fifo array (current) with done-: 192.999ms
+res: made: 1000000 dummy = 1000000
+ 1000000     0-0------------------fifo array (current)-: 206.995ms
+res: made: 1000000 dummy = 1000000
+ 1000000     0-0----------fifo set (current) with done-: 506.406ms
+res: made: 1000000 dummy = 1000000
+ 1000000     0-0--------------------fifo set (current)-: 383.341ms
+res: made: 1000000 dummy = 1000000
+//---------------------------------------------------------------------------------------------------------
+ 1000000     0-0-----------fifo array (full) with done-: 530.541ms
+res: made: 1000000 dummy = 1000000
+ 1000000     0-0-----------micros? - fifo array (full)-: 208.863ms
+res: made: 1000000 dummy = 1000000
+ 1000000     0-0-------------fifo set (full) with done-: 633.561ms
+res: made: 1000000 dummy = 1000000
+ 1000000     0-0-----------------------fifo set (full)-: 430.435ms
+res: made: 1000000 dummy = 1000000
+===============================starting test==============================
+------------------------------------begin Test------------------------------------------------ 1000 2
+    1000     0-2tasks? - fifo array (current) with done-: 0.425ms
+res: made: 1000 dummy = 1997
+    1000     0-2------------------fifo array (current)-: 0.221ms
+res: made: 1000 dummy = 1997
+    1000     0-2----------fifo set (current) with done-: 0.425ms
+res: made: 1000 dummy = 1997
+    1000     0-2--------------------fifo set (current)-: 0.415ms
+res: made: 1000 dummy = 1997
+//---------------------------------------------------------------------------------------------------------
+    1000     0-2-----------fifo array (full) with done-: 0.600ms
+res: made: 1000 dummy = 1997
+    1000     0-2-----------micros? - fifo array (full)-: 0.515ms
+res: made: 1000 dummy = 2000
+    1000     0-2-------------fifo set (full) with done-: 0.336ms
+res: made: 1000 dummy = 1997
+    1000     0-2-----------------------fifo set (full)-: 0.504ms
+res: made: 1000 dummy = 2000
+------------------------------------begin Test------------------------------------------------ 10000 2
+   10000     0-2tasks? - fifo array (current) with done-: 2.498ms
+res: made: 10000 dummy = 19961
+   10000     0-2------------------fifo array (current)-: 2.427ms
+res: made: 10000 dummy = 19961
+   10000     0-2----------fifo set (current) with done-: 2.420ms
+res: made: 10000 dummy = 19961
+   10000     0-2--------------------fifo set (current)-: 3.472ms
+res: made: 10000 dummy = 19961
+//---------------------------------------------------------------------------------------------------------
+   10000     0-2-----------fifo array (full) with done-: 6.004ms
+res: made: 10000 dummy = 19961
+   10000     0-2-----------micros? - fifo array (full)-: 3.414ms
+res: made: 10000 dummy = 20000
+   10000     0-2-------------fifo set (full) with done-: 1.832ms
+res: made: 10000 dummy = 19961
+   10000     0-2-----------------------fifo set (full)-: 2.320ms
+res: made: 10000 dummy = 20000
+------------------------------------begin Test------------------------------------------------ 100000 2
+  100000     0-2tasks? - fifo array (current) with done-: 17.887ms
+res: made: 100000 dummy = 199610
+  100000     0-2------------------fifo array (current)-: 39.482ms
+res: made: 100000 dummy = 199610
+  100000     0-2----------fifo set (current) with done-: 29.267ms
+res: made: 100000 dummy = 199610
+  100000     0-2--------------------fifo set (current)-: 54.367ms
+res: made: 100000 dummy = 199610
+//---------------------------------------------------------------------------------------------------------
+  100000     0-2-----------fifo array (full) with done-: 48.502ms
+res: made: 100000 dummy = 199610
+  100000     0-2-----------micros? - fifo array (full)-: 30.103ms
+res: made: 100000 dummy = 200000
+  100000     0-2-------------fifo set (full) with done-: 33.230ms
+res: made: 100000 dummy = 199610
+  100000     0-2-----------------------fifo set (full)-: 42.161ms
+res: made: 100000 dummy = 200000
+------------------------------------begin Test------------------------------------------------ 1000000 2
+ 1000000     0-2tasks? - fifo array (current) with done-: 359.737ms
+res: made: 1000000 dummy = 1996094
+ 1000000     0-2------------------fifo array (current)-: 342.337ms
+res: made: 1000000 dummy = 1996094
+ 1000000     0-2----------fifo set (current) with done-: 610.452ms
+res: made: 1000000 dummy = 1996094
+ 1000000     0-2--------------------fifo set (current)-: 743.808ms
+res: made: 1000000 dummy = 1996094
+//---------------------------------------------------------------------------------------------------------
+ 1000000     0-2-----------fifo array (full) with done-: 538.076ms
+res: made: 1000000 dummy = 1996094
+ 1000000     0-2-----------micros? - fifo array (full)-: 555.563ms
+res: made: 1000000 dummy = 2000000
+ 1000000     0-2-------------fifo set (full) with done-: 618.359ms
+res: made: 1000000 dummy = 1996094
+ 1000000     0-2-----------------------fifo set (full)-: 1701.830ms
+res: made: 1000000 dummy = 2000000
+===============================starting test==============================
+------------------------------------begin Test------------------------------------------------ 1000 10
+    1000    0-10tasks? - fifo array (current) with done-: 0.156ms
+res: made: 1000 dummy = 6129
+    1000    0-10------------------fifo array (current)-: 0.239ms
+res: made: 1000 dummy = 6129
+    1000    0-10----------fifo set (current) with done-: 0.877ms
+res: made: 1000 dummy = 6129
+    1000    0-10--------------------fifo set (current)-: 0.804ms
+res: made: 1000 dummy = 6129
+//---------------------------------------------------------------------------------------------------------
+    1000    0-10-----------fifo array (full) with done-: 0.198ms
+res: made: 1000 dummy = 6129
+    1000    0-10-----------micros? - fifo array (full)-: 0.452ms
+res: made: 1000 dummy = 10000
+    1000    0-10-------------fifo set (full) with done-: 0.202ms
+res: made: 1000 dummy = 6129
+    1000    0-10-----------------------fifo set (full)-: 0.951ms
+res: made: 1000 dummy = 10000
+------------------------------------begin Test------------------------------------------------ 10000 10
+   10000    0-10tasks? - fifo array (current) with done-: 8.006ms
+res: made: 10000 dummy = 61259
+   10000    0-10------------------fifo array (current)-: 11.100ms
+res: made: 10000 dummy = 61259
+   10000    0-10----------fifo set (current) with done-: 4.530ms
+res: made: 10000 dummy = 61259
+   10000    0-10--------------------fifo set (current)-: 8.539ms
+res: made: 10000 dummy = 61259
+//---------------------------------------------------------------------------------------------------------
+   10000    0-10-----------fifo array (full) with done-: 2.081ms
+res: made: 10000 dummy = 61259
+   10000    0-10-----------micros? - fifo array (full)-: 10.748ms
+res: made: 10000 dummy = 100000
+   10000    0-10-------------fifo set (full) with done-: 2.274ms
+res: made: 10000 dummy = 61259
+   10000    0-10-----------------------fifo set (full)-: 21.429ms
+res: made: 10000 dummy = 100000
+------------------------------------begin Test------------------------------------------------ 100000 10
+  100000    0-10tasks? - fifo array (current) with done-: 44.467ms
+res: made: 100000 dummy = 612581
+  100000    0-10------------------fifo array (current)-: 187.258ms
+res: made: 100000 dummy = 612581
+  100000    0-10----------fifo set (current) with done-: 101.865ms
+res: made: 100000 dummy = 612581
+  100000    0-10--------------------fifo set (current)-: 123.210ms
+res: made: 100000 dummy = 612581
+//---------------------------------------------------------------------------------------------------------
+  100000    0-10-----------fifo array (full) with done-: 43.020ms
+res: made: 100000 dummy = 612581
+  100000    0-10-----------micros? - fifo array (full)-: 164.257ms
+res: made: 100000 dummy = 1000000
+  100000    0-10-------------fifo set (full) with done-: 40.339ms
+res: made: 100000 dummy = 612581
+  100000    0-10-----------------------fifo set (full)-: 431.034ms
+res: made: 100000 dummy = 1000000
+------------------------------------begin Test------------------------------------------------ 1000000 10
+ 1000000    0-10tasks? - fifo array (current) with done-: 430.883ms
+res: made: 1000000 dummy = 6125796
+ 1000000    0-10------------------fifo array (current)-: 1413.997ms
+res: made: 1000000 dummy = 6125796
+ 1000000    0-10----------fifo set (current) with done-: 1402.482ms
+res: made: 1000000 dummy = 6125796
+ 1000000    0-10--------------------fifo set (current)-: 2261.037ms
+res: made: 1000000 dummy = 6125796
+//---------------------------------------------------------------------------------------------------------
+ 1000000    0-10-----------fifo array (full) with done-: 617.762ms
+res: made: 1000000 dummy = 6125796
+ 1000000    0-10-----------micros? - fifo array (full)-: 13433.762ms
+res: made: 1000000 dummy = 10000000
+ 1000000    0-10-------------fifo set (full) with done-: 869.852ms
+res: made: 1000000 dummy = 6125796
+ 1000000    0-10-----------------------fifo set (full)-: 37820.074ms
+res: made: 1000000 dummy = 10000000

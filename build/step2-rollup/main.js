@@ -1,484 +1,41 @@
-import { getCpuTime, getRange, getObjectById, getTicks, getObjectsByPrototype, findInRange, findClosestByRange, findClosestByPath, getDirection, getTerrainAt } from 'game/utils';
-import { Creep, StructureTower } from 'game/prototypes';
-import { Flag, BodyPart } from 'arena/prototypes';
+import { searchPath } from 'game/path-finder';
+import { getCpuTime, getTicks, getRange, getTerrainAt, getObjectById, getObjectsByPrototype } from 'game/utils';
 import { text } from 'game/visual';
-import { ATTACK, RANGED_ATTACK, HEAL, WORK, CARRY, MOVE, TOP_RIGHT, RIGHT, BOTTOM_RIGHT, TOP_LEFT, LEFT, BOTTOM_LEFT, TOP, BOTTOM, TERRAIN_WALL, TERRAIN_SWAMP } from 'game/constants';
-import { searchPath, CostMatrix } from 'game/path-finder';
+import { RESOURCE_ENERGY, ATTACK, RANGED_ATTACK, HEAL, CARRY, WORK, BODYPART_COST, MOVE, TOUGH } from 'game/constants';
+import { Creep, Structure, OwnedStructure, StructureContainer, StructureSpawn } from 'game/prototypes';
 
-function _toArray(arr) {
-  return _arrayWithHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableRest();
-}
-
-function _arrayWithHoles(arr) {
-  if (Array.isArray(arr)) return arr;
-}
-
-function _iterableToArray(iter) {
-  if (typeof Symbol !== "undefined" && iter[Symbol.iterator] != null || iter["@@iterator"] != null) return Array.from(iter);
-}
-
-function _unsupportedIterableToArray(o, minLen) {
-  if (!o) return;
-  if (typeof o === "string") return _arrayLikeToArray(o, minLen);
-  var n = Object.prototype.toString.call(o).slice(8, -1);
-  if (n === "Object" && o.constructor) n = o.constructor.name;
-  if (n === "Map" || n === "Set") return Array.from(o);
-  if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);
-}
-
-function _arrayLikeToArray(arr, len) {
-  if (len == null || len > arr.length) len = arr.length;
-
-  for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];
-
-  return arr2;
-}
-
-function _nonIterableRest() {
-  throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-}
-
-function _toPrimitive(input, hint) {
-  if (typeof input !== "object" || input === null) return input;
-  var prim = input[Symbol.toPrimitive];
-
-  if (prim !== undefined) {
-    var res = prim.call(input, hint || "default");
-    if (typeof res !== "object") return res;
-    throw new TypeError("@@toPrimitive must return a primitive value.");
-  }
-
-  return (hint === "string" ? String : Number)(input);
-}
-
-function _toPropertyKey(arg) {
-  var key = _toPrimitive(arg, "string");
-
-  return typeof key === "symbol" ? key : String(key);
-}
-
-function _decorate(decorators, factory, superClass, mixins) {
-  var api = _getDecoratorsApi();
-
-  if (mixins) {
-    for (var i = 0; i < mixins.length; i++) {
-      api = mixins[i](api);
-    }
-  }
-
-  var r = factory(function initialize(O) {
-    api.initializeInstanceElements(O, decorated.elements);
-  }, superClass);
-  var decorated = api.decorateClass(_coalesceClassElements(r.d.map(_createElementDescriptor)), decorators);
-  api.initializeClassElements(r.F, decorated.elements);
-  return api.runClassFinishers(r.F, decorated.finishers);
-}
-
-function _getDecoratorsApi() {
-  _getDecoratorsApi = function () {
-    return api;
-  };
-
-  var api = {
-    elementsDefinitionOrder: [["method"], ["field"]],
-    initializeInstanceElements: function (O, elements) {
-      ["method", "field"].forEach(function (kind) {
-        elements.forEach(function (element) {
-          if (element.kind === kind && element.placement === "own") {
-            this.defineClassElement(O, element);
-          }
-        }, this);
-      }, this);
-    },
-    initializeClassElements: function (F, elements) {
-      var proto = F.prototype;
-      ["method", "field"].forEach(function (kind) {
-        elements.forEach(function (element) {
-          var placement = element.placement;
-
-          if (element.kind === kind && (placement === "static" || placement === "prototype")) {
-            var receiver = placement === "static" ? F : proto;
-            this.defineClassElement(receiver, element);
-          }
-        }, this);
-      }, this);
-    },
-    defineClassElement: function (receiver, element) {
-      var descriptor = element.descriptor;
-
-      if (element.kind === "field") {
-        var initializer = element.initializer;
-        descriptor = {
-          enumerable: descriptor.enumerable,
-          writable: descriptor.writable,
-          configurable: descriptor.configurable,
-          value: initializer === void 0 ? void 0 : initializer.call(receiver)
-        };
-      }
-
-      Object.defineProperty(receiver, element.key, descriptor);
-    },
-    decorateClass: function (elements, decorators) {
-      var newElements = [];
-      var finishers = [];
-      var placements = {
-        static: [],
-        prototype: [],
-        own: []
-      };
-      elements.forEach(function (element) {
-        this.addElementPlacement(element, placements);
-      }, this);
-      elements.forEach(function (element) {
-        if (!_hasDecorators(element)) return newElements.push(element);
-        var elementFinishersExtras = this.decorateElement(element, placements);
-        newElements.push(elementFinishersExtras.element);
-        newElements.push.apply(newElements, elementFinishersExtras.extras);
-        finishers.push.apply(finishers, elementFinishersExtras.finishers);
-      }, this);
-
-      if (!decorators) {
-        return {
-          elements: newElements,
-          finishers: finishers
-        };
-      }
-
-      var result = this.decorateConstructor(newElements, decorators);
-      finishers.push.apply(finishers, result.finishers);
-      result.finishers = finishers;
-      return result;
-    },
-    addElementPlacement: function (element, placements, silent) {
-      var keys = placements[element.placement];
-
-      if (!silent && keys.indexOf(element.key) !== -1) {
-        throw new TypeError("Duplicated element (" + element.key + ")");
-      }
-
-      keys.push(element.key);
-    },
-    decorateElement: function (element, placements) {
-      var extras = [];
-      var finishers = [];
-
-      for (var decorators = element.decorators, i = decorators.length - 1; i >= 0; i--) {
-        var keys = placements[element.placement];
-        keys.splice(keys.indexOf(element.key), 1);
-        var elementObject = this.fromElementDescriptor(element);
-        var elementFinisherExtras = this.toElementFinisherExtras((0, decorators[i])(elementObject) || elementObject);
-        element = elementFinisherExtras.element;
-        this.addElementPlacement(element, placements);
-
-        if (elementFinisherExtras.finisher) {
-          finishers.push(elementFinisherExtras.finisher);
-        }
-
-        var newExtras = elementFinisherExtras.extras;
-
-        if (newExtras) {
-          for (var j = 0; j < newExtras.length; j++) {
-            this.addElementPlacement(newExtras[j], placements);
-          }
-
-          extras.push.apply(extras, newExtras);
-        }
-      }
-
-      return {
-        element: element,
-        finishers: finishers,
-        extras: extras
-      };
-    },
-    decorateConstructor: function (elements, decorators) {
-      var finishers = [];
-
-      for (var i = decorators.length - 1; i >= 0; i--) {
-        var obj = this.fromClassDescriptor(elements);
-        var elementsAndFinisher = this.toClassDescriptor((0, decorators[i])(obj) || obj);
-
-        if (elementsAndFinisher.finisher !== undefined) {
-          finishers.push(elementsAndFinisher.finisher);
-        }
-
-        if (elementsAndFinisher.elements !== undefined) {
-          elements = elementsAndFinisher.elements;
-
-          for (var j = 0; j < elements.length - 1; j++) {
-            for (var k = j + 1; k < elements.length; k++) {
-              if (elements[j].key === elements[k].key && elements[j].placement === elements[k].placement) {
-                throw new TypeError("Duplicated element (" + elements[j].key + ")");
-              }
-            }
-          }
-        }
-      }
-
-      return {
-        elements: elements,
-        finishers: finishers
-      };
-    },
-    fromElementDescriptor: function (element) {
-      var obj = {
-        kind: element.kind,
-        key: element.key,
-        placement: element.placement,
-        descriptor: element.descriptor
-      };
-      var desc = {
-        value: "Descriptor",
-        configurable: true
-      };
-      Object.defineProperty(obj, Symbol.toStringTag, desc);
-      if (element.kind === "field") obj.initializer = element.initializer;
-      return obj;
-    },
-    toElementDescriptors: function (elementObjects) {
-      if (elementObjects === undefined) return;
-      return _toArray(elementObjects).map(function (elementObject) {
-        var element = this.toElementDescriptor(elementObject);
-        this.disallowProperty(elementObject, "finisher", "An element descriptor");
-        this.disallowProperty(elementObject, "extras", "An element descriptor");
-        return element;
-      }, this);
-    },
-    toElementDescriptor: function (elementObject) {
-      var kind = String(elementObject.kind);
-
-      if (kind !== "method" && kind !== "field") {
-        throw new TypeError('An element descriptor\'s .kind property must be either "method" or' + ' "field", but a decorator created an element descriptor with' + ' .kind "' + kind + '"');
-      }
-
-      var key = _toPropertyKey(elementObject.key);
-
-      var placement = String(elementObject.placement);
-
-      if (placement !== "static" && placement !== "prototype" && placement !== "own") {
-        throw new TypeError('An element descriptor\'s .placement property must be one of "static",' + ' "prototype" or "own", but a decorator created an element descriptor' + ' with .placement "' + placement + '"');
-      }
-
-      var descriptor = elementObject.descriptor;
-      this.disallowProperty(elementObject, "elements", "An element descriptor");
-      var element = {
-        kind: kind,
-        key: key,
-        placement: placement,
-        descriptor: Object.assign({}, descriptor)
-      };
-
-      if (kind !== "field") {
-        this.disallowProperty(elementObject, "initializer", "A method descriptor");
-      } else {
-        this.disallowProperty(descriptor, "get", "The property descriptor of a field descriptor");
-        this.disallowProperty(descriptor, "set", "The property descriptor of a field descriptor");
-        this.disallowProperty(descriptor, "value", "The property descriptor of a field descriptor");
-        element.initializer = elementObject.initializer;
-      }
-
-      return element;
-    },
-    toElementFinisherExtras: function (elementObject) {
-      var element = this.toElementDescriptor(elementObject);
-
-      var finisher = _optionalCallableProperty(elementObject, "finisher");
-
-      var extras = this.toElementDescriptors(elementObject.extras);
-      return {
-        element: element,
-        finisher: finisher,
-        extras: extras
-      };
-    },
-    fromClassDescriptor: function (elements) {
-      var obj = {
-        kind: "class",
-        elements: elements.map(this.fromElementDescriptor, this)
-      };
-      var desc = {
-        value: "Descriptor",
-        configurable: true
-      };
-      Object.defineProperty(obj, Symbol.toStringTag, desc);
-      return obj;
-    },
-    toClassDescriptor: function (obj) {
-      var kind = String(obj.kind);
-
-      if (kind !== "class") {
-        throw new TypeError('A class descriptor\'s .kind property must be "class", but a decorator' + ' created a class descriptor with .kind "' + kind + '"');
-      }
-
-      this.disallowProperty(obj, "key", "A class descriptor");
-      this.disallowProperty(obj, "placement", "A class descriptor");
-      this.disallowProperty(obj, "descriptor", "A class descriptor");
-      this.disallowProperty(obj, "initializer", "A class descriptor");
-      this.disallowProperty(obj, "extras", "A class descriptor");
-
-      var finisher = _optionalCallableProperty(obj, "finisher");
-
-      var elements = this.toElementDescriptors(obj.elements);
-      return {
-        elements: elements,
-        finisher: finisher
-      };
-    },
-    runClassFinishers: function (constructor, finishers) {
-      for (var i = 0; i < finishers.length; i++) {
-        var newConstructor = (0, finishers[i])(constructor);
-
-        if (newConstructor !== undefined) {
-          if (typeof newConstructor !== "function") {
-            throw new TypeError("Finishers must return a constructor.");
-          }
-
-          constructor = newConstructor;
-        }
-      }
-
-      return constructor;
-    },
-    disallowProperty: function (obj, name, objectType) {
-      if (obj[name] !== undefined) {
-        throw new TypeError(objectType + " can't have a ." + name + " property.");
-      }
-    }
-  };
-  return api;
-}
-
-function _createElementDescriptor(def) {
-  var key = _toPropertyKey(def.key);
-
-  var descriptor;
-
-  if (def.kind === "method") {
-    descriptor = {
-      value: def.value,
-      writable: true,
-      configurable: true,
-      enumerable: false
-    };
-  } else if (def.kind === "get") {
-    descriptor = {
-      get: def.value,
-      configurable: true,
-      enumerable: false
-    };
-  } else if (def.kind === "set") {
-    descriptor = {
-      set: def.value,
-      configurable: true,
-      enumerable: false
-    };
-  } else if (def.kind === "field") {
-    descriptor = {
-      configurable: true,
-      writable: true,
-      enumerable: true
-    };
-  }
-
-  var element = {
-    kind: def.kind === "field" ? "field" : "method",
-    key: key,
-    placement: def.static ? "static" : def.kind === "field" ? "own" : "prototype",
-    descriptor: descriptor
-  };
-  if (def.decorators) element.decorators = def.decorators;
-  if (def.kind === "field") element.initializer = def.value;
-  return element;
-}
-
-function _coalesceGetterSetter(element, other) {
-  if (element.descriptor.get !== undefined) {
-    other.descriptor.get = element.descriptor.get;
-  } else {
-    other.descriptor.set = element.descriptor.set;
-  }
-}
-
-function _coalesceClassElements(elements) {
-  var newElements = [];
-
-  var isSameElement = function (other) {
-    return other.kind === "method" && other.key === element.key && other.placement === element.placement;
-  };
-
-  for (var i = 0; i < elements.length; i++) {
-    var element = elements[i];
-    var other;
-
-    if (element.kind === "method" && (other = newElements.find(isSameElement))) {
-      if (_isDataDescriptor(element.descriptor) || _isDataDescriptor(other.descriptor)) {
-        if (_hasDecorators(element) || _hasDecorators(other)) {
-          throw new ReferenceError("Duplicated methods (" + element.key + ") can't be decorated.");
-        }
-
-        other.descriptor = element.descriptor;
-      } else {
-        if (_hasDecorators(element)) {
-          if (_hasDecorators(other)) {
-            throw new ReferenceError("Decorators can't be placed on different accessors with for " + "the same property (" + element.key + ").");
-          }
-
-          other.decorators = element.decorators;
-        }
-
-        _coalesceGetterSetter(element, other);
-      }
-    } else {
-      newElements.push(element);
-    }
-  }
-
-  return newElements;
-}
-
-function _hasDecorators(element) {
-  return element.decorators && element.decorators.length;
-}
-
-function _isDataDescriptor(desc) {
-  return desc !== undefined && !(desc.value === undefined && desc.writable === undefined);
-}
-
-function _optionalCallableProperty(obj, name) {
-  var value = obj[name];
-
-  if (value !== undefined && typeof value !== "function") {
-    throw new TypeError("Expected '" + name + "' to be a function");
-  }
-
-  return value;
-}
-
-let mem$1 = {};
 class defaultSettings {
-    getCpu() {
-        return getCpuTime();
+    constructor() {
+        this.allResourceConstants = [RESOURCE_ENERGY];
+        this.creepInjuredThreshold = 0.55;
+        this.creepClassCacheTicks = 1;
+        this.intelUpdateFrequency = 1;
+        overrideSettings(this);
     }
-    getTick() {
-        throw new Error("override me!");
+    getPathCost(obj1, obj2) {
+        let path = getSettings().getPath(obj1, obj2);
+        if (path.incomplete)
+            return Infinity;
+        return path.cost;
     }
-    getMemory() {
-        return mem$1;
+    getRangeByPath(obj1, obj2) {
+        let path = getSettings().getPath(obj1, obj2);
+        if (path.incomplete)
+            return Infinity;
+        return path.path.length;
     }
-    getRange(obj1, obj2) {
-        return getRange(obj1, obj2);
-    }
-    drawText(txt, pos, style = {}) {
-        if (!style.font) {
-            style.font = 1;
+    toGoals(objs, range) {
+        let goals = [];
+        let index = 0;
+        for (let obj of objs) {
+            let goal = {
+                pos: obj,
+                range: !Array.isArray(range) ? range : range[Math.min(index, range.length)]
+            };
+            goals.push(goal);
+            index++;
         }
-        text(txt, pos, style);
-    }
-    getDistance(pos1, pos2) {
-        return getRange(pos1, pos2);
-    }
-    getObjectById(id) {
-        return getObjectById(id);
+        return goals;
     }
 }
 class holder {
@@ -489,15 +46,450 @@ class holder {
 let settingsHolder = new holder();
 function getSettings() {
     if (!settingsHolder.settings) {
-        console.log("---------------------------------------using default settings!!!------------------------");
-        settingsHolder.settings = new defaultSettings();
-        return settingsHolder.settings;
+        throw new Error("trying to get settings that haven't been set, move your settings import to the top of main");
     }
     return settingsHolder.settings;
 }
 function overrideSettings(newSettingsObj) {
     console.log("---------------------------------------using Custom settings!!!------------------------");
     settingsHolder.settings = newSettingsObj;
+}
+
+let mem = {};
+class settings extends defaultSettings {
+    getCpu() {
+        return getCpuTime();
+    }
+    getTick() {
+        return getTicks();
+    }
+    getMemory() {
+        return mem;
+    }
+    getRange(obj1, obj2) {
+        return getRange(obj1, obj2);
+    }
+    drawText(txt, pos, style = {}) {
+        if (!style.font) {
+            style.font = 1;
+        }
+        text(txt, pos, style);
+    }
+    getPath(obj1, obj2, opts) {
+        return searchPath(obj1, obj2, opts);
+    }
+    getTerrainAt(pos) {
+        return getTerrainAt(pos);
+    }
+    getObjectById(id) {
+        return getObjectById(id);
+    }
+}
+let runtimeSettings = new settings();
+
+function addInPriorityOrder(arr, item) {
+    for (let index in arr) {
+        let existingItem = arr[index];
+        if (existingItem.priority < item.priority) {
+            arr.splice(Number(index), 0, item);
+            return;
+        }
+    }
+    arr.push(item);
+    return;
+}
+
+class functionQueueArray {
+    constructor(initialSize = 10000) {
+        this.initialSize = initialSize;
+        this.funcs = Array(initialSize);
+        this.numFuncs = 0;
+        this.doneFuncs = new WeakSet();
+        this.numDoneFuncs = 0;
+    }
+    resetArray() {
+        this.funcs = Array(this.initialSize);
+        this.numFuncs = 0;
+    }
+    addFunc(func) {
+        this.funcs[this.numFuncs] = func;
+        this.numFuncs++;
+    }
+    processCurrentQueue() {
+        if (this.numFuncs == 0)
+            return;
+        let currentQueue = this.funcs;
+        let numFuncs = this.numFuncs;
+        this.resetArray();
+        let currentFunc = 0;
+        let func;
+        while (currentFunc < numFuncs) {
+            func = currentQueue[currentFunc++];
+            func();
+        }
+    }
+    processCurrentQueueWithDone() {
+        if (this.numFuncs == 0)
+            return;
+        let currentQueue = this.funcs;
+        let numFuncs = this.numFuncs;
+        this.resetArray();
+        let currentFunc = 0;
+        let func;
+        while (currentFunc < numFuncs) {
+            func = currentQueue[currentFunc++];
+            let done = func();
+            if (done === false) {
+                this.addFunc(func);
+            }
+        }
+    }
+    processFullQueueWithDone() {
+        if (this.numDoneFuncs > Math.min(Math.max(this.numFuncs * 0.2, 0), 10000000)) {
+            let oldFuncs = this.funcs;
+            let total = this.numFuncs;
+            let current = 0;
+            this.resetArray();
+            while (current < total) {
+                let func = oldFuncs[current];
+                if (!this.doneFuncs.has(func)) {
+                    this.addFunc(func);
+                }
+                current++;
+            }
+            this.doneFuncs = new WeakSet();
+            this.numDoneFuncs = 0;
+        }
+        if (this.numFuncs == 0)
+            return;
+        let currentFunc = 0;
+        let func;
+        let doneFuncs = this.doneFuncs;
+        let funcs = this.funcs;
+        while (currentFunc < this.numFuncs) {
+            func = funcs[currentFunc];
+            if (!doneFuncs.has(func)) {
+                if (func() !== false) {
+                    doneFuncs.add(func);
+                    this.numDoneFuncs++;
+                }
+            }
+            currentFunc++;
+        }
+    }
+    processFullQueue() {
+        if (this.numFuncs == 0)
+            return;
+        let currentFunc = 0;
+        let func;
+        let funcs = this.funcs;
+        while (currentFunc < this.numFuncs) {
+            func = funcs[currentFunc++];
+            func();
+        }
+        this.resetArray();
+    }
+}
+
+class functionQueueSet {
+    constructor() {
+        this.funcs = new Set();
+        this.addFunc = this.funcs.add.bind(this.funcs);
+    }
+    resetSet() {
+        this.funcs = new Set();
+        this.addFunc = this.funcs.add.bind(this.funcs);
+    }
+    processCurrentQueueWithDone() {
+        if (this.funcs.size == 0)
+            return;
+        let funcs = this.funcs;
+        this.resetSet();
+        funcs.forEach((func) => {
+            let done = func();
+            if (done === false) {
+                this.addFunc(func);
+            }
+        });
+    }
+    processCurrentQueue() {
+        if (this.funcs.size == 0)
+            return;
+        let funcs = this.funcs;
+        this.resetSet();
+        funcs.forEach((func) => {
+            func();
+        });
+    }
+    processFullQueueWithDone() {
+        if (this.funcs.size == 0)
+            return;
+        this.funcs.forEach((func) => {
+            let done = func();
+            if (done !== false) {
+                this.funcs.delete(func);
+            }
+        });
+    }
+    processFullQueue() {
+        if (this.funcs.size == 0)
+            return;
+        this.funcs.forEach((func) => {
+            func();
+        });
+        this.funcs.clear();
+    }
+}
+
+var tickPhases;
+(function (tickPhases) {
+    tickPhases[tickPhases["PRE_TICK"] = 0] = "PRE_TICK";
+    tickPhases[tickPhases["POST_TICK"] = 1] = "POST_TICK";
+})(tickPhases || (tickPhases = {}));
+class taskQueue {
+    constructor(name, priority = 0, tickPhase = tickPhases.POST_TICK) {
+        this.tasks = new functionQueueArray();
+        this.microTasks = new functionQueueSet();
+        this.priority = 0;
+        this.name = name;
+        this.tickPhase = tickPhase;
+        this.priority = priority;
+        addQueue(this);
+    }
+    queueTask(task) {
+        this.tasks.addFunc(task);
+    }
+    queueMicroTask(microTask) {
+        this.microTasks.addFunc(microTask);
+    }
+    run() {
+        console.log("running queue", this.name);
+        this.runTasks();
+        this.runMicroTasks();
+    }
+    runTasks() {
+        this.tasks.processCurrentQueueWithDone();
+    }
+    runMicroTasks() {
+        this.microTasks.processFullQueue();
+    }
+}
+let preTickQueues = new Array();
+let postTickQueues = new Array();
+let queueLookup = new Map();
+var builtInQueues;
+(function (builtInQueues) {
+    builtInQueues["TICK_INIT"] = "tickInit";
+    builtInQueues["UPDATE"] = "update";
+    builtInQueues["BEFORE_MAIN"] = "beforeMain";
+    builtInQueues["AFTER_MAIN"] = "afterMain";
+    builtInQueues["ACTIONS"] = "actions";
+    builtInQueues["MOVEMENT"] = "movement";
+    builtInQueues["TICK_DONE"] = "tickDone";
+})(builtInQueues || (builtInQueues = {}));
+var TaskPriorities;
+(function (TaskPriorities) {
+    TaskPriorities[TaskPriorities["FIRST"] = 10000] = "FIRST";
+    TaskPriorities[TaskPriorities["DEFAULT"] = 0] = "DEFAULT";
+    TaskPriorities[TaskPriorities["LAST"] = -10000] = "LAST";
+})(TaskPriorities || (TaskPriorities = {}));
+new taskQueue(builtInQueues.TICK_INIT, TaskPriorities.FIRST, tickPhases.PRE_TICK);
+new taskQueue(builtInQueues.UPDATE, TaskPriorities.LAST, tickPhases.PRE_TICK);
+new taskQueue(builtInQueues.BEFORE_MAIN, TaskPriorities.LAST, tickPhases.PRE_TICK);
+new taskQueue(builtInQueues.AFTER_MAIN, TaskPriorities.FIRST, tickPhases.POST_TICK);
+new taskQueue(builtInQueues.ACTIONS, TaskPriorities.DEFAULT, tickPhases.POST_TICK);
+new taskQueue(builtInQueues.MOVEMENT, TaskPriorities.DEFAULT - 10, tickPhases.POST_TICK);
+let tickDoneQueue = new taskQueue(builtInQueues.TICK_DONE, TaskPriorities.LAST, tickPhases.POST_TICK);
+let currentQueue = false;
+function queueMicroTask(microTask, queue = false) {
+    if (queue === false) {
+        if (currentQueue) {
+            queue = currentQueue;
+        }
+        else {
+            queue = tickDoneQueue;
+        }
+    }
+    else if (!(queue instanceof taskQueue)) {
+        queue = getQueue(queue);
+    }
+    queue.queueMicroTask(microTask);
+}
+function queueTask(task, queue = false) {
+    if (queue === false) {
+        if (currentQueue) {
+            queue = currentQueue;
+        }
+        else {
+            queue = tickDoneQueue;
+        }
+    }
+    else if (!(queue instanceof taskQueue)) {
+        queue = getQueue(queue);
+    }
+    queue.queueTask(task);
+}
+function addQueue(queue) {
+    if (queueLookup.has(queue.name)) {
+        throw new Error("Queue names must be unique!" + queue.name);
+    }
+    queueLookup.set(queue.name, queue);
+    if (queue.tickPhase == tickPhases.PRE_TICK) {
+        addInPriorityOrder(preTickQueues, queue);
+    }
+    else {
+        addInPriorityOrder(postTickQueues, queue);
+    }
+}
+function getQueue(queueName) {
+    if (!queueLookup.has(queueName)) {
+        throw new Error("Trying to add func to non-existant queue");
+    }
+    return queueLookup.get(queueName);
+}
+function runPreTickQueues() {
+    for (let queue of preTickQueues) {
+        currentQueue = queue;
+        queue.run();
+        currentQueue = false;
+    }
+}
+function runPostTickQueues() {
+    for (let queue of postTickQueues) {
+        currentQueue = queue;
+        queue.run();
+        currentQueue = false;
+    }
+}
+
+function startTick$1() {
+    runPreTickQueues();
+}
+function endTick$1() {
+    runPostTickQueues();
+}
+
+/**
+ * a cheapo "good enough for now" uuid function, not a real one.
+ * uses math.random, so colisions are possible.
+ * @returns string
+ */
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0,
+        v = c == 'x' ? r : r & 0x3 | 0x8;
+    return v.toString(16);
+  });
+}
+
+let intervals = new Map();
+function processIntervals() {
+    let settings = getSettings();
+    let currentTick = settings.getTick();
+    intervals.forEach((interval) => {
+        if (!(interval.startTick >= 0)) {
+            interval.startTick = 0;
+        }
+        let ticksSinceStart = currentTick - interval.startTick;
+        if (ticksSinceStart >= interval.ticks) {
+            queueMicroTask(interval.func, interval.queueName);
+            interval.startTick = currentTick;
+        }
+    });
+    return false;
+}
+queueTask(processIntervals, builtInQueues.TICK_INIT);
+function clearInterval$1(intervalId) {
+    if (intervals.has(intervalId)) {
+        console.log("deleting interval:", intervalId);
+        intervals.delete(intervalId);
+    }
+}
+function setInterval$1(callback, ticks, queueName = "default") {
+    if (!(ticks > 0)) {
+        throw new Error("Interval ticks must be greater than 0!");
+    }
+    let intervalId = uuid();
+    intervals.set(intervalId, {
+        id: intervalId,
+        func: callback,
+        ticks: ticks,
+        startTick: getSettings().getTick(),
+        cpuUsed: 0,
+        queueName: queueName
+    });
+    return intervalId;
+}
+
+let timeouts = new Map();
+function processTimeouts() {
+    let settings = getSettings();
+    let currentTick = settings.getTick();
+    timeouts.forEach((timeout) => {
+        if (!(timeout.startTick >= 0)) {
+            timeout.startTick = 0;
+        }
+        let ticksSinceStart = currentTick - timeout.startTick;
+        if (ticksSinceStart >= timeout.ticks) {
+            queueMicroTask(timeout.func, timeout.queueName);
+            timeouts.delete(timeout.id);
+        }
+    });
+    return false;
+}
+queueTask(processTimeouts, builtInQueues.TICK_INIT);
+
+/*! *****************************************************************************
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+***************************************************************************** */
+function __decorate(decorators, target, key, desc) {
+  var c = arguments.length,
+      r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc,
+      d;
+  if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+  return c > 3 && r && Object.defineProperty(target, key, r), r;
+}
+function __awaiter(thisArg, _arguments, P, generator) {
+  function adopt(value) {
+    return value instanceof P ? value : new P(function (resolve) {
+      resolve(value);
+    });
+  }
+
+  return new (P || (P = Promise))(function (resolve, reject) {
+    function fulfilled(value) {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+
+    function rejected(value) {
+      try {
+        step(generator["throw"](value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+
+    function step(result) {
+      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+    }
+
+    step((generator = generator.apply(thisArg, _arguments || [])).next());
+  });
 }
 
 getSettings();
@@ -548,208 +540,11 @@ class Profiler {
         return;
     }
 }
-let profiler$1 = new Profiler();
-function profile$1(className = false) {
+let profiler = new Profiler();
+function profile(className = false) {
     return (target) => {
         return;
     };
-}
-
-let profiler = profiler$1;
-let profile = profile$1;
-
-/**
- * Queue of tasks that need to be run
- * @type {Function[]}
- */
-
-let tasks = [];
-/**
- * Queue of microTasks that need to be run
- * @type {Function[]}
- */
-
-let microTasks = [];
-/**
- * Queue a Microtask to be executed inbetween or after tasks, as cpu allows
- * 
- * These run first at the end of the main loop, then again inbetween tasks.
- * @param {Function} microTask 
- */
-
-function queueMicroTask(microTask) {
-  microTasks.push(microTask);
-}
-/**
- * Queue a Task to be executed at the end of the tick, as cpu allows
- * 
- * These run at the end of the tick, after the microtasks are run.
- * @param {Function} task 
- */
-
-function queueTask(task) {
-  tasks.push(task);
-}
-
-let taskRunners = _decorate([profile("tasks")], function (_initialize) {
-  class taskRunners {
-    constructor() {
-      _initialize(this);
-    }
-
-  }
-
-  return {
-    F: taskRunners,
-    d: [{
-      kind: "method",
-      decorators: [profile("tasks")],
-      static: true,
-      key: "runMicroTasks",
-      value: function runMicroTasks(maxRuns = Infinity) {
-        let profileName = profiler.getCurrentProfileTarget(); //console.log('microtask profiler name:',profileName)
-        // profiler.startCall(profileName);
-        //console.log('microTasks:', microTasks.length, maxRuns);
-
-        let currentTask = 0;
-        let numTasks;
-
-        while (currentTask < (numTasks = microTasks.length) && currentTask <= maxRuns) {
-          //console.log("running batch of microtasks")
-          while (currentTask < numTasks) {
-            let func = microTasks[currentTask];
-
-            if (!func) {
-              console.log("undefined microtask, check yer shit");
-              continue;
-            } //console.log("microTask", typeof func);
-
-
-            profiler.pauseCall(profileName);
-            func();
-            profiler.resumeCall(profileName);
-            currentTask++;
-          }
-        }
-
-        microTasks.splice(0, currentTask); //console.log("MicroTasks done")
-        //profiler.endCall(profileName)
-      }
-    }, {
-      kind: "method",
-      static: true,
-      key: "runTasks",
-      value: function runTasks(maxRuns = Infinity) {
-        let profileName = profiler.getCurrentProfileTarget(); //profiler.startCall(profileName);
-
-        let runs = 0;
-        let tasksToRun = tasks;
-        tasks = []; //console.log('tasks:', tasksToRun.length);
-
-        while (tasksToRun.length > 0 && runs++ <= maxRuns) {
-          let func = tasksToRun.shift();
-
-          if (!func) {
-            console.log("undefined microtask, check yer shit");
-            continue;
-          } //console.log("task", typeof func);
-
-
-          profiler.pauseCall(profileName);
-          func();
-          taskRunners.runMicroTasks(1000000);
-          profiler.resumeCall(profileName);
-        }
-
-        if (tasksToRun.length > 0) {
-          tasks.push(...tasksToRun);
-        } //console.log("Tasks done")
-        //profiler.endCall(profileName)
-
-      }
-    }]
-  };
-});
-function endTick$1() {
-  let profileName = "tasks:endTick";
-  profiler.startCall(profileName); //console.log("Tasks end tick");
-
-  taskRunners.runMicroTasks();
-  taskRunners.runTasks();
-  profiler.endCall(profileName);
-}
-
-let intervals = {};
-function processIntervals() {
-    let profilerName = "setInterval:processIntervals";
-    profiler.startCall(profilerName);
-    let settings = getSettings();
-    for (let intervalId in intervals) {
-        let interval = intervals[intervalId];
-        if (!intervals[intervalId]) {
-            console.log("interval canceled:", intervalId);
-            return;
-        }
-        if (!(interval.startTick >= 0)) {
-            interval.startTick = 0;
-        }
-        let currentTick = settings.getTick();
-        let ticksSinceStart = currentTick - interval.startTick;
-        if (ticksSinceStart >= interval.ticks) {
-            queueMicroTask(interval.func);
-            interval.startTick = currentTick;
-        }
-    }
-    queueTask(processIntervals);
-    profiler.endCall(profilerName);
-}
-queueTask(processIntervals);
-
-let timeouts = {};
-function processTimeouts() {
-    let profilerName = "setTimeout:processTimeouts";
-    profiler.startCall(profilerName);
-    let settings = getSettings();
-    for (let timeoutId in timeouts) {
-        let timeout = timeouts[timeoutId];
-        if (!timeouts[timeoutId]) {
-            console.log("timeout canceled:", timeoutId);
-            return;
-        }
-        if (!(timeout.startTick >= 0)) {
-            timeout.startTick = 0;
-        }
-        let ticksSinceStart = settings.getTick() - timeout.startTick;
-        if (ticksSinceStart >= timeout.ticks) {
-            queueMicroTask(timeout.func);
-            delete timeouts[timeoutId];
-        }
-    }
-    queueTask(processTimeouts);
-    profiler.endCall(profilerName);
-}
-queueTask(processTimeouts);
-
-/*! *****************************************************************************
-Copyright (c) Microsoft Corporation.
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-***************************************************************************** */
-function __decorate(decorators, target, key, desc) {
-  var c = arguments.length,
-      r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc,
-      d;
-  if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-  return c > 3 && r && Object.defineProperty(target, key, r), r;
 }
 
 var PromiseState;
@@ -758,7 +553,7 @@ var PromiseState;
     PromiseState[PromiseState["Resolved"] = 1] = "Resolved";
     PromiseState[PromiseState["Rejected"] = 2] = "Rejected";
 })(PromiseState || (PromiseState = {}));
-class Promise$1 {
+class Promise$2 {
     constructor(executor) {
         this.callbacks = [];
         this.state = PromiseState.Pending;
@@ -771,12 +566,12 @@ class Promise$1 {
         profiler.endCall("Promise:construct:" + lastProfiledName);
     }
     static resolve(value) {
-        return new Promise$1((resolve) => {
+        return new Promise$2((resolve) => {
             resolve(value);
         });
     }
     static reject(value) {
-        return new Promise$1((_, reject) => {
+        return new Promise$2((_, reject) => {
             reject(value);
         });
     }
@@ -786,7 +581,7 @@ class Promise$1 {
             lastProfiledName = "global";
         }
         profiler.startCall("Promise:then");
-        let thenPromise = new Promise$1((resolve, reject) => {
+        let thenPromise = new Promise$2((resolve, reject) => {
             this.callbacks.push(() => {
                 profiler.startCall("Promise:callback:" + lastProfiledName);
                 try {
@@ -814,8 +609,8 @@ class Promise$1 {
                     if (this === callbackResult) {
                         throw new TypeError("A promsie can't resolve to itself");
                     }
-                    if (callbackResult instanceof Promise$1) {
-                        while ((callbackResult instanceof Promise$1) && callbackResult.state !== PromiseState.Pending) {
+                    if (callbackResult instanceof Promise$2) {
+                        while ((callbackResult instanceof Promise$2) && callbackResult.state !== PromiseState.Pending) {
                             callbackResult = callbackResult.reasonOrValue;
                         }
                         callbackResult.then(resolve, reject);
@@ -868,93 +663,78 @@ class Promise$1 {
 }
 __decorate([
     profile("Promise")
-], Promise$1.prototype, "resolveHandler", null);
+], Promise$2.prototype, "resolveHandler", null);
 __decorate([
     profile("Promise")
-], Promise$1.prototype, "rejectHandler", null);
+], Promise$2.prototype, "rejectHandler", null);
 __decorate([
     profile("Promise")
-], Promise$1.prototype, "resolvePromise", null);
+], Promise$2.prototype, "resolvePromise", null);
 
+let setInterval = setInterval$1;
+let clearInterval = clearInterval$1;
+let startTick = startTick$1;
 let endTick = endTick$1;
+let Promise$1 = Promise$2;
 
-Creep.prototype.smartMove = function (direction) {
-    console.log(this.id, "moving", direction, this.move);
-    return this.move(direction);
-};
-Creep.prototype.isAttacker = function (onlyActive = false) {
-    if (!onlyActive) {
-        return this.body.some((part) => part.type == ATTACK);
-    }
-    else {
-        return this.body.some((part) => part.type == ATTACK && part.hits != 0);
-    }
-};
-Creep.prototype.isRangedAttacker = function (onlyActive = false) {
-    if (!onlyActive) {
-        return this.body.some((part) => part.type == RANGED_ATTACK);
-    }
-    else {
-        return this.body.some((part) => part.type == RANGED_ATTACK && part.hits != 0);
-    }
-};
-Creep.prototype.isHealer = function (onlyActive = false) {
-    if (!onlyActive) {
-        return this.body.some((part) => part.type == HEAL);
-    }
-    else {
-        return this.body.some((part) => part.type == HEAL && part.hits != 0);
-    }
-};
-Creep.prototype.isWorker = function () {
-    return this.body.some((part) => part.type == WORK);
-};
-Creep.prototype.isHauler = function () {
-    return this.body.some((part) => part.type == CARRY);
-};
-Object.defineProperty(Creep.prototype, "squad", {
-    get() {
-        var _a;
-        return (_a = this._squad) !== null && _a !== void 0 ? _a : false;
-    },
-    set(value) {
-        this._squad = value;
-    }
-});
-
-let mem = {};
-class settings$1 {
-    getCpu() {
-        return getCpuTime();
-    }
-    getTick() {
-        return getTicks();
-    }
-    getMemory() {
-        return mem;
-    }
-    getRange(obj1, obj2) {
-        return getRange(obj1, obj2);
-    }
-    drawText(txt, pos, style = {}) {
-        if (!style.font) {
-            style.font = 1;
+class CachedValue {
+    constructor(refreshFN, cacheTTL = 1, refreshNow = false) {
+        this.nextClearTick = 0;
+        this.currentValue = null;
+        this.cacheTTL = cacheTTL;
+        this.refreshFN = refreshFN;
+        if (refreshNow) {
+            this.currentValue = this.getNewValue();
         }
-        text(txt, pos, style);
+        if (cacheTTL == Infinity) {
+            this._hasValue = this.hasCachedValue;
+            this.get = this.getCachedValue;
+        }
     }
-    getDistance(pos1, pos2) {
-        return getRange(pos1, pos2);
+    checkClearCache() {
+        let currentTick = getSettings().getTick();
+        if (this.hasCachedValue() && currentTick >= this.nextClearTick) {
+            this.clearValue();
+        }
     }
-    getObjectById(id) {
-        return getObjectById(id);
+    getNewValue() {
+        let currentTick = getSettings().getTick();
+        this.nextClearTick = currentTick + this.cacheTTL;
+        return this.currentValue = this.refreshFN();
+    }
+    hasCachedValue() {
+        return this.currentValue !== null;
+    }
+    _hasValue() {
+        this.checkClearCache();
+        return this.hasCachedValue();
+    }
+    getCachedValue() {
+        if (!this.currentValue) {
+            this.currentValue = this.getNewValue();
+        }
+        return this.currentValue;
+    }
+    get() {
+        this.checkClearCache();
+        return this.getCachedValue();
+    }
+    get hasValue() {
+        return this._hasValue();
+    }
+    get value() {
+        return this.get();
+    }
+    set value(newValue) {
+        this.currentValue = newValue;
+    }
+    clearValue() {
+        this.currentValue = null;
     }
 }
-var runtimeSettings = new settings$1();
-
-getSettings();
 
 const COLOR_WHITE = 10;
-class logger$2 {
+class logger$1 {
     constructor(module, color = "white") {
         this.module = module;
         this.enabled = true;
@@ -977,1606 +757,4753 @@ class logger$2 {
     }
 }
 
-new logger$2("fakeDash");
-/**
- * @param {any} obj
- * @param {string} path
- * @param {any} defaultValue
+new logger$1("fakeDash");
+
+var sourceMapGenerator = {};
+
+var base64Vlq = {};
+
+var base64$1 = {};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+/*
+ * Copyright 2011 Mozilla Foundation and contributors
+ * Licensed under the New BSD license. See LICENSE or:
+ * http://opensource.org/licenses/BSD-3-Clause
  */
 
-function get(obj, path, defaultValue = "") {
-  // @ts-ignore
-  const result = path.split('.').reduce((r, p) => r[p], obj);
-  return result !== undefined ? result : defaultValue;
+var intToCharMap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.split('');
+/**
+ * Encode an integer in the range of 0 to 63 to a single base 64 digit.
+ */
+
+base64$1.encode = function (number) {
+  if (0 <= number && number < intToCharMap.length) {
+    return intToCharMap[number];
+  }
+
+  throw new TypeError("Must be between 0 and 63: " + number);
+};
+/**
+ * Decode a single base 64 character code digit to an integer. Returns -1 on
+ * failure.
+ */
+
+
+base64$1.decode = function (charCode) {
+  var bigA = 65; // 'A'
+
+  var bigZ = 90; // 'Z'
+
+  var littleA = 97; // 'a'
+
+  var littleZ = 122; // 'z'
+
+  var zero = 48; // '0'
+
+  var nine = 57; // '9'
+
+  var plus = 43; // '+'
+
+  var slash = 47; // '/'
+
+  var littleOffset = 26;
+  var numberOffset = 52; // 0 - 25: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+
+  if (bigA <= charCode && charCode <= bigZ) {
+    return charCode - bigA;
+  } // 26 - 51: abcdefghijklmnopqrstuvwxyz
+
+
+  if (littleA <= charCode && charCode <= littleZ) {
+    return charCode - littleA + littleOffset;
+  } // 52 - 61: 0123456789
+
+
+  if (zero <= charCode && charCode <= nine) {
+    return charCode - zero + numberOffset;
+  } // 62: +
+
+
+  if (charCode == plus) {
+    return 62;
+  } // 63: /
+
+
+  if (charCode == slash) {
+    return 63;
+  } // Invalid base64 digit.
+
+
+  return -1;
+};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+/*
+ * Copyright 2011 Mozilla Foundation and contributors
+ * Licensed under the New BSD license. See LICENSE or:
+ * http://opensource.org/licenses/BSD-3-Clause
+ *
+ * Based on the Base 64 VLQ implementation in Closure Compiler:
+ * https://code.google.com/p/closure-compiler/source/browse/trunk/src/com/google/debugging/sourcemap/Base64VLQ.java
+ *
+ * Copyright 2011 The Closure Compiler Authors. All rights reserved.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials provided
+ *    with the distribution.
+ *  * Neither the name of Google Inc. nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+var base64 = base64$1; // A single base 64 digit can contain 6 bits of data. For the base 64 variable
+// length quantities we use in the source map spec, the first bit is the sign,
+// the next four bits are the actual value, and the 6th bit is the
+// continuation bit. The continuation bit tells us whether there are more
+// digits in this value following this digit.
+//
+//   Continuation
+//   |    Sign
+//   |    |
+//   V    V
+//   101011
+
+var VLQ_BASE_SHIFT = 5; // binary: 100000
+
+var VLQ_BASE = 1 << VLQ_BASE_SHIFT; // binary: 011111
+
+var VLQ_BASE_MASK = VLQ_BASE - 1; // binary: 100000
+
+var VLQ_CONTINUATION_BIT = VLQ_BASE;
+/**
+ * Converts from a two-complement value to a value where the sign bit is
+ * placed in the least significant bit.  For example, as decimals:
+ *   1 becomes 2 (10 binary), -1 becomes 3 (11 binary)
+ *   2 becomes 4 (100 binary), -2 becomes 5 (101 binary)
+ */
+
+function toVLQSigned(aValue) {
+  return aValue < 0 ? (-aValue << 1) + 1 : (aValue << 1) + 0;
+}
+/**
+ * Converts to a two-complement value from a value where the sign bit is
+ * placed in the least significant bit.  For example, as decimals:
+ *   2 (10 binary) becomes 1, 3 (11 binary) becomes -1
+ *   4 (100 binary) becomes 2, 5 (101 binary) becomes -2
+ */
+
+
+function fromVLQSigned(aValue) {
+  var isNegative = (aValue & 1) === 1;
+  var shifted = aValue >> 1;
+  return isNegative ? -shifted : shifted;
+}
+/**
+ * Returns the base 64 VLQ encoded value.
+ */
+
+
+base64Vlq.encode = function base64VLQ_encode(aValue) {
+  var encoded = "";
+  var digit;
+  var vlq = toVLQSigned(aValue);
+
+  do {
+    digit = vlq & VLQ_BASE_MASK;
+    vlq >>>= VLQ_BASE_SHIFT;
+
+    if (vlq > 0) {
+      // There are still more digits in this value, so we must make sure the
+      // continuation bit is marked.
+      digit |= VLQ_CONTINUATION_BIT;
+    }
+
+    encoded += base64.encode(digit);
+  } while (vlq > 0);
+
+  return encoded;
+};
+/**
+ * Decodes the next base 64 VLQ value from the given string and returns the
+ * value and the rest of the string via the out parameter.
+ */
+
+
+base64Vlq.decode = function base64VLQ_decode(aStr, aIndex, aOutParam) {
+  var strLen = aStr.length;
+  var result = 0;
+  var shift = 0;
+  var continuation, digit;
+
+  do {
+    if (aIndex >= strLen) {
+      throw new Error("Expected more digits in base 64 VLQ value.");
+    }
+
+    digit = base64.decode(aStr.charCodeAt(aIndex++));
+
+    if (digit === -1) {
+      throw new Error("Invalid base64 digit: " + aStr.charAt(aIndex - 1));
+    }
+
+    continuation = !!(digit & VLQ_CONTINUATION_BIT);
+    digit &= VLQ_BASE_MASK;
+    result = result + (digit << shift);
+    shift += VLQ_BASE_SHIFT;
+  } while (continuation);
+
+  aOutParam.value = fromVLQSigned(result);
+  aOutParam.rest = aIndex;
+};
+
+var util$5 = {};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+
+(function (exports) {
+  /*
+   * Copyright 2011 Mozilla Foundation and contributors
+   * Licensed under the New BSD license. See LICENSE or:
+   * http://opensource.org/licenses/BSD-3-Clause
+   */
+
+  /**
+   * This is a helper function for getting values from parameter/options
+   * objects.
+   *
+   * @param args The object we are extracting values from
+   * @param name The name of the property we are getting.
+   * @param defaultValue An optional value to return if the property is missing
+   * from the object. If this is not specified and the property is missing, an
+   * error will be thrown.
+   */
+  function getArg(aArgs, aName, aDefaultValue) {
+    if (aName in aArgs) {
+      return aArgs[aName];
+    } else if (arguments.length === 3) {
+      return aDefaultValue;
+    } else {
+      throw new Error('"' + aName + '" is a required argument.');
+    }
+  }
+
+  exports.getArg = getArg;
+  var urlRegexp = /^(?:([\w+\-.]+):)?\/\/(?:(\w+:\w+)@)?([\w.-]*)(?::(\d+))?(.*)$/;
+  var dataUrlRegexp = /^data:.+\,.+$/;
+
+  function urlParse(aUrl) {
+    var match = aUrl.match(urlRegexp);
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      scheme: match[1],
+      auth: match[2],
+      host: match[3],
+      port: match[4],
+      path: match[5]
+    };
+  }
+
+  exports.urlParse = urlParse;
+
+  function urlGenerate(aParsedUrl) {
+    var url = '';
+
+    if (aParsedUrl.scheme) {
+      url += aParsedUrl.scheme + ':';
+    }
+
+    url += '//';
+
+    if (aParsedUrl.auth) {
+      url += aParsedUrl.auth + '@';
+    }
+
+    if (aParsedUrl.host) {
+      url += aParsedUrl.host;
+    }
+
+    if (aParsedUrl.port) {
+      url += ":" + aParsedUrl.port;
+    }
+
+    if (aParsedUrl.path) {
+      url += aParsedUrl.path;
+    }
+
+    return url;
+  }
+
+  exports.urlGenerate = urlGenerate;
+  /**
+   * Normalizes a path, or the path portion of a URL:
+   *
+   * - Replaces consecutive slashes with one slash.
+   * - Removes unnecessary '.' parts.
+   * - Removes unnecessary '<dir>/..' parts.
+   *
+   * Based on code in the Node.js 'path' core module.
+   *
+   * @param aPath The path or url to normalize.
+   */
+
+  function normalize(aPath) {
+    var path = aPath;
+    var url = urlParse(aPath);
+
+    if (url) {
+      if (!url.path) {
+        return aPath;
+      }
+
+      path = url.path;
+    }
+
+    var isAbsolute = exports.isAbsolute(path);
+    var parts = path.split(/\/+/);
+
+    for (var part, up = 0, i = parts.length - 1; i >= 0; i--) {
+      part = parts[i];
+
+      if (part === '.') {
+        parts.splice(i, 1);
+      } else if (part === '..') {
+        up++;
+      } else if (up > 0) {
+        if (part === '') {
+          // The first part is blank if the path is absolute. Trying to go
+          // above the root is a no-op. Therefore we can remove all '..' parts
+          // directly after the root.
+          parts.splice(i + 1, up);
+          up = 0;
+        } else {
+          parts.splice(i, 2);
+          up--;
+        }
+      }
+    }
+
+    path = parts.join('/');
+
+    if (path === '') {
+      path = isAbsolute ? '/' : '.';
+    }
+
+    if (url) {
+      url.path = path;
+      return urlGenerate(url);
+    }
+
+    return path;
+  }
+
+  exports.normalize = normalize;
+  /**
+   * Joins two paths/URLs.
+   *
+   * @param aRoot The root path or URL.
+   * @param aPath The path or URL to be joined with the root.
+   *
+   * - If aPath is a URL or a data URI, aPath is returned, unless aPath is a
+   *   scheme-relative URL: Then the scheme of aRoot, if any, is prepended
+   *   first.
+   * - Otherwise aPath is a path. If aRoot is a URL, then its path portion
+   *   is updated with the result and aRoot is returned. Otherwise the result
+   *   is returned.
+   *   - If aPath is absolute, the result is aPath.
+   *   - Otherwise the two paths are joined with a slash.
+   * - Joining for example 'http://' and 'www.example.com' is also supported.
+   */
+
+  function join(aRoot, aPath) {
+    if (aRoot === "") {
+      aRoot = ".";
+    }
+
+    if (aPath === "") {
+      aPath = ".";
+    }
+
+    var aPathUrl = urlParse(aPath);
+    var aRootUrl = urlParse(aRoot);
+
+    if (aRootUrl) {
+      aRoot = aRootUrl.path || '/';
+    } // `join(foo, '//www.example.org')`
+
+
+    if (aPathUrl && !aPathUrl.scheme) {
+      if (aRootUrl) {
+        aPathUrl.scheme = aRootUrl.scheme;
+      }
+
+      return urlGenerate(aPathUrl);
+    }
+
+    if (aPathUrl || aPath.match(dataUrlRegexp)) {
+      return aPath;
+    } // `join('http://', 'www.example.com')`
+
+
+    if (aRootUrl && !aRootUrl.host && !aRootUrl.path) {
+      aRootUrl.host = aPath;
+      return urlGenerate(aRootUrl);
+    }
+
+    var joined = aPath.charAt(0) === '/' ? aPath : normalize(aRoot.replace(/\/+$/, '') + '/' + aPath);
+
+    if (aRootUrl) {
+      aRootUrl.path = joined;
+      return urlGenerate(aRootUrl);
+    }
+
+    return joined;
+  }
+
+  exports.join = join;
+
+  exports.isAbsolute = function (aPath) {
+    return aPath.charAt(0) === '/' || urlRegexp.test(aPath);
+  };
+  /**
+   * Make a path relative to a URL or another path.
+   *
+   * @param aRoot The root path or URL.
+   * @param aPath The path or URL to be made relative to aRoot.
+   */
+
+
+  function relative(aRoot, aPath) {
+    if (aRoot === "") {
+      aRoot = ".";
+    }
+
+    aRoot = aRoot.replace(/\/$/, ''); // It is possible for the path to be above the root. In this case, simply
+    // checking whether the root is a prefix of the path won't work. Instead, we
+    // need to remove components from the root one by one, until either we find
+    // a prefix that fits, or we run out of components to remove.
+
+    var level = 0;
+
+    while (aPath.indexOf(aRoot + '/') !== 0) {
+      var index = aRoot.lastIndexOf("/");
+
+      if (index < 0) {
+        return aPath;
+      } // If the only part of the root that is left is the scheme (i.e. http://,
+      // file:///, etc.), one or more slashes (/), or simply nothing at all, we
+      // have exhausted all components, so the path is not relative to the root.
+
+
+      aRoot = aRoot.slice(0, index);
+
+      if (aRoot.match(/^([^\/]+:\/)?\/*$/)) {
+        return aPath;
+      }
+
+      ++level;
+    } // Make sure we add a "../" for each component we removed from the root.
+
+
+    return Array(level + 1).join("../") + aPath.substr(aRoot.length + 1);
+  }
+
+  exports.relative = relative;
+
+  var supportsNullProto = function () {
+    var obj = Object.create(null);
+    return !('__proto__' in obj);
+  }();
+
+  function identity(s) {
+    return s;
+  }
+  /**
+   * Because behavior goes wacky when you set `__proto__` on objects, we
+   * have to prefix all the strings in our set with an arbitrary character.
+   *
+   * See https://github.com/mozilla/source-map/pull/31 and
+   * https://github.com/mozilla/source-map/issues/30
+   *
+   * @param String aStr
+   */
+
+
+  function toSetString(aStr) {
+    if (isProtoString(aStr)) {
+      return '$' + aStr;
+    }
+
+    return aStr;
+  }
+
+  exports.toSetString = supportsNullProto ? identity : toSetString;
+
+  function fromSetString(aStr) {
+    if (isProtoString(aStr)) {
+      return aStr.slice(1);
+    }
+
+    return aStr;
+  }
+
+  exports.fromSetString = supportsNullProto ? identity : fromSetString;
+
+  function isProtoString(s) {
+    if (!s) {
+      return false;
+    }
+
+    var length = s.length;
+
+    if (length < 9
+    /* "__proto__".length */
+    ) {
+      return false;
+    }
+
+    if (s.charCodeAt(length - 1) !== 95
+    /* '_' */
+    || s.charCodeAt(length - 2) !== 95
+    /* '_' */
+    || s.charCodeAt(length - 3) !== 111
+    /* 'o' */
+    || s.charCodeAt(length - 4) !== 116
+    /* 't' */
+    || s.charCodeAt(length - 5) !== 111
+    /* 'o' */
+    || s.charCodeAt(length - 6) !== 114
+    /* 'r' */
+    || s.charCodeAt(length - 7) !== 112
+    /* 'p' */
+    || s.charCodeAt(length - 8) !== 95
+    /* '_' */
+    || s.charCodeAt(length - 9) !== 95
+    /* '_' */
+    ) {
+      return false;
+    }
+
+    for (var i = length - 10; i >= 0; i--) {
+      if (s.charCodeAt(i) !== 36
+      /* '$' */
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+  /**
+   * Comparator between two mappings where the original positions are compared.
+   *
+   * Optionally pass in `true` as `onlyCompareGenerated` to consider two
+   * mappings with the same original source/line/column, but different generated
+   * line and column the same. Useful when searching for a mapping with a
+   * stubbed out mapping.
+   */
+
+
+  function compareByOriginalPositions(mappingA, mappingB, onlyCompareOriginal) {
+    var cmp = strcmp(mappingA.source, mappingB.source);
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.originalLine - mappingB.originalLine;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.originalColumn - mappingB.originalColumn;
+
+    if (cmp !== 0 || onlyCompareOriginal) {
+      return cmp;
+    }
+
+    cmp = mappingA.generatedColumn - mappingB.generatedColumn;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.generatedLine - mappingB.generatedLine;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    return strcmp(mappingA.name, mappingB.name);
+  }
+
+  exports.compareByOriginalPositions = compareByOriginalPositions;
+  /**
+   * Comparator between two mappings with deflated source and name indices where
+   * the generated positions are compared.
+   *
+   * Optionally pass in `true` as `onlyCompareGenerated` to consider two
+   * mappings with the same generated line and column, but different
+   * source/name/original line and column the same. Useful when searching for a
+   * mapping with a stubbed out mapping.
+   */
+
+  function compareByGeneratedPositionsDeflated(mappingA, mappingB, onlyCompareGenerated) {
+    var cmp = mappingA.generatedLine - mappingB.generatedLine;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.generatedColumn - mappingB.generatedColumn;
+
+    if (cmp !== 0 || onlyCompareGenerated) {
+      return cmp;
+    }
+
+    cmp = strcmp(mappingA.source, mappingB.source);
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.originalLine - mappingB.originalLine;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.originalColumn - mappingB.originalColumn;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    return strcmp(mappingA.name, mappingB.name);
+  }
+
+  exports.compareByGeneratedPositionsDeflated = compareByGeneratedPositionsDeflated;
+
+  function strcmp(aStr1, aStr2) {
+    if (aStr1 === aStr2) {
+      return 0;
+    }
+
+    if (aStr1 === null) {
+      return 1; // aStr2 !== null
+    }
+
+    if (aStr2 === null) {
+      return -1; // aStr1 !== null
+    }
+
+    if (aStr1 > aStr2) {
+      return 1;
+    }
+
+    return -1;
+  }
+  /**
+   * Comparator between two mappings with inflated source and name strings where
+   * the generated positions are compared.
+   */
+
+
+  function compareByGeneratedPositionsInflated(mappingA, mappingB) {
+    var cmp = mappingA.generatedLine - mappingB.generatedLine;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.generatedColumn - mappingB.generatedColumn;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = strcmp(mappingA.source, mappingB.source);
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.originalLine - mappingB.originalLine;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    cmp = mappingA.originalColumn - mappingB.originalColumn;
+
+    if (cmp !== 0) {
+      return cmp;
+    }
+
+    return strcmp(mappingA.name, mappingB.name);
+  }
+
+  exports.compareByGeneratedPositionsInflated = compareByGeneratedPositionsInflated;
+  /**
+   * Strip any JSON XSSI avoidance prefix from the string (as documented
+   * in the source maps specification), and then parse the string as
+   * JSON.
+   */
+
+  function parseSourceMapInput(str) {
+    return JSON.parse(str.replace(/^\)]}'[^\n]*\n/, ''));
+  }
+
+  exports.parseSourceMapInput = parseSourceMapInput;
+  /**
+   * Compute the URL of a source given the the source root, the source's
+   * URL, and the source map's URL.
+   */
+
+  function computeSourceURL(sourceRoot, sourceURL, sourceMapURL) {
+    sourceURL = sourceURL || '';
+
+    if (sourceRoot) {
+      // This follows what Chrome does.
+      if (sourceRoot[sourceRoot.length - 1] !== '/' && sourceURL[0] !== '/') {
+        sourceRoot += '/';
+      } // The spec says:
+      //   Line 4: An optional source root, useful for relocating source
+      //   files on a server or removing repeated values in the
+      //   “sources” entry.  This value is prepended to the individual
+      //   entries in the “source” field.
+
+
+      sourceURL = sourceRoot + sourceURL;
+    } // Historically, SourceMapConsumer did not take the sourceMapURL as
+    // a parameter.  This mode is still somewhat supported, which is why
+    // this code block is conditional.  However, it's preferable to pass
+    // the source map URL to SourceMapConsumer, so that this function
+    // can implement the source URL resolution algorithm as outlined in
+    // the spec.  This block is basically the equivalent of:
+    //    new URL(sourceURL, sourceMapURL).toString()
+    // ... except it avoids using URL, which wasn't available in the
+    // older releases of node still supported by this library.
+    //
+    // The spec says:
+    //   If the sources are not absolute URLs after prepending of the
+    //   “sourceRoot”, the sources are resolved relative to the
+    //   SourceMap (like resolving script src in a html document).
+
+
+    if (sourceMapURL) {
+      var parsed = urlParse(sourceMapURL);
+
+      if (!parsed) {
+        throw new Error("sourceMapURL could not be parsed");
+      }
+
+      if (parsed.path) {
+        // Strip the last path component, but keep the "/".
+        var index = parsed.path.lastIndexOf('/');
+
+        if (index >= 0) {
+          parsed.path = parsed.path.substring(0, index + 1);
+        }
+      }
+
+      sourceURL = join(urlGenerate(parsed), sourceURL);
+    }
+
+    return normalize(sourceURL);
+  }
+
+  exports.computeSourceURL = computeSourceURL;
+})(util$5);
+
+var arraySet = {};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+/*
+ * Copyright 2011 Mozilla Foundation and contributors
+ * Licensed under the New BSD license. See LICENSE or:
+ * http://opensource.org/licenses/BSD-3-Clause
+ */
+
+var util$4 = util$5;
+var has = Object.prototype.hasOwnProperty;
+var hasNativeMap = typeof Map !== "undefined";
+/**
+ * A data structure which is a combination of an array and a set. Adding a new
+ * member is O(1), testing for membership is O(1), and finding the index of an
+ * element is O(1). Removing elements from the set is not supported. Only
+ * strings are supported for membership.
+ */
+
+function ArraySet$2() {
+  this._array = [];
+  this._set = hasNativeMap ? new Map() : Object.create(null);
+}
+/**
+ * Static method for creating ArraySet instances from an existing array.
+ */
+
+
+ArraySet$2.fromArray = function ArraySet_fromArray(aArray, aAllowDuplicates) {
+  var set = new ArraySet$2();
+
+  for (var i = 0, len = aArray.length; i < len; i++) {
+    set.add(aArray[i], aAllowDuplicates);
+  }
+
+  return set;
+};
+/**
+ * Return how many unique items are in this ArraySet. If duplicates have been
+ * added, than those do not count towards the size.
+ *
+ * @returns Number
+ */
+
+
+ArraySet$2.prototype.size = function ArraySet_size() {
+  return hasNativeMap ? this._set.size : Object.getOwnPropertyNames(this._set).length;
+};
+/**
+ * Add the given string to this set.
+ *
+ * @param String aStr
+ */
+
+
+ArraySet$2.prototype.add = function ArraySet_add(aStr, aAllowDuplicates) {
+  var sStr = hasNativeMap ? aStr : util$4.toSetString(aStr);
+  var isDuplicate = hasNativeMap ? this.has(aStr) : has.call(this._set, sStr);
+  var idx = this._array.length;
+
+  if (!isDuplicate || aAllowDuplicates) {
+    this._array.push(aStr);
+  }
+
+  if (!isDuplicate) {
+    if (hasNativeMap) {
+      this._set.set(aStr, idx);
+    } else {
+      this._set[sStr] = idx;
+    }
+  }
+};
+/**
+ * Is the given string a member of this set?
+ *
+ * @param String aStr
+ */
+
+
+ArraySet$2.prototype.has = function ArraySet_has(aStr) {
+  if (hasNativeMap) {
+    return this._set.has(aStr);
+  } else {
+    var sStr = util$4.toSetString(aStr);
+    return has.call(this._set, sStr);
+  }
+};
+/**
+ * What is the index of the given string in the array?
+ *
+ * @param String aStr
+ */
+
+
+ArraySet$2.prototype.indexOf = function ArraySet_indexOf(aStr) {
+  if (hasNativeMap) {
+    var idx = this._set.get(aStr);
+
+    if (idx >= 0) {
+      return idx;
+    }
+  } else {
+    var sStr = util$4.toSetString(aStr);
+
+    if (has.call(this._set, sStr)) {
+      return this._set[sStr];
+    }
+  }
+
+  throw new Error('"' + aStr + '" is not in the set.');
+};
+/**
+ * What is the element at the given index?
+ *
+ * @param Number aIdx
+ */
+
+
+ArraySet$2.prototype.at = function ArraySet_at(aIdx) {
+  if (aIdx >= 0 && aIdx < this._array.length) {
+    return this._array[aIdx];
+  }
+
+  throw new Error('No element indexed by ' + aIdx);
+};
+/**
+ * Returns the array representation of this set (which has the proper indices
+ * indicated by indexOf). Note that this is a copy of the internal array used
+ * for storing the members so that no one can mess with internal state.
+ */
+
+
+ArraySet$2.prototype.toArray = function ArraySet_toArray() {
+  return this._array.slice();
+};
+
+arraySet.ArraySet = ArraySet$2;
+
+var mappingList = {};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+/*
+ * Copyright 2014 Mozilla Foundation and contributors
+ * Licensed under the New BSD license. See LICENSE or:
+ * http://opensource.org/licenses/BSD-3-Clause
+ */
+
+var util$3 = util$5;
+/**
+ * Determine whether mappingB is after mappingA with respect to generated
+ * position.
+ */
+
+function generatedPositionAfter(mappingA, mappingB) {
+  // Optimized for most common case
+  var lineA = mappingA.generatedLine;
+  var lineB = mappingB.generatedLine;
+  var columnA = mappingA.generatedColumn;
+  var columnB = mappingB.generatedColumn;
+  return lineB > lineA || lineB == lineA && columnB >= columnA || util$3.compareByGeneratedPositionsInflated(mappingA, mappingB) <= 0;
+}
+/**
+ * A data structure to provide a sorted view of accumulated mappings in a
+ * performance conscious manner. It trades a neglibable overhead in general
+ * case for a large speedup in case of mappings being added in order.
+ */
+
+
+function MappingList$1() {
+  this._array = [];
+  this._sorted = true; // Serves as infimum
+
+  this._last = {
+    generatedLine: -1,
+    generatedColumn: 0
+  };
+}
+/**
+ * Iterate through internal items. This method takes the same arguments that
+ * `Array.prototype.forEach` takes.
+ *
+ * NOTE: The order of the mappings is NOT guaranteed.
+ */
+
+
+MappingList$1.prototype.unsortedForEach = function MappingList_forEach(aCallback, aThisArg) {
+  this._array.forEach(aCallback, aThisArg);
+};
+/**
+ * Add the given source mapping.
+ *
+ * @param Object aMapping
+ */
+
+
+MappingList$1.prototype.add = function MappingList_add(aMapping) {
+  if (generatedPositionAfter(this._last, aMapping)) {
+    this._last = aMapping;
+
+    this._array.push(aMapping);
+  } else {
+    this._sorted = false;
+
+    this._array.push(aMapping);
+  }
+};
+/**
+ * Returns the flat, sorted array of mappings. The mappings are sorted by
+ * generated position.
+ *
+ * WARNING: This method returns internal data without copying, for
+ * performance. The return value must NOT be mutated, and should be treated as
+ * an immutable borrow. If you want to take ownership, you must make your own
+ * copy.
+ */
+
+
+MappingList$1.prototype.toArray = function MappingList_toArray() {
+  if (!this._sorted) {
+    this._array.sort(util$3.compareByGeneratedPositionsInflated);
+
+    this._sorted = true;
+  }
+
+  return this._array;
+};
+
+mappingList.MappingList = MappingList$1;
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+/*
+ * Copyright 2011 Mozilla Foundation and contributors
+ * Licensed under the New BSD license. See LICENSE or:
+ * http://opensource.org/licenses/BSD-3-Clause
+ */
+
+var base64VLQ$1 = base64Vlq;
+var util$2 = util$5;
+var ArraySet$1 = arraySet.ArraySet;
+var MappingList = mappingList.MappingList;
+/**
+ * An instance of the SourceMapGenerator represents a source map which is
+ * being built incrementally. You may pass an object with the following
+ * properties:
+ *
+ *   - file: The filename of the generated source.
+ *   - sourceRoot: A root for all relative URLs in this source map.
+ */
+
+function SourceMapGenerator$1(aArgs) {
+  if (!aArgs) {
+    aArgs = {};
+  }
+
+  this._file = util$2.getArg(aArgs, 'file', null);
+  this._sourceRoot = util$2.getArg(aArgs, 'sourceRoot', null);
+  this._skipValidation = util$2.getArg(aArgs, 'skipValidation', false);
+  this._sources = new ArraySet$1();
+  this._names = new ArraySet$1();
+  this._mappings = new MappingList();
+  this._sourcesContents = null;
 }
 
-let logger$1 = new logger$2("indexingCollection");
-class LRUInfo {
-    constructor(id) {
-        this.id = id;
-        this.newer = this.older = false;
+SourceMapGenerator$1.prototype._version = 3;
+/**
+ * Creates a new SourceMapGenerator based on a SourceMapConsumer
+ *
+ * @param aSourceMapConsumer The SourceMap.
+ */
+
+SourceMapGenerator$1.fromSourceMap = function SourceMapGenerator_fromSourceMap(aSourceMapConsumer) {
+  var sourceRoot = aSourceMapConsumer.sourceRoot;
+  var generator = new SourceMapGenerator$1({
+    file: aSourceMapConsumer.file,
+    sourceRoot: sourceRoot
+  });
+  aSourceMapConsumer.eachMapping(function (mapping) {
+    var newMapping = {
+      generated: {
+        line: mapping.generatedLine,
+        column: mapping.generatedColumn
+      }
+    };
+
+    if (mapping.source != null) {
+      newMapping.source = mapping.source;
+
+      if (sourceRoot != null) {
+        newMapping.source = util$2.relative(sourceRoot, newMapping.source);
+      }
+
+      newMapping.original = {
+        line: mapping.originalLine,
+        column: mapping.originalColumn
+      };
+
+      if (mapping.name != null) {
+        newMapping.name = mapping.name;
+      }
     }
+
+    generator.addMapping(newMapping);
+  });
+  aSourceMapConsumer.sources.forEach(function (sourceFile) {
+    var sourceRelative = sourceFile;
+
+    if (sourceRoot !== null) {
+      sourceRelative = util$2.relative(sourceRoot, sourceFile);
+    }
+
+    if (!generator._sources.has(sourceRelative)) {
+      generator._sources.add(sourceRelative);
+    }
+
+    var content = aSourceMapConsumer.sourceContentFor(sourceFile);
+
+    if (content != null) {
+      generator.setSourceContent(sourceFile, content);
+    }
+  });
+  return generator;
+};
+/**
+ * Add a single mapping from original source line and column to the generated
+ * source's line and column for this source map being created. The mapping
+ * object should have the following properties:
+ *
+ *   - generated: An object with the generated line and column positions.
+ *   - original: An object with the original line and column positions.
+ *   - source: The original source file (relative to the sourceRoot).
+ *   - name: An optional original token name for this mapping.
+ */
+
+
+SourceMapGenerator$1.prototype.addMapping = function SourceMapGenerator_addMapping(aArgs) {
+  var generated = util$2.getArg(aArgs, 'generated');
+  var original = util$2.getArg(aArgs, 'original', null);
+  var source = util$2.getArg(aArgs, 'source', null);
+  var name = util$2.getArg(aArgs, 'name', null);
+
+  if (!this._skipValidation) {
+    this._validateMapping(generated, original, source, name);
+  }
+
+  if (source != null) {
+    source = String(source);
+
+    if (!this._sources.has(source)) {
+      this._sources.add(source);
+    }
+  }
+
+  if (name != null) {
+    name = String(name);
+
+    if (!this._names.has(name)) {
+      this._names.add(name);
+    }
+  }
+
+  this._mappings.add({
+    generatedLine: generated.line,
+    generatedColumn: generated.column,
+    originalLine: original != null && original.line,
+    originalColumn: original != null && original.column,
+    source: source,
+    name: name
+  });
+};
+/**
+ * Set the source content for a source file.
+ */
+
+
+SourceMapGenerator$1.prototype.setSourceContent = function SourceMapGenerator_setSourceContent(aSourceFile, aSourceContent) {
+  var source = aSourceFile;
+
+  if (this._sourceRoot != null) {
+    source = util$2.relative(this._sourceRoot, source);
+  }
+
+  if (aSourceContent != null) {
+    // Add the source content to the _sourcesContents map.
+    // Create a new _sourcesContents map if the property is null.
+    if (!this._sourcesContents) {
+      this._sourcesContents = Object.create(null);
+    }
+
+    this._sourcesContents[util$2.toSetString(source)] = aSourceContent;
+  } else if (this._sourcesContents) {
+    // Remove the source file from the _sourcesContents map.
+    // If the _sourcesContents map is empty, set the property to null.
+    delete this._sourcesContents[util$2.toSetString(source)];
+
+    if (Object.keys(this._sourcesContents).length === 0) {
+      this._sourcesContents = null;
+    }
+  }
+};
+/**
+ * Applies the mappings of a sub-source-map for a specific source file to the
+ * source map being generated. Each mapping to the supplied source file is
+ * rewritten using the supplied source map. Note: The resolution for the
+ * resulting mappings is the minimium of this map and the supplied map.
+ *
+ * @param aSourceMapConsumer The source map to be applied.
+ * @param aSourceFile Optional. The filename of the source file.
+ *        If omitted, SourceMapConsumer's file property will be used.
+ * @param aSourceMapPath Optional. The dirname of the path to the source map
+ *        to be applied. If relative, it is relative to the SourceMapConsumer.
+ *        This parameter is needed when the two source maps aren't in the same
+ *        directory, and the source map to be applied contains relative source
+ *        paths. If so, those relative source paths need to be rewritten
+ *        relative to the SourceMapGenerator.
+ */
+
+
+SourceMapGenerator$1.prototype.applySourceMap = function SourceMapGenerator_applySourceMap(aSourceMapConsumer, aSourceFile, aSourceMapPath) {
+  var sourceFile = aSourceFile; // If aSourceFile is omitted, we will use the file property of the SourceMap
+
+  if (aSourceFile == null) {
+    if (aSourceMapConsumer.file == null) {
+      throw new Error('SourceMapGenerator.prototype.applySourceMap requires either an explicit source file, ' + 'or the source map\'s "file" property. Both were omitted.');
+    }
+
+    sourceFile = aSourceMapConsumer.file;
+  }
+
+  var sourceRoot = this._sourceRoot; // Make "sourceFile" relative if an absolute Url is passed.
+
+  if (sourceRoot != null) {
+    sourceFile = util$2.relative(sourceRoot, sourceFile);
+  } // Applying the SourceMap can add and remove items from the sources and
+  // the names array.
+
+
+  var newSources = new ArraySet$1();
+  var newNames = new ArraySet$1(); // Find mappings for the "sourceFile"
+
+  this._mappings.unsortedForEach(function (mapping) {
+    if (mapping.source === sourceFile && mapping.originalLine != null) {
+      // Check if it can be mapped by the source map, then update the mapping.
+      var original = aSourceMapConsumer.originalPositionFor({
+        line: mapping.originalLine,
+        column: mapping.originalColumn
+      });
+
+      if (original.source != null) {
+        // Copy mapping
+        mapping.source = original.source;
+
+        if (aSourceMapPath != null) {
+          mapping.source = util$2.join(aSourceMapPath, mapping.source);
+        }
+
+        if (sourceRoot != null) {
+          mapping.source = util$2.relative(sourceRoot, mapping.source);
+        }
+
+        mapping.originalLine = original.line;
+        mapping.originalColumn = original.column;
+
+        if (original.name != null) {
+          mapping.name = original.name;
+        }
+      }
+    }
+
+    var source = mapping.source;
+
+    if (source != null && !newSources.has(source)) {
+      newSources.add(source);
+    }
+
+    var name = mapping.name;
+
+    if (name != null && !newNames.has(name)) {
+      newNames.add(name);
+    }
+  }, this);
+
+  this._sources = newSources;
+  this._names = newNames; // Copy sourcesContents of applied map.
+
+  aSourceMapConsumer.sources.forEach(function (sourceFile) {
+    var content = aSourceMapConsumer.sourceContentFor(sourceFile);
+
+    if (content != null) {
+      if (aSourceMapPath != null) {
+        sourceFile = util$2.join(aSourceMapPath, sourceFile);
+      }
+
+      if (sourceRoot != null) {
+        sourceFile = util$2.relative(sourceRoot, sourceFile);
+      }
+
+      this.setSourceContent(sourceFile, content);
+    }
+  }, this);
+};
+/**
+ * A mapping can have one of the three levels of data:
+ *
+ *   1. Just the generated position.
+ *   2. The Generated position, original position, and original source.
+ *   3. Generated and original position, original source, as well as a name
+ *      token.
+ *
+ * To maintain consistency, we validate that any new mapping being added falls
+ * in to one of these categories.
+ */
+
+
+SourceMapGenerator$1.prototype._validateMapping = function SourceMapGenerator_validateMapping(aGenerated, aOriginal, aSource, aName) {
+  // When aOriginal is truthy but has empty values for .line and .column,
+  // it is most likely a programmer error. In this case we throw a very
+  // specific error message to try to guide them the right way.
+  // For example: https://github.com/Polymer/polymer-bundler/pull/519
+  if (aOriginal && typeof aOriginal.line !== 'number' && typeof aOriginal.column !== 'number') {
+    throw new Error('original.line and original.column are not numbers -- you probably meant to omit ' + 'the original mapping entirely and only map the generated position. If so, pass ' + 'null for the original mapping instead of an object with empty or null values.');
+  }
+
+  if (aGenerated && 'line' in aGenerated && 'column' in aGenerated && aGenerated.line > 0 && aGenerated.column >= 0 && !aOriginal && !aSource && !aName) {
+    // Case 1.
+    return;
+  } else if (aGenerated && 'line' in aGenerated && 'column' in aGenerated && aOriginal && 'line' in aOriginal && 'column' in aOriginal && aGenerated.line > 0 && aGenerated.column >= 0 && aOriginal.line > 0 && aOriginal.column >= 0 && aSource) {
+    // Cases 2 and 3.
+    return;
+  } else {
+    throw new Error('Invalid mapping: ' + JSON.stringify({
+      generated: aGenerated,
+      source: aSource,
+      original: aOriginal,
+      name: aName
+    }));
+  }
+};
+/**
+ * Serialize the accumulated mappings in to the stream of base 64 VLQs
+ * specified by the source map format.
+ */
+
+
+SourceMapGenerator$1.prototype._serializeMappings = function SourceMapGenerator_serializeMappings() {
+  var previousGeneratedColumn = 0;
+  var previousGeneratedLine = 1;
+  var previousOriginalColumn = 0;
+  var previousOriginalLine = 0;
+  var previousName = 0;
+  var previousSource = 0;
+  var result = '';
+  var next;
+  var mapping;
+  var nameIdx;
+  var sourceIdx;
+
+  var mappings = this._mappings.toArray();
+
+  for (var i = 0, len = mappings.length; i < len; i++) {
+    mapping = mappings[i];
+    next = '';
+
+    if (mapping.generatedLine !== previousGeneratedLine) {
+      previousGeneratedColumn = 0;
+
+      while (mapping.generatedLine !== previousGeneratedLine) {
+        next += ';';
+        previousGeneratedLine++;
+      }
+    } else {
+      if (i > 0) {
+        if (!util$2.compareByGeneratedPositionsInflated(mapping, mappings[i - 1])) {
+          continue;
+        }
+
+        next += ',';
+      }
+    }
+
+    next += base64VLQ$1.encode(mapping.generatedColumn - previousGeneratedColumn);
+    previousGeneratedColumn = mapping.generatedColumn;
+
+    if (mapping.source != null) {
+      sourceIdx = this._sources.indexOf(mapping.source);
+      next += base64VLQ$1.encode(sourceIdx - previousSource);
+      previousSource = sourceIdx; // lines are stored 0-based in SourceMap spec version 3
+
+      next += base64VLQ$1.encode(mapping.originalLine - 1 - previousOriginalLine);
+      previousOriginalLine = mapping.originalLine - 1;
+      next += base64VLQ$1.encode(mapping.originalColumn - previousOriginalColumn);
+      previousOriginalColumn = mapping.originalColumn;
+
+      if (mapping.name != null) {
+        nameIdx = this._names.indexOf(mapping.name);
+        next += base64VLQ$1.encode(nameIdx - previousName);
+        previousName = nameIdx;
+      }
+    }
+
+    result += next;
+  }
+
+  return result;
+};
+
+SourceMapGenerator$1.prototype._generateSourcesContent = function SourceMapGenerator_generateSourcesContent(aSources, aSourceRoot) {
+  return aSources.map(function (source) {
+    if (!this._sourcesContents) {
+      return null;
+    }
+
+    if (aSourceRoot != null) {
+      source = util$2.relative(aSourceRoot, source);
+    }
+
+    var key = util$2.toSetString(source);
+    return Object.prototype.hasOwnProperty.call(this._sourcesContents, key) ? this._sourcesContents[key] : null;
+  }, this);
+};
+/**
+ * Externalize the source map.
+ */
+
+
+SourceMapGenerator$1.prototype.toJSON = function SourceMapGenerator_toJSON() {
+  var map = {
+    version: this._version,
+    sources: this._sources.toArray(),
+    names: this._names.toArray(),
+    mappings: this._serializeMappings()
+  };
+
+  if (this._file != null) {
+    map.file = this._file;
+  }
+
+  if (this._sourceRoot != null) {
+    map.sourceRoot = this._sourceRoot;
+  }
+
+  if (this._sourcesContents) {
+    map.sourcesContent = this._generateSourcesContent(map.sources, map.sourceRoot);
+  }
+
+  return map;
+};
+/**
+ * Render the source map being generated to a string.
+ */
+
+
+SourceMapGenerator$1.prototype.toString = function SourceMapGenerator_toString() {
+  return JSON.stringify(this.toJSON());
+};
+
+sourceMapGenerator.SourceMapGenerator = SourceMapGenerator$1;
+
+var binarySearch$1 = {};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+
+(function (exports) {
+  /*
+   * Copyright 2011 Mozilla Foundation and contributors
+   * Licensed under the New BSD license. See LICENSE or:
+   * http://opensource.org/licenses/BSD-3-Clause
+   */
+  exports.GREATEST_LOWER_BOUND = 1;
+  exports.LEAST_UPPER_BOUND = 2;
+  /**
+   * Recursive implementation of binary search.
+   *
+   * @param aLow Indices here and lower do not contain the needle.
+   * @param aHigh Indices here and higher do not contain the needle.
+   * @param aNeedle The element being searched for.
+   * @param aHaystack The non-empty array being searched.
+   * @param aCompare Function which takes two elements and returns -1, 0, or 1.
+   * @param aBias Either 'binarySearch.GREATEST_LOWER_BOUND' or
+   *     'binarySearch.LEAST_UPPER_BOUND'. Specifies whether to return the
+   *     closest element that is smaller than or greater than the one we are
+   *     searching for, respectively, if the exact element cannot be found.
+   */
+
+  function recursiveSearch(aLow, aHigh, aNeedle, aHaystack, aCompare, aBias) {
+    // This function terminates when one of the following is true:
+    //
+    //   1. We find the exact element we are looking for.
+    //
+    //   2. We did not find the exact element, but we can return the index of
+    //      the next-closest element.
+    //
+    //   3. We did not find the exact element, and there is no next-closest
+    //      element than the one we are searching for, so we return -1.
+    var mid = Math.floor((aHigh - aLow) / 2) + aLow;
+    var cmp = aCompare(aNeedle, aHaystack[mid], true);
+
+    if (cmp === 0) {
+      // Found the element we are looking for.
+      return mid;
+    } else if (cmp > 0) {
+      // Our needle is greater than aHaystack[mid].
+      if (aHigh - mid > 1) {
+        // The element is in the upper half.
+        return recursiveSearch(mid, aHigh, aNeedle, aHaystack, aCompare, aBias);
+      } // The exact needle element was not found in this haystack. Determine if
+      // we are in termination case (3) or (2) and return the appropriate thing.
+
+
+      if (aBias == exports.LEAST_UPPER_BOUND) {
+        return aHigh < aHaystack.length ? aHigh : -1;
+      } else {
+        return mid;
+      }
+    } else {
+      // Our needle is less than aHaystack[mid].
+      if (mid - aLow > 1) {
+        // The element is in the lower half.
+        return recursiveSearch(aLow, mid, aNeedle, aHaystack, aCompare, aBias);
+      } // we are in termination case (3) or (2) and return the appropriate thing.
+
+
+      if (aBias == exports.LEAST_UPPER_BOUND) {
+        return mid;
+      } else {
+        return aLow < 0 ? -1 : aLow;
+      }
+    }
+  }
+  /**
+   * This is an implementation of binary search which will always try and return
+   * the index of the closest element if there is no exact hit. This is because
+   * mappings between original and generated line/col pairs are single points,
+   * and there is an implicit region between each of them, so a miss just means
+   * that you aren't on the very start of a region.
+   *
+   * @param aNeedle The element you are looking for.
+   * @param aHaystack The array that is being searched.
+   * @param aCompare A function which takes the needle and an element in the
+   *     array and returns -1, 0, or 1 depending on whether the needle is less
+   *     than, equal to, or greater than the element, respectively.
+   * @param aBias Either 'binarySearch.GREATEST_LOWER_BOUND' or
+   *     'binarySearch.LEAST_UPPER_BOUND'. Specifies whether to return the
+   *     closest element that is smaller than or greater than the one we are
+   *     searching for, respectively, if the exact element cannot be found.
+   *     Defaults to 'binarySearch.GREATEST_LOWER_BOUND'.
+   */
+
+
+  exports.search = function search(aNeedle, aHaystack, aCompare, aBias) {
+    if (aHaystack.length === 0) {
+      return -1;
+    }
+
+    var index = recursiveSearch(-1, aHaystack.length, aNeedle, aHaystack, aCompare, aBias || exports.GREATEST_LOWER_BOUND);
+
+    if (index < 0) {
+      return -1;
+    } // We have found either the exact element, or the next-closest element than
+    // the one we are searching for. However, there may be more than one such
+    // element. Make sure we always return the smallest of these.
+
+
+    while (index - 1 >= 0) {
+      if (aCompare(aHaystack[index], aHaystack[index - 1], true) !== 0) {
+        break;
+      }
+
+      --index;
+    }
+
+    return index;
+  };
+})(binarySearch$1);
+
+var quickSort$1 = {};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+/*
+ * Copyright 2011 Mozilla Foundation and contributors
+ * Licensed under the New BSD license. See LICENSE or:
+ * http://opensource.org/licenses/BSD-3-Clause
+ */
+// It turns out that some (most?) JavaScript engines don't self-host
+// `Array.prototype.sort`. This makes sense because C++ will likely remain
+// faster than JS when doing raw CPU-intensive sorting. However, when using a
+// custom comparator function, calling back and forth between the VM's C++ and
+// JIT'd JS is rather slow *and* loses JIT type information, resulting in
+// worse generated code for the comparator function than would be optimal. In
+// fact, when sorting with a comparator, these costs outweigh the benefits of
+// sorting in C++. By using our own JS-implemented Quick Sort (below), we get
+// a ~3500ms mean speed-up in `bench/bench.html`.
+
+/**
+ * Swap the elements indexed by `x` and `y` in the array `ary`.
+ *
+ * @param {Array} ary
+ *        The array.
+ * @param {Number} x
+ *        The index of the first item.
+ * @param {Number} y
+ *        The index of the second item.
+ */
+
+function swap(ary, x, y) {
+  var temp = ary[x];
+  ary[x] = ary[y];
+  ary[y] = temp;
 }
-class IndexingCollection {
-    constructor(idField = "id", groupByFields = [], limits = false) {
-        if (!limits) {
-            limits = [10, 20, 30];
-        }
-        if (!idField) {
-            throw new Error("Id field required!");
-        }
-        this.idField = idField;
-        this.groupByFields = groupByFields;
-        this.thingsById = {};
-        this.groups = {};
-        for (let f in groupByFields) {
-            let field = groupByFields[f];
-            this.groups[field] = {};
-        }
-        this.nodeInfoById = new Map();
-        this.limits = limits;
-        this.head = false;
-        this.tail = false;
-        this.serializeSeperator = "∪";
+/**
+ * Returns a random integer within the range `low .. high` inclusive.
+ *
+ * @param {Number} low
+ *        The lower bound on the range.
+ * @param {Number} high
+ *        The upper bound on the range.
+ */
+
+
+function randomIntInRange(low, high) {
+  return Math.round(low + Math.random() * (high - low));
+}
+/**
+ * The Quick Sort algorithm.
+ *
+ * @param {Array} ary
+ *        An array to sort.
+ * @param {function} comparator
+ *        Function to use to compare two items.
+ * @param {Number} p
+ *        Start index of the array
+ * @param {Number} r
+ *        End index of the array
+ */
+
+
+function doQuickSort(ary, comparator, p, r) {
+  // If our lower bound is less than our upper bound, we (1) partition the
+  // array into two pieces and (2) recurse on each half. If it is not, this is
+  // the empty array and our base case.
+  if (p < r) {
+    // (1) Partitioning.
+    //
+    // The partitioning chooses a pivot between `p` and `r` and moves all
+    // elements that are less than or equal to the pivot to the before it, and
+    // all the elements that are greater than it after it. The effect is that
+    // once partition is done, the pivot is in the exact place it will be when
+    // the array is put in sorted order, and it will not need to be moved
+    // again. This runs in O(n) time.
+    // Always choose a random pivot so that an input array which is reverse
+    // sorted does not cause O(n^2) running time.
+    var pivotIndex = randomIntInRange(p, r);
+    var i = p - 1;
+    swap(ary, pivotIndex, r);
+    var pivot = ary[r]; // Immediately after `j` is incremented in this loop, the following hold
+    // true:
+    //
+    //   * Every element in `ary[p .. i]` is less than or equal to the pivot.
+    //
+    //   * Every element in `ary[i+1 .. j-1]` is greater than the pivot.
+
+    for (var j = p; j < r; j++) {
+      if (comparator(ary[j], pivot) <= 0) {
+        i += 1;
+        swap(ary, i, j);
+      }
     }
-    _markUsed(thingInfo) {
-        if (this.head && thingInfo.id == this.head.id) {
-            return;
-        }
-        if (thingInfo.older || thingInfo.newer) {
-            let older = thingInfo.older;
-            let newer = thingInfo.newer;
-            if (older)
-                older.newer = newer;
-            if (newer)
-                newer.older = older;
-            thingInfo.older = thingInfo.newer = false;
-        }
-        if (!this.head) {
-            this.head = this.tail = thingInfo;
-        }
-        else {
-            this.head.newer = thingInfo;
-            thingInfo.older = this.head;
-            this.head = thingInfo;
-            if (this.head.id == thingInfo.id) {
-                thingInfo.newer = false;
-            }
-        }
+
+    swap(ary, i + 1, j);
+    var q = i + 1; // (2) Recurse on each half.
+
+    doQuickSort(ary, comparator, p, q - 1);
+    doQuickSort(ary, comparator, q + 1, r);
+  }
+}
+/**
+ * Sort the given array in-place with the given comparator function.
+ *
+ * @param {Array} ary
+ *        An array to sort.
+ * @param {function} comparator
+ *        Function to use to compare two items.
+ */
+
+
+quickSort$1.quickSort = function (ary, comparator) {
+  doQuickSort(ary, comparator, 0, ary.length - 1);
+};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+/*
+ * Copyright 2011 Mozilla Foundation and contributors
+ * Licensed under the New BSD license. See LICENSE or:
+ * http://opensource.org/licenses/BSD-3-Clause
+ */
+
+var util$1 = util$5;
+var binarySearch = binarySearch$1;
+var ArraySet = arraySet.ArraySet;
+var base64VLQ = base64Vlq;
+var quickSort = quickSort$1.quickSort;
+
+function SourceMapConsumer(aSourceMap, aSourceMapURL) {
+  var sourceMap = aSourceMap;
+
+  if (typeof aSourceMap === 'string') {
+    sourceMap = util$1.parseSourceMapInput(aSourceMap);
+  }
+
+  return sourceMap.sections != null ? new IndexedSourceMapConsumer(sourceMap, aSourceMapURL) : new BasicSourceMapConsumer(sourceMap, aSourceMapURL);
+}
+
+SourceMapConsumer.fromSourceMap = function (aSourceMap, aSourceMapURL) {
+  return BasicSourceMapConsumer.fromSourceMap(aSourceMap, aSourceMapURL);
+};
+/**
+ * The version of the source mapping spec that we are consuming.
+ */
+
+
+SourceMapConsumer.prototype._version = 3; // `__generatedMappings` and `__originalMappings` are arrays that hold the
+// parsed mapping coordinates from the source map's "mappings" attribute. They
+// are lazily instantiated, accessed via the `_generatedMappings` and
+// `_originalMappings` getters respectively, and we only parse the mappings
+// and create these arrays once queried for a source location. We jump through
+// these hoops because there can be many thousands of mappings, and parsing
+// them is expensive, so we only want to do it if we must.
+//
+// Each object in the arrays is of the form:
+//
+//     {
+//       generatedLine: The line number in the generated code,
+//       generatedColumn: The column number in the generated code,
+//       source: The path to the original source file that generated this
+//               chunk of code,
+//       originalLine: The line number in the original source that
+//                     corresponds to this chunk of generated code,
+//       originalColumn: The column number in the original source that
+//                       corresponds to this chunk of generated code,
+//       name: The name of the original symbol which generated this chunk of
+//             code.
+//     }
+//
+// All properties except for `generatedLine` and `generatedColumn` can be
+// `null`.
+//
+// `_generatedMappings` is ordered by the generated positions.
+//
+// `_originalMappings` is ordered by the original positions.
+
+SourceMapConsumer.prototype.__generatedMappings = null;
+Object.defineProperty(SourceMapConsumer.prototype, '_generatedMappings', {
+  configurable: true,
+  enumerable: true,
+  get: function () {
+    if (!this.__generatedMappings) {
+      this._parseMappings(this._mappings, this.sourceRoot);
     }
-    _enforceLimit() {
-        let finalLimit = this.limits[this.limits.length - 1];
-        while (this.nodeInfoById.size > finalLimit) {
-            logger$1.log('over limit!', this.nodeInfoById.size, finalLimit);
-            let nodeInfoToRemove = this.tail;
-            if (!nodeInfoToRemove) {
-                continue;
-            }
-            let nodeToRemove = this.thingsById[nodeInfoToRemove.id];
-            this._debugQueue();
-            logger$1.log("removing node", JSON.stringify(nodeToRemove));
-            this.remove(nodeToRemove);
-        }
+
+    return this.__generatedMappings;
+  }
+});
+SourceMapConsumer.prototype.__originalMappings = null;
+Object.defineProperty(SourceMapConsumer.prototype, '_originalMappings', {
+  configurable: true,
+  enumerable: true,
+  get: function () {
+    if (!this.__originalMappings) {
+      this._parseMappings(this._mappings, this.sourceRoot);
     }
-    forEach(fn) {
-        if (!this.head) {
-            return;
-        }
-        let curr = this.head;
-        let cThing = this.thingsById[curr.id];
-        if (!cThing) {
-            if (Object.keys(this.thingsById).length == 0) {
-                return;
-            }
-            logger$1.log("broken...", this.head.id, Object.keys(this.thingsById));
-            return;
-        }
-        fn(cThing);
-        let i = 0;
-        let max = Object.keys(this.thingsById).length + 10;
-        if (!curr.older) {
-            logger$1.log('broke somethin?');
-            throw new Error("wtf");
-        }
-        while (curr = curr.older) {
-            if (i > max) {
-                logger$1.log('broke somethin?');
-                throw new Error("wtf");
-            }
-            cThing = this.thingsById[curr.id];
-            fn(cThing);
-            i++;
-        }
-    }
-    _debugQueue() {
-        let out = "";
-        this.forEach((thing) => {
-            out += thing.id + ">";
+
+    return this.__originalMappings;
+  }
+});
+
+SourceMapConsumer.prototype._charIsMappingSeparator = function SourceMapConsumer_charIsMappingSeparator(aStr, index) {
+  var c = aStr.charAt(index);
+  return c === ";" || c === ",";
+};
+/**
+ * Parse the mappings in a string in to a data structure which we can easily
+ * query (the ordered arrays in the `this.__generatedMappings` and
+ * `this.__originalMappings` properties).
+ */
+
+
+SourceMapConsumer.prototype._parseMappings = function SourceMapConsumer_parseMappings(aStr, aSourceRoot) {
+  throw new Error("Subclasses must implement _parseMappings");
+};
+
+SourceMapConsumer.GENERATED_ORDER = 1;
+SourceMapConsumer.ORIGINAL_ORDER = 2;
+SourceMapConsumer.GREATEST_LOWER_BOUND = 1;
+SourceMapConsumer.LEAST_UPPER_BOUND = 2;
+/**
+ * Iterate over each mapping between an original source/line/column and a
+ * generated line/column in this source map.
+ *
+ * @param Function aCallback
+ *        The function that is called with each mapping.
+ * @param Object aContext
+ *        Optional. If specified, this object will be the value of `this` every
+ *        time that `aCallback` is called.
+ * @param aOrder
+ *        Either `SourceMapConsumer.GENERATED_ORDER` or
+ *        `SourceMapConsumer.ORIGINAL_ORDER`. Specifies whether you want to
+ *        iterate over the mappings sorted by the generated file's line/column
+ *        order or the original's source/line/column order, respectively. Defaults to
+ *        `SourceMapConsumer.GENERATED_ORDER`.
+ */
+
+SourceMapConsumer.prototype.eachMapping = function SourceMapConsumer_eachMapping(aCallback, aContext, aOrder) {
+  var context = aContext || null;
+  var order = aOrder || SourceMapConsumer.GENERATED_ORDER;
+  var mappings;
+
+  switch (order) {
+    case SourceMapConsumer.GENERATED_ORDER:
+      mappings = this._generatedMappings;
+      break;
+
+    case SourceMapConsumer.ORIGINAL_ORDER:
+      mappings = this._originalMappings;
+      break;
+
+    default:
+      throw new Error("Unknown order of iteration.");
+  }
+
+  var sourceRoot = this.sourceRoot;
+  mappings.map(function (mapping) {
+    var source = mapping.source === null ? null : this._sources.at(mapping.source);
+    source = util$1.computeSourceURL(sourceRoot, source, this._sourceMapURL);
+    return {
+      source: source,
+      generatedLine: mapping.generatedLine,
+      generatedColumn: mapping.generatedColumn,
+      originalLine: mapping.originalLine,
+      originalColumn: mapping.originalColumn,
+      name: mapping.name === null ? null : this._names.at(mapping.name)
+    };
+  }, this).forEach(aCallback, context);
+};
+/**
+ * Returns all generated line and column information for the original source,
+ * line, and column provided. If no column is provided, returns all mappings
+ * corresponding to a either the line we are searching for or the next
+ * closest line that has any mappings. Otherwise, returns all mappings
+ * corresponding to the given line and either the column we are searching for
+ * or the next closest column that has any offsets.
+ *
+ * The only argument is an object with the following properties:
+ *
+ *   - source: The filename of the original source.
+ *   - line: The line number in the original source.  The line number is 1-based.
+ *   - column: Optional. the column number in the original source.
+ *    The column number is 0-based.
+ *
+ * and an array of objects is returned, each with the following properties:
+ *
+ *   - line: The line number in the generated source, or null.  The
+ *    line number is 1-based.
+ *   - column: The column number in the generated source, or null.
+ *    The column number is 0-based.
+ */
+
+
+SourceMapConsumer.prototype.allGeneratedPositionsFor = function SourceMapConsumer_allGeneratedPositionsFor(aArgs) {
+  var line = util$1.getArg(aArgs, 'line'); // When there is no exact match, BasicSourceMapConsumer.prototype._findMapping
+  // returns the index of the closest mapping less than the needle. By
+  // setting needle.originalColumn to 0, we thus find the last mapping for
+  // the given line, provided such a mapping exists.
+
+  var needle = {
+    source: util$1.getArg(aArgs, 'source'),
+    originalLine: line,
+    originalColumn: util$1.getArg(aArgs, 'column', 0)
+  };
+  needle.source = this._findSourceIndex(needle.source);
+
+  if (needle.source < 0) {
+    return [];
+  }
+
+  var mappings = [];
+
+  var index = this._findMapping(needle, this._originalMappings, "originalLine", "originalColumn", util$1.compareByOriginalPositions, binarySearch.LEAST_UPPER_BOUND);
+
+  if (index >= 0) {
+    var mapping = this._originalMappings[index];
+
+    if (aArgs.column === undefined) {
+      var originalLine = mapping.originalLine; // Iterate until either we run out of mappings, or we run into
+      // a mapping for a different line than the one we found. Since
+      // mappings are sorted, this is guaranteed to find all mappings for
+      // the line we found.
+
+      while (mapping && mapping.originalLine === originalLine) {
+        mappings.push({
+          line: util$1.getArg(mapping, 'generatedLine', null),
+          column: util$1.getArg(mapping, 'generatedColumn', null),
+          lastColumn: util$1.getArg(mapping, 'lastGeneratedColumn', null)
         });
-        logger$1.log('internal queue:', out);
-    }
-    add(theThing) {
-        let id = get(theThing, this.idField);
-        if (this.thingsById[id]) {
-            this.remove(theThing);
-        }
-        this.thingsById[id] = theThing;
-        for (let f in this.groupByFields) {
-            let fieldPath = this.groupByFields[f];
-            let value = get(theThing, fieldPath);
-            if (!this.groups[fieldPath][value]) {
-                this.groups[fieldPath][value] = [];
-            }
-            this.groups[fieldPath][value].push(id);
-        }
-        let nodeInfo = new LRUInfo(id);
-        this.nodeInfoById.set(id, nodeInfo);
-        this._markUsed(nodeInfo);
-        this._enforceLimit();
-    }
-    remove(theThing) {
-        let id = get(theThing, this.idField);
-        if (!this.thingsById[id]) {
-            throw new Error("Thing not in collection! -> " + id);
-        }
-        else {
-            delete this.thingsById[id];
-            let nodeInfo = this.nodeInfoById.get(id);
-            if (!nodeInfo) {
-                throw new Error("Thing not in collection! -> " + id);
-            }
-            if (nodeInfo.newer) {
-                let newerNode = nodeInfo.newer;
-                newerNode.older = nodeInfo.older;
-            }
-            if (nodeInfo.older) {
-                let olderNode = nodeInfo.older;
-                olderNode.newer = nodeInfo.newer;
-            }
-            if (nodeInfo.id == this.head.id) {
-                this.head = nodeInfo.older;
-            }
-            if (nodeInfo.id == this.tail.id) {
-                this.tail = nodeInfo.newer;
-            }
-            this.nodeInfoById.delete(id);
-            for (let f in this.groupByFields) {
-                let fieldPath = this.groupByFields[f];
-                let value = get(theThing, fieldPath);
-                if (this.groups[fieldPath][value]) {
-                    this.groups[fieldPath][value] = this.groups[fieldPath][value].filter((thisId) => id == thisId);
-                }
-                else {
-                    logger$1.log("grouping error:", fieldPath, value, Object.keys(this.groups[fieldPath]));
-                    throw new Error("Object for removal isn't in all groupings.. I broke something, I'm sorry.");
-                }
-            }
-        }
-    }
-    hasId(id) {
-        let has = !!this.thingsById[id];
-        return has;
-    }
-    has(aThing) {
-        let id = get(aThing, this.idField);
-        let has = this.thingsById[id] != undefined;
-        if (has) {
-            this.nodeInfoById.get(id);
-        }
-        return has;
-    }
-    getAll() {
-        return Object.values(this.thingsById);
-    }
-    getById(id) {
-        if (!this.thingsById[id]) {
-            return false;
-        }
-        let info = this.nodeInfoById.get(id);
-        if (info)
-            this._markUsed(info);
-        return this.thingsById[id];
-    }
-    getGroupWithValue(fieldPath, value) {
-        let group = this.getGroup(fieldPath);
-        if (!group[value]) {
-            return false;
-        }
-        return group[value];
-    }
-    getGroup(fieldPath) {
-        if (this.groupByFields.indexOf(fieldPath) == -1) {
-            throw new Error("there's no grouping by this field:" + fieldPath);
-        }
-        return this.groups[fieldPath];
-    }
-    serialize() {
-        let arr = [];
-        arr.push(this.idField);
-        arr.push(this.limits.join("Œ"));
-        arr = arr.concat(this.groupByFields);
-        arr.push(false);
-        let numSerialized = 0;
-        let currLimitIndex = 0;
-        this.forEach((thing) => {
-            if (currLimitIndex >= (this.limits.length - 1)) {
-                return;
-            }
-            let serialized = thing.serialize(currLimitIndex + 1);
-            arr.push(serialized);
-            numSerialized++;
-            let currLimit = this.limits[currLimitIndex];
-            while (currLimit && numSerialized >= currLimit) {
-                currLimit = this.limits[currLimitIndex];
-                currLimitIndex++;
-                logger$1.log("next limit", currLimitIndex + 1, "/", this.limits.length, "for serializing", this.limits[currLimitIndex - 1]);
-                if (currLimitIndex >= (this.limits.length - 1)) {
-                    logger$1.log("not serializing anymore", numSerialized);
-                    return;
-                }
-            }
+        mapping = this._originalMappings[++index];
+      }
+    } else {
+      var originalColumn = mapping.originalColumn; // Iterate until either we run out of mappings, or we run into
+      // a mapping for a different line than the one we were searching for.
+      // Since mappings are sorted, this is guaranteed to find all mappings for
+      // the line we are searching for.
+
+      while (mapping && mapping.originalLine === line && mapping.originalColumn == originalColumn) {
+        mappings.push({
+          line: util$1.getArg(mapping, 'generatedLine', null),
+          column: util$1.getArg(mapping, 'generatedColumn', null),
+          lastColumn: util$1.getArg(mapping, 'lastGeneratedColumn', null)
         });
-        return this.serializeSeperator + arr.join(this.serializeSeperator);
+        mapping = this._originalMappings[++index];
+      }
     }
-    static deserialize(str, thingClass) {
-        logger$1.log("deserializin");
-        if (!str) {
-            throw new Error("wtf are you doin bro");
+  }
+
+  return mappings;
+};
+/**
+ * A BasicSourceMapConsumer instance represents a parsed source map which we can
+ * query for information about the original file positions by giving it a file
+ * position in the generated source.
+ *
+ * The first parameter is the raw source map (either as a JSON string, or
+ * already parsed to an object). According to the spec, source maps have the
+ * following attributes:
+ *
+ *   - version: Which version of the source map spec this map is following.
+ *   - sources: An array of URLs to the original source files.
+ *   - names: An array of identifiers which can be referrenced by individual mappings.
+ *   - sourceRoot: Optional. The URL root from which all sources are relative.
+ *   - sourcesContent: Optional. An array of contents of the original source files.
+ *   - mappings: A string of base64 VLQs which contain the actual mappings.
+ *   - file: Optional. The generated file this source map is associated with.
+ *
+ * Here is an example source map, taken from the source map spec[0]:
+ *
+ *     {
+ *       version : 3,
+ *       file: "out.js",
+ *       sourceRoot : "",
+ *       sources: ["foo.js", "bar.js"],
+ *       names: ["src", "maps", "are", "fun"],
+ *       mappings: "AA,AB;;ABCDE;"
+ *     }
+ *
+ * The second parameter, if given, is a string whose value is the URL
+ * at which the source map was found.  This URL is used to compute the
+ * sources array.
+ *
+ * [0]: https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit?pli=1#
+ */
+
+function BasicSourceMapConsumer(aSourceMap, aSourceMapURL) {
+  var sourceMap = aSourceMap;
+
+  if (typeof aSourceMap === 'string') {
+    sourceMap = util$1.parseSourceMapInput(aSourceMap);
+  }
+
+  var version = util$1.getArg(sourceMap, 'version');
+  var sources = util$1.getArg(sourceMap, 'sources'); // Sass 3.3 leaves out the 'names' array, so we deviate from the spec (which
+  // requires the array) to play nice here.
+
+  var names = util$1.getArg(sourceMap, 'names', []);
+  var sourceRoot = util$1.getArg(sourceMap, 'sourceRoot', null);
+  var sourcesContent = util$1.getArg(sourceMap, 'sourcesContent', null);
+  var mappings = util$1.getArg(sourceMap, 'mappings');
+  var file = util$1.getArg(sourceMap, 'file', null); // Once again, Sass deviates from the spec and supplies the version as a
+  // string rather than a number, so we use loose equality checking here.
+
+  if (version != this._version) {
+    throw new Error('Unsupported version: ' + version);
+  }
+
+  if (sourceRoot) {
+    sourceRoot = util$1.normalize(sourceRoot);
+  }
+
+  sources = sources.map(String) // Some source maps produce relative source paths like "./foo.js" instead of
+  // "foo.js".  Normalize these first so that future comparisons will succeed.
+  // See bugzil.la/1090768.
+  .map(util$1.normalize) // Always ensure that absolute sources are internally stored relative to
+  // the source root, if the source root is absolute. Not doing this would
+  // be particularly problematic when the source root is a prefix of the
+  // source (valid, but why??). See github issue #199 and bugzil.la/1188982.
+  .map(function (source) {
+    return sourceRoot && util$1.isAbsolute(sourceRoot) && util$1.isAbsolute(source) ? util$1.relative(sourceRoot, source) : source;
+  }); // Pass `true` below to allow duplicate names and sources. While source maps
+  // are intended to be compressed and deduplicated, the TypeScript compiler
+  // sometimes generates source maps with duplicates in them. See Github issue
+  // #72 and bugzil.la/889492.
+
+  this._names = ArraySet.fromArray(names.map(String), true);
+  this._sources = ArraySet.fromArray(sources, true);
+  this._absoluteSources = this._sources.toArray().map(function (s) {
+    return util$1.computeSourceURL(sourceRoot, s, aSourceMapURL);
+  });
+  this.sourceRoot = sourceRoot;
+  this.sourcesContent = sourcesContent;
+  this._mappings = mappings;
+  this._sourceMapURL = aSourceMapURL;
+  this.file = file;
+}
+
+BasicSourceMapConsumer.prototype = Object.create(SourceMapConsumer.prototype);
+BasicSourceMapConsumer.prototype.consumer = SourceMapConsumer;
+/**
+ * Utility function to find the index of a source.  Returns -1 if not
+ * found.
+ */
+
+BasicSourceMapConsumer.prototype._findSourceIndex = function (aSource) {
+  var relativeSource = aSource;
+
+  if (this.sourceRoot != null) {
+    relativeSource = util$1.relative(this.sourceRoot, relativeSource);
+  }
+
+  if (this._sources.has(relativeSource)) {
+    return this._sources.indexOf(relativeSource);
+  } // Maybe aSource is an absolute URL as returned by |sources|.  In
+  // this case we can't simply undo the transform.
+
+
+  var i;
+
+  for (i = 0; i < this._absoluteSources.length; ++i) {
+    if (this._absoluteSources[i] == aSource) {
+      return i;
+    }
+  }
+
+  return -1;
+};
+/**
+ * Create a BasicSourceMapConsumer from a SourceMapGenerator.
+ *
+ * @param SourceMapGenerator aSourceMap
+ *        The source map that will be consumed.
+ * @param String aSourceMapURL
+ *        The URL at which the source map can be found (optional)
+ * @returns BasicSourceMapConsumer
+ */
+
+
+BasicSourceMapConsumer.fromSourceMap = function SourceMapConsumer_fromSourceMap(aSourceMap, aSourceMapURL) {
+  var smc = Object.create(BasicSourceMapConsumer.prototype);
+  var names = smc._names = ArraySet.fromArray(aSourceMap._names.toArray(), true);
+  var sources = smc._sources = ArraySet.fromArray(aSourceMap._sources.toArray(), true);
+  smc.sourceRoot = aSourceMap._sourceRoot;
+  smc.sourcesContent = aSourceMap._generateSourcesContent(smc._sources.toArray(), smc.sourceRoot);
+  smc.file = aSourceMap._file;
+  smc._sourceMapURL = aSourceMapURL;
+  smc._absoluteSources = smc._sources.toArray().map(function (s) {
+    return util$1.computeSourceURL(smc.sourceRoot, s, aSourceMapURL);
+  }); // Because we are modifying the entries (by converting string sources and
+  // names to indices into the sources and names ArraySets), we have to make
+  // a copy of the entry or else bad things happen. Shared mutable state
+  // strikes again! See github issue #191.
+
+  var generatedMappings = aSourceMap._mappings.toArray().slice();
+
+  var destGeneratedMappings = smc.__generatedMappings = [];
+  var destOriginalMappings = smc.__originalMappings = [];
+
+  for (var i = 0, length = generatedMappings.length; i < length; i++) {
+    var srcMapping = generatedMappings[i];
+    var destMapping = new Mapping();
+    destMapping.generatedLine = srcMapping.generatedLine;
+    destMapping.generatedColumn = srcMapping.generatedColumn;
+
+    if (srcMapping.source) {
+      destMapping.source = sources.indexOf(srcMapping.source);
+      destMapping.originalLine = srcMapping.originalLine;
+      destMapping.originalColumn = srcMapping.originalColumn;
+
+      if (srcMapping.name) {
+        destMapping.name = names.indexOf(srcMapping.name);
+      }
+
+      destOriginalMappings.push(destMapping);
+    }
+
+    destGeneratedMappings.push(destMapping);
+  }
+
+  quickSort(smc.__originalMappings, util$1.compareByOriginalPositions);
+  return smc;
+};
+/**
+ * The version of the source mapping spec that we are consuming.
+ */
+
+
+BasicSourceMapConsumer.prototype._version = 3;
+/**
+ * The list of original sources.
+ */
+
+Object.defineProperty(BasicSourceMapConsumer.prototype, 'sources', {
+  get: function () {
+    return this._absoluteSources.slice();
+  }
+});
+/**
+ * Provide the JIT with a nice shape / hidden class.
+ */
+
+function Mapping() {
+  this.generatedLine = 0;
+  this.generatedColumn = 0;
+  this.source = null;
+  this.originalLine = null;
+  this.originalColumn = null;
+  this.name = null;
+}
+/**
+ * Parse the mappings in a string in to a data structure which we can easily
+ * query (the ordered arrays in the `this.__generatedMappings` and
+ * `this.__originalMappings` properties).
+ */
+
+
+BasicSourceMapConsumer.prototype._parseMappings = function SourceMapConsumer_parseMappings(aStr, aSourceRoot) {
+  var generatedLine = 1;
+  var previousGeneratedColumn = 0;
+  var previousOriginalLine = 0;
+  var previousOriginalColumn = 0;
+  var previousSource = 0;
+  var previousName = 0;
+  var length = aStr.length;
+  var index = 0;
+  var cachedSegments = {};
+  var temp = {};
+  var originalMappings = [];
+  var generatedMappings = [];
+  var mapping, str, segment, end, value;
+
+  while (index < length) {
+    if (aStr.charAt(index) === ';') {
+      generatedLine++;
+      index++;
+      previousGeneratedColumn = 0;
+    } else if (aStr.charAt(index) === ',') {
+      index++;
+    } else {
+      mapping = new Mapping();
+      mapping.generatedLine = generatedLine; // Because each offset is encoded relative to the previous one,
+      // many segments often have the same encoding. We can exploit this
+      // fact by caching the parsed variable length fields of each segment,
+      // allowing us to avoid a second parse if we encounter the same
+      // segment again.
+
+      for (end = index; end < length; end++) {
+        if (this._charIsMappingSeparator(aStr, end)) {
+          break;
         }
-        let seperator = str.slice(0, 1);
-        str = str.substr(1);
-        logger$1.log("deserialize", seperator, str);
-        let arr = str.split(seperator);
-        let idField = arr.shift();
-        let limitStr = arr.shift();
-        let limits = [];
-        if (limitStr) {
-            limits = limitStr.split("Œ");
+      }
+
+      str = aStr.slice(index, end);
+      segment = cachedSegments[str];
+
+      if (segment) {
+        index += str.length;
+      } else {
+        segment = [];
+
+        while (index < end) {
+          base64VLQ.decode(aStr, index, temp);
+          value = temp.value;
+          index = temp.rest;
+          segment.push(value);
         }
-        let groups = [];
-        let group = true;
-        while (group != "false") {
-            group = arr.shift() || false;
-            if (typeof group == "string" && group != "false")
-                groups.push(group);
+
+        if (segment.length === 2) {
+          throw new Error('Found a source, but no line and column');
         }
-        let inst = new IndexingCollection(idField, groups, limits);
-        inst.serializeSeperator = seperator;
-        arr = arr.reverse();
-        for (let i in arr) {
-            let itemObj = arr[i];
-            let item = thingClass.deserialize(itemObj);
-            inst.add(item);
+
+        if (segment.length === 3) {
+          throw new Error('Found a source and line, but no column');
         }
-        return inst;
+
+        cachedSegments[str] = segment;
+      } // Generated column.
+
+
+      mapping.generatedColumn = previousGeneratedColumn + segment[0];
+      previousGeneratedColumn = mapping.generatedColumn;
+
+      if (segment.length > 1) {
+        // Original source.
+        mapping.source = previousSource + segment[1];
+        previousSource += segment[1]; // Original line.
+
+        mapping.originalLine = previousOriginalLine + segment[2];
+        previousOriginalLine = mapping.originalLine; // Lines are stored 0-based
+
+        mapping.originalLine += 1; // Original column.
+
+        mapping.originalColumn = previousOriginalColumn + segment[3];
+        previousOriginalColumn = mapping.originalColumn;
+
+        if (segment.length > 4) {
+          // Original name.
+          mapping.name = previousName + segment[4];
+          previousName += segment[4];
+        }
+      }
+
+      generatedMappings.push(mapping);
+
+      if (typeof mapping.originalLine === 'number') {
+        originalMappings.push(mapping);
+      }
+    }
+  }
+
+  quickSort(generatedMappings, util$1.compareByGeneratedPositionsDeflated);
+  this.__generatedMappings = generatedMappings;
+  quickSort(originalMappings, util$1.compareByOriginalPositions);
+  this.__originalMappings = originalMappings;
+};
+/**
+ * Find the mapping that best matches the hypothetical "needle" mapping that
+ * we are searching for in the given "haystack" of mappings.
+ */
+
+
+BasicSourceMapConsumer.prototype._findMapping = function SourceMapConsumer_findMapping(aNeedle, aMappings, aLineName, aColumnName, aComparator, aBias) {
+  // To return the position we are searching for, we must first find the
+  // mapping for the given position and then return the opposite position it
+  // points to. Because the mappings are sorted, we can use binary search to
+  // find the best mapping.
+  if (aNeedle[aLineName] <= 0) {
+    throw new TypeError('Line must be greater than or equal to 1, got ' + aNeedle[aLineName]);
+  }
+
+  if (aNeedle[aColumnName] < 0) {
+    throw new TypeError('Column must be greater than or equal to 0, got ' + aNeedle[aColumnName]);
+  }
+
+  return binarySearch.search(aNeedle, aMappings, aComparator, aBias);
+};
+/**
+ * Compute the last column for each generated mapping. The last column is
+ * inclusive.
+ */
+
+
+BasicSourceMapConsumer.prototype.computeColumnSpans = function SourceMapConsumer_computeColumnSpans() {
+  for (var index = 0; index < this._generatedMappings.length; ++index) {
+    var mapping = this._generatedMappings[index]; // Mappings do not contain a field for the last generated columnt. We
+    // can come up with an optimistic estimate, however, by assuming that
+    // mappings are contiguous (i.e. given two consecutive mappings, the
+    // first mapping ends where the second one starts).
+
+    if (index + 1 < this._generatedMappings.length) {
+      var nextMapping = this._generatedMappings[index + 1];
+
+      if (mapping.generatedLine === nextMapping.generatedLine) {
+        mapping.lastGeneratedColumn = nextMapping.generatedColumn - 1;
+        continue;
+      }
+    } // The last mapping for each line spans the entire line.
+
+
+    mapping.lastGeneratedColumn = Infinity;
+  }
+};
+/**
+ * Returns the original source, line, and column information for the generated
+ * source's line and column positions provided. The only argument is an object
+ * with the following properties:
+ *
+ *   - line: The line number in the generated source.  The line number
+ *     is 1-based.
+ *   - column: The column number in the generated source.  The column
+ *     number is 0-based.
+ *   - bias: Either 'SourceMapConsumer.GREATEST_LOWER_BOUND' or
+ *     'SourceMapConsumer.LEAST_UPPER_BOUND'. Specifies whether to return the
+ *     closest element that is smaller than or greater than the one we are
+ *     searching for, respectively, if the exact element cannot be found.
+ *     Defaults to 'SourceMapConsumer.GREATEST_LOWER_BOUND'.
+ *
+ * and an object is returned with the following properties:
+ *
+ *   - source: The original source file, or null.
+ *   - line: The line number in the original source, or null.  The
+ *     line number is 1-based.
+ *   - column: The column number in the original source, or null.  The
+ *     column number is 0-based.
+ *   - name: The original identifier, or null.
+ */
+
+
+BasicSourceMapConsumer.prototype.originalPositionFor = function SourceMapConsumer_originalPositionFor(aArgs) {
+  var needle = {
+    generatedLine: util$1.getArg(aArgs, 'line'),
+    generatedColumn: util$1.getArg(aArgs, 'column')
+  };
+
+  var index = this._findMapping(needle, this._generatedMappings, "generatedLine", "generatedColumn", util$1.compareByGeneratedPositionsDeflated, util$1.getArg(aArgs, 'bias', SourceMapConsumer.GREATEST_LOWER_BOUND));
+
+  if (index >= 0) {
+    var mapping = this._generatedMappings[index];
+
+    if (mapping.generatedLine === needle.generatedLine) {
+      var source = util$1.getArg(mapping, 'source', null);
+
+      if (source !== null) {
+        source = this._sources.at(source);
+        source = util$1.computeSourceURL(this.sourceRoot, source, this._sourceMapURL);
+      }
+
+      var name = util$1.getArg(mapping, 'name', null);
+
+      if (name !== null) {
+        name = this._names.at(name);
+      }
+
+      return {
+        source: source,
+        line: util$1.getArg(mapping, 'originalLine', null),
+        column: util$1.getArg(mapping, 'originalColumn', null),
+        name: name
+      };
+    }
+  }
+
+  return {
+    source: null,
+    line: null,
+    column: null,
+    name: null
+  };
+};
+/**
+ * Return true if we have the source content for every source in the source
+ * map, false otherwise.
+ */
+
+
+BasicSourceMapConsumer.prototype.hasContentsOfAllSources = function BasicSourceMapConsumer_hasContentsOfAllSources() {
+  if (!this.sourcesContent) {
+    return false;
+  }
+
+  return this.sourcesContent.length >= this._sources.size() && !this.sourcesContent.some(function (sc) {
+    return sc == null;
+  });
+};
+/**
+ * Returns the original source content. The only argument is the url of the
+ * original source file. Returns null if no original source content is
+ * available.
+ */
+
+
+BasicSourceMapConsumer.prototype.sourceContentFor = function SourceMapConsumer_sourceContentFor(aSource, nullOnMissing) {
+  if (!this.sourcesContent) {
+    return null;
+  }
+
+  var index = this._findSourceIndex(aSource);
+
+  if (index >= 0) {
+    return this.sourcesContent[index];
+  }
+
+  var relativeSource = aSource;
+
+  if (this.sourceRoot != null) {
+    relativeSource = util$1.relative(this.sourceRoot, relativeSource);
+  }
+
+  var url;
+
+  if (this.sourceRoot != null && (url = util$1.urlParse(this.sourceRoot))) {
+    // XXX: file:// URIs and absolute paths lead to unexpected behavior for
+    // many users. We can help them out when they expect file:// URIs to
+    // behave like it would if they were running a local HTTP server. See
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=885597.
+    var fileUriAbsPath = relativeSource.replace(/^file:\/\//, "");
+
+    if (url.scheme == "file" && this._sources.has(fileUriAbsPath)) {
+      return this.sourcesContent[this._sources.indexOf(fileUriAbsPath)];
+    }
+
+    if ((!url.path || url.path == "/") && this._sources.has("/" + relativeSource)) {
+      return this.sourcesContent[this._sources.indexOf("/" + relativeSource)];
+    }
+  } // This function is used recursively from
+  // IndexedSourceMapConsumer.prototype.sourceContentFor. In that case, we
+  // don't want to throw if we can't find the source - we just want to
+  // return null, so we provide a flag to exit gracefully.
+
+
+  if (nullOnMissing) {
+    return null;
+  } else {
+    throw new Error('"' + relativeSource + '" is not in the SourceMap.');
+  }
+};
+/**
+ * Returns the generated line and column information for the original source,
+ * line, and column positions provided. The only argument is an object with
+ * the following properties:
+ *
+ *   - source: The filename of the original source.
+ *   - line: The line number in the original source.  The line number
+ *     is 1-based.
+ *   - column: The column number in the original source.  The column
+ *     number is 0-based.
+ *   - bias: Either 'SourceMapConsumer.GREATEST_LOWER_BOUND' or
+ *     'SourceMapConsumer.LEAST_UPPER_BOUND'. Specifies whether to return the
+ *     closest element that is smaller than or greater than the one we are
+ *     searching for, respectively, if the exact element cannot be found.
+ *     Defaults to 'SourceMapConsumer.GREATEST_LOWER_BOUND'.
+ *
+ * and an object is returned with the following properties:
+ *
+ *   - line: The line number in the generated source, or null.  The
+ *     line number is 1-based.
+ *   - column: The column number in the generated source, or null.
+ *     The column number is 0-based.
+ */
+
+
+BasicSourceMapConsumer.prototype.generatedPositionFor = function SourceMapConsumer_generatedPositionFor(aArgs) {
+  var source = util$1.getArg(aArgs, 'source');
+  source = this._findSourceIndex(source);
+
+  if (source < 0) {
+    return {
+      line: null,
+      column: null,
+      lastColumn: null
+    };
+  }
+
+  var needle = {
+    source: source,
+    originalLine: util$1.getArg(aArgs, 'line'),
+    originalColumn: util$1.getArg(aArgs, 'column')
+  };
+
+  var index = this._findMapping(needle, this._originalMappings, "originalLine", "originalColumn", util$1.compareByOriginalPositions, util$1.getArg(aArgs, 'bias', SourceMapConsumer.GREATEST_LOWER_BOUND));
+
+  if (index >= 0) {
+    var mapping = this._originalMappings[index];
+
+    if (mapping.source === needle.source) {
+      return {
+        line: util$1.getArg(mapping, 'generatedLine', null),
+        column: util$1.getArg(mapping, 'generatedColumn', null),
+        lastColumn: util$1.getArg(mapping, 'lastGeneratedColumn', null)
+      };
+    }
+  }
+
+  return {
+    line: null,
+    column: null,
+    lastColumn: null
+  };
+};
+/**
+ * An IndexedSourceMapConsumer instance represents a parsed source map which
+ * we can query for information. It differs from BasicSourceMapConsumer in
+ * that it takes "indexed" source maps (i.e. ones with a "sections" field) as
+ * input.
+ *
+ * The first parameter is a raw source map (either as a JSON string, or already
+ * parsed to an object). According to the spec for indexed source maps, they
+ * have the following attributes:
+ *
+ *   - version: Which version of the source map spec this map is following.
+ *   - file: Optional. The generated file this source map is associated with.
+ *   - sections: A list of section definitions.
+ *
+ * Each value under the "sections" field has two fields:
+ *   - offset: The offset into the original specified at which this section
+ *       begins to apply, defined as an object with a "line" and "column"
+ *       field.
+ *   - map: A source map definition. This source map could also be indexed,
+ *       but doesn't have to be.
+ *
+ * Instead of the "map" field, it's also possible to have a "url" field
+ * specifying a URL to retrieve a source map from, but that's currently
+ * unsupported.
+ *
+ * Here's an example source map, taken from the source map spec[0], but
+ * modified to omit a section which uses the "url" field.
+ *
+ *  {
+ *    version : 3,
+ *    file: "app.js",
+ *    sections: [{
+ *      offset: {line:100, column:10},
+ *      map: {
+ *        version : 3,
+ *        file: "section.js",
+ *        sources: ["foo.js", "bar.js"],
+ *        names: ["src", "maps", "are", "fun"],
+ *        mappings: "AAAA,E;;ABCDE;"
+ *      }
+ *    }],
+ *  }
+ *
+ * The second parameter, if given, is a string whose value is the URL
+ * at which the source map was found.  This URL is used to compute the
+ * sources array.
+ *
+ * [0]: https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit#heading=h.535es3xeprgt
+ */
+
+function IndexedSourceMapConsumer(aSourceMap, aSourceMapURL) {
+  var sourceMap = aSourceMap;
+
+  if (typeof aSourceMap === 'string') {
+    sourceMap = util$1.parseSourceMapInput(aSourceMap);
+  }
+
+  var version = util$1.getArg(sourceMap, 'version');
+  var sections = util$1.getArg(sourceMap, 'sections');
+
+  if (version != this._version) {
+    throw new Error('Unsupported version: ' + version);
+  }
+
+  this._sources = new ArraySet();
+  this._names = new ArraySet();
+  var lastOffset = {
+    line: -1,
+    column: 0
+  };
+  this._sections = sections.map(function (s) {
+    if (s.url) {
+      // The url field will require support for asynchronicity.
+      // See https://github.com/mozilla/source-map/issues/16
+      throw new Error('Support for url field in sections not implemented.');
+    }
+
+    var offset = util$1.getArg(s, 'offset');
+    var offsetLine = util$1.getArg(offset, 'line');
+    var offsetColumn = util$1.getArg(offset, 'column');
+
+    if (offsetLine < lastOffset.line || offsetLine === lastOffset.line && offsetColumn < lastOffset.column) {
+      throw new Error('Section offsets must be ordered and non-overlapping.');
+    }
+
+    lastOffset = offset;
+    return {
+      generatedOffset: {
+        // The offset fields are 0-based, but we use 1-based indices when
+        // encoding/decoding from VLQ.
+        generatedLine: offsetLine + 1,
+        generatedColumn: offsetColumn + 1
+      },
+      consumer: new SourceMapConsumer(util$1.getArg(s, 'map'), aSourceMapURL)
+    };
+  });
+}
+
+IndexedSourceMapConsumer.prototype = Object.create(SourceMapConsumer.prototype);
+IndexedSourceMapConsumer.prototype.constructor = SourceMapConsumer;
+/**
+ * The version of the source mapping spec that we are consuming.
+ */
+
+IndexedSourceMapConsumer.prototype._version = 3;
+/**
+ * The list of original sources.
+ */
+
+Object.defineProperty(IndexedSourceMapConsumer.prototype, 'sources', {
+  get: function () {
+    var sources = [];
+
+    for (var i = 0; i < this._sections.length; i++) {
+      for (var j = 0; j < this._sections[i].consumer.sources.length; j++) {
+        sources.push(this._sections[i].consumer.sources[j]);
+      }
+    }
+
+    return sources;
+  }
+});
+/**
+ * Returns the original source, line, and column information for the generated
+ * source's line and column positions provided. The only argument is an object
+ * with the following properties:
+ *
+ *   - line: The line number in the generated source.  The line number
+ *     is 1-based.
+ *   - column: The column number in the generated source.  The column
+ *     number is 0-based.
+ *
+ * and an object is returned with the following properties:
+ *
+ *   - source: The original source file, or null.
+ *   - line: The line number in the original source, or null.  The
+ *     line number is 1-based.
+ *   - column: The column number in the original source, or null.  The
+ *     column number is 0-based.
+ *   - name: The original identifier, or null.
+ */
+
+IndexedSourceMapConsumer.prototype.originalPositionFor = function IndexedSourceMapConsumer_originalPositionFor(aArgs) {
+  var needle = {
+    generatedLine: util$1.getArg(aArgs, 'line'),
+    generatedColumn: util$1.getArg(aArgs, 'column')
+  }; // Find the section containing the generated position we're trying to map
+  // to an original position.
+
+  var sectionIndex = binarySearch.search(needle, this._sections, function (needle, section) {
+    var cmp = needle.generatedLine - section.generatedOffset.generatedLine;
+
+    if (cmp) {
+      return cmp;
+    }
+
+    return needle.generatedColumn - section.generatedOffset.generatedColumn;
+  });
+  var section = this._sections[sectionIndex];
+
+  if (!section) {
+    return {
+      source: null,
+      line: null,
+      column: null,
+      name: null
+    };
+  }
+
+  return section.consumer.originalPositionFor({
+    line: needle.generatedLine - (section.generatedOffset.generatedLine - 1),
+    column: needle.generatedColumn - (section.generatedOffset.generatedLine === needle.generatedLine ? section.generatedOffset.generatedColumn - 1 : 0),
+    bias: aArgs.bias
+  });
+};
+/**
+ * Return true if we have the source content for every source in the source
+ * map, false otherwise.
+ */
+
+
+IndexedSourceMapConsumer.prototype.hasContentsOfAllSources = function IndexedSourceMapConsumer_hasContentsOfAllSources() {
+  return this._sections.every(function (s) {
+    return s.consumer.hasContentsOfAllSources();
+  });
+};
+/**
+ * Returns the original source content. The only argument is the url of the
+ * original source file. Returns null if no original source content is
+ * available.
+ */
+
+
+IndexedSourceMapConsumer.prototype.sourceContentFor = function IndexedSourceMapConsumer_sourceContentFor(aSource, nullOnMissing) {
+  for (var i = 0; i < this._sections.length; i++) {
+    var section = this._sections[i];
+    var content = section.consumer.sourceContentFor(aSource, true);
+
+    if (content) {
+      return content;
+    }
+  }
+
+  if (nullOnMissing) {
+    return null;
+  } else {
+    throw new Error('"' + aSource + '" is not in the SourceMap.');
+  }
+};
+/**
+ * Returns the generated line and column information for the original source,
+ * line, and column positions provided. The only argument is an object with
+ * the following properties:
+ *
+ *   - source: The filename of the original source.
+ *   - line: The line number in the original source.  The line number
+ *     is 1-based.
+ *   - column: The column number in the original source.  The column
+ *     number is 0-based.
+ *
+ * and an object is returned with the following properties:
+ *
+ *   - line: The line number in the generated source, or null.  The
+ *     line number is 1-based. 
+ *   - column: The column number in the generated source, or null.
+ *     The column number is 0-based.
+ */
+
+
+IndexedSourceMapConsumer.prototype.generatedPositionFor = function IndexedSourceMapConsumer_generatedPositionFor(aArgs) {
+  for (var i = 0; i < this._sections.length; i++) {
+    var section = this._sections[i]; // Only consider this section if the requested source is in the list of
+    // sources of the consumer.
+
+    if (section.consumer._findSourceIndex(util$1.getArg(aArgs, 'source')) === -1) {
+      continue;
+    }
+
+    var generatedPosition = section.consumer.generatedPositionFor(aArgs);
+
+    if (generatedPosition) {
+      var ret = {
+        line: generatedPosition.line + (section.generatedOffset.generatedLine - 1),
+        column: generatedPosition.column + (section.generatedOffset.generatedLine === generatedPosition.line ? section.generatedOffset.generatedColumn - 1 : 0)
+      };
+      return ret;
+    }
+  }
+
+  return {
+    line: null,
+    column: null
+  };
+};
+/**
+ * Parse the mappings in a string in to a data structure which we can easily
+ * query (the ordered arrays in the `this.__generatedMappings` and
+ * `this.__originalMappings` properties).
+ */
+
+
+IndexedSourceMapConsumer.prototype._parseMappings = function IndexedSourceMapConsumer_parseMappings(aStr, aSourceRoot) {
+  this.__generatedMappings = [];
+  this.__originalMappings = [];
+
+  for (var i = 0; i < this._sections.length; i++) {
+    var section = this._sections[i];
+    var sectionMappings = section.consumer._generatedMappings;
+
+    for (var j = 0; j < sectionMappings.length; j++) {
+      var mapping = sectionMappings[j];
+
+      var source = section.consumer._sources.at(mapping.source);
+
+      source = util$1.computeSourceURL(section.consumer.sourceRoot, source, this._sourceMapURL);
+
+      this._sources.add(source);
+
+      source = this._sources.indexOf(source);
+      var name = null;
+
+      if (mapping.name) {
+        name = section.consumer._names.at(mapping.name);
+
+        this._names.add(name);
+
+        name = this._names.indexOf(name);
+      } // The mappings coming from the consumer for the section have
+      // generated positions relative to the start of the section, so we
+      // need to offset them to be relative to the start of the concatenated
+      // generated file.
+
+
+      var adjustedMapping = {
+        source: source,
+        generatedLine: mapping.generatedLine + (section.generatedOffset.generatedLine - 1),
+        generatedColumn: mapping.generatedColumn + (section.generatedOffset.generatedLine === mapping.generatedLine ? section.generatedOffset.generatedColumn - 1 : 0),
+        originalLine: mapping.originalLine,
+        originalColumn: mapping.originalColumn,
+        name: name
+      };
+
+      this.__generatedMappings.push(adjustedMapping);
+
+      if (typeof adjustedMapping.originalLine === 'number') {
+        this.__originalMappings.push(adjustedMapping);
+      }
+    }
+  }
+
+  quickSort(this.__generatedMappings, util$1.compareByGeneratedPositionsDeflated);
+  quickSort(this.__originalMappings, util$1.compareByOriginalPositions);
+};
+
+/* -*- Mode: js; js-indent-level: 2; -*- */
+/*
+ * Copyright 2011 Mozilla Foundation and contributors
+ * Licensed under the New BSD license. See LICENSE or:
+ * http://opensource.org/licenses/BSD-3-Clause
+ */
+
+var SourceMapGenerator = sourceMapGenerator.SourceMapGenerator;
+var util = util$5; // Matches a Windows-style `\r\n` newline or a `\n` newline used by all other
+// operating systems these days (capturing the result).
+
+var REGEX_NEWLINE = /(\r?\n)/; // Newline character code for charCodeAt() comparisons
+
+var NEWLINE_CODE = 10; // Private symbol for identifying `SourceNode`s when multiple versions of
+// the source-map library are loaded. This MUST NOT CHANGE across
+// versions!
+
+var isSourceNode = "$$$isSourceNode$$$";
+/**
+ * SourceNodes provide a way to abstract over interpolating/concatenating
+ * snippets of generated JavaScript source code while maintaining the line and
+ * column information associated with the original source code.
+ *
+ * @param aLine The original line number.
+ * @param aColumn The original column number.
+ * @param aSource The original source's filename.
+ * @param aChunks Optional. An array of strings which are snippets of
+ *        generated JS, or other SourceNodes.
+ * @param aName The original identifier.
+ */
+
+function SourceNode(aLine, aColumn, aSource, aChunks, aName) {
+  this.children = [];
+  this.sourceContents = {};
+  this.line = aLine == null ? null : aLine;
+  this.column = aColumn == null ? null : aColumn;
+  this.source = aSource == null ? null : aSource;
+  this.name = aName == null ? null : aName;
+  this[isSourceNode] = true;
+  if (aChunks != null) this.add(aChunks);
+}
+/**
+ * Creates a SourceNode from generated code and a SourceMapConsumer.
+ *
+ * @param aGeneratedCode The generated code
+ * @param aSourceMapConsumer The SourceMap for the generated code
+ * @param aRelativePath Optional. The path that relative sources in the
+ *        SourceMapConsumer should be relative to.
+ */
+
+
+SourceNode.fromStringWithSourceMap = function SourceNode_fromStringWithSourceMap(aGeneratedCode, aSourceMapConsumer, aRelativePath) {
+  // The SourceNode we want to fill with the generated code
+  // and the SourceMap
+  var node = new SourceNode(); // All even indices of this array are one line of the generated code,
+  // while all odd indices are the newlines between two adjacent lines
+  // (since `REGEX_NEWLINE` captures its match).
+  // Processed fragments are accessed by calling `shiftNextLine`.
+
+  var remainingLines = aGeneratedCode.split(REGEX_NEWLINE);
+  var remainingLinesIndex = 0;
+
+  var shiftNextLine = function () {
+    var lineContents = getNextLine(); // The last line of a file might not have a newline.
+
+    var newLine = getNextLine() || "";
+    return lineContents + newLine;
+
+    function getNextLine() {
+      return remainingLinesIndex < remainingLines.length ? remainingLines[remainingLinesIndex++] : undefined;
+    }
+  }; // We need to remember the position of "remainingLines"
+
+
+  var lastGeneratedLine = 1,
+      lastGeneratedColumn = 0; // The generate SourceNodes we need a code range.
+  // To extract it current and last mapping is used.
+  // Here we store the last mapping.
+
+  var lastMapping = null;
+  aSourceMapConsumer.eachMapping(function (mapping) {
+    if (lastMapping !== null) {
+      // We add the code from "lastMapping" to "mapping":
+      // First check if there is a new line in between.
+      if (lastGeneratedLine < mapping.generatedLine) {
+        // Associate first line with "lastMapping"
+        addMappingWithCode(lastMapping, shiftNextLine());
+        lastGeneratedLine++;
+        lastGeneratedColumn = 0; // The remaining code is added without mapping
+      } else {
+        // There is no new line in between.
+        // Associate the code between "lastGeneratedColumn" and
+        // "mapping.generatedColumn" with "lastMapping"
+        var nextLine = remainingLines[remainingLinesIndex] || '';
+        var code = nextLine.substr(0, mapping.generatedColumn - lastGeneratedColumn);
+        remainingLines[remainingLinesIndex] = nextLine.substr(mapping.generatedColumn - lastGeneratedColumn);
+        lastGeneratedColumn = mapping.generatedColumn;
+        addMappingWithCode(lastMapping, code); // No more remaining code, continue
+
+        lastMapping = mapping;
+        return;
+      }
+    } // We add the generated code until the first mapping
+    // to the SourceNode without any mapping.
+    // Each line is added as separate string.
+
+
+    while (lastGeneratedLine < mapping.generatedLine) {
+      node.add(shiftNextLine());
+      lastGeneratedLine++;
+    }
+
+    if (lastGeneratedColumn < mapping.generatedColumn) {
+      var nextLine = remainingLines[remainingLinesIndex] || '';
+      node.add(nextLine.substr(0, mapping.generatedColumn));
+      remainingLines[remainingLinesIndex] = nextLine.substr(mapping.generatedColumn);
+      lastGeneratedColumn = mapping.generatedColumn;
+    }
+
+    lastMapping = mapping;
+  }, this); // We have processed all mappings.
+
+  if (remainingLinesIndex < remainingLines.length) {
+    if (lastMapping) {
+      // Associate the remaining code in the current line with "lastMapping"
+      addMappingWithCode(lastMapping, shiftNextLine());
+    } // and add the remaining lines without any mapping
+
+
+    node.add(remainingLines.splice(remainingLinesIndex).join(""));
+  } // Copy sourcesContent into SourceNode
+
+
+  aSourceMapConsumer.sources.forEach(function (sourceFile) {
+    var content = aSourceMapConsumer.sourceContentFor(sourceFile);
+
+    if (content != null) {
+      if (aRelativePath != null) {
+        sourceFile = util.join(aRelativePath, sourceFile);
+      }
+
+      node.setSourceContent(sourceFile, content);
+    }
+  });
+  return node;
+
+  function addMappingWithCode(mapping, code) {
+    if (mapping === null || mapping.source === undefined) {
+      node.add(code);
+    } else {
+      var source = aRelativePath ? util.join(aRelativePath, mapping.source) : mapping.source;
+      node.add(new SourceNode(mapping.originalLine, mapping.originalColumn, source, code, mapping.name));
+    }
+  }
+};
+/**
+ * Add a chunk of generated JS to this source node.
+ *
+ * @param aChunk A string snippet of generated JS code, another instance of
+ *        SourceNode, or an array where each member is one of those things.
+ */
+
+
+SourceNode.prototype.add = function SourceNode_add(aChunk) {
+  if (Array.isArray(aChunk)) {
+    aChunk.forEach(function (chunk) {
+      this.add(chunk);
+    }, this);
+  } else if (aChunk[isSourceNode] || typeof aChunk === "string") {
+    if (aChunk) {
+      this.children.push(aChunk);
+    }
+  } else {
+    throw new TypeError("Expected a SourceNode, string, or an array of SourceNodes and strings. Got " + aChunk);
+  }
+
+  return this;
+};
+/**
+ * Add a chunk of generated JS to the beginning of this source node.
+ *
+ * @param aChunk A string snippet of generated JS code, another instance of
+ *        SourceNode, or an array where each member is one of those things.
+ */
+
+
+SourceNode.prototype.prepend = function SourceNode_prepend(aChunk) {
+  if (Array.isArray(aChunk)) {
+    for (var i = aChunk.length - 1; i >= 0; i--) {
+      this.prepend(aChunk[i]);
+    }
+  } else if (aChunk[isSourceNode] || typeof aChunk === "string") {
+    this.children.unshift(aChunk);
+  } else {
+    throw new TypeError("Expected a SourceNode, string, or an array of SourceNodes and strings. Got " + aChunk);
+  }
+
+  return this;
+};
+/**
+ * Walk over the tree of JS snippets in this node and its children. The
+ * walking function is called once for each snippet of JS and is passed that
+ * snippet and the its original associated source's line/column location.
+ *
+ * @param aFn The traversal function.
+ */
+
+
+SourceNode.prototype.walk = function SourceNode_walk(aFn) {
+  var chunk;
+
+  for (var i = 0, len = this.children.length; i < len; i++) {
+    chunk = this.children[i];
+
+    if (chunk[isSourceNode]) {
+      chunk.walk(aFn);
+    } else {
+      if (chunk !== '') {
+        aFn(chunk, {
+          source: this.source,
+          line: this.line,
+          column: this.column,
+          name: this.name
+        });
+      }
+    }
+  }
+};
+/**
+ * Like `String.prototype.join` except for SourceNodes. Inserts `aStr` between
+ * each of `this.children`.
+ *
+ * @param aSep The separator.
+ */
+
+
+SourceNode.prototype.join = function SourceNode_join(aSep) {
+  var newChildren;
+  var i;
+  var len = this.children.length;
+
+  if (len > 0) {
+    newChildren = [];
+
+    for (i = 0; i < len - 1; i++) {
+      newChildren.push(this.children[i]);
+      newChildren.push(aSep);
+    }
+
+    newChildren.push(this.children[i]);
+    this.children = newChildren;
+  }
+
+  return this;
+};
+/**
+ * Call String.prototype.replace on the very right-most source snippet. Useful
+ * for trimming whitespace from the end of a source node, etc.
+ *
+ * @param aPattern The pattern to replace.
+ * @param aReplacement The thing to replace the pattern with.
+ */
+
+
+SourceNode.prototype.replaceRight = function SourceNode_replaceRight(aPattern, aReplacement) {
+  var lastChild = this.children[this.children.length - 1];
+
+  if (lastChild[isSourceNode]) {
+    lastChild.replaceRight(aPattern, aReplacement);
+  } else if (typeof lastChild === 'string') {
+    this.children[this.children.length - 1] = lastChild.replace(aPattern, aReplacement);
+  } else {
+    this.children.push(''.replace(aPattern, aReplacement));
+  }
+
+  return this;
+};
+/**
+ * Set the source content for a source file. This will be added to the SourceMapGenerator
+ * in the sourcesContent field.
+ *
+ * @param aSourceFile The filename of the source file
+ * @param aSourceContent The content of the source file
+ */
+
+
+SourceNode.prototype.setSourceContent = function SourceNode_setSourceContent(aSourceFile, aSourceContent) {
+  this.sourceContents[util.toSetString(aSourceFile)] = aSourceContent;
+};
+/**
+ * Walk over the tree of SourceNodes. The walking function is called for each
+ * source file content and is passed the filename and source content.
+ *
+ * @param aFn The traversal function.
+ */
+
+
+SourceNode.prototype.walkSourceContents = function SourceNode_walkSourceContents(aFn) {
+  for (var i = 0, len = this.children.length; i < len; i++) {
+    if (this.children[i][isSourceNode]) {
+      this.children[i].walkSourceContents(aFn);
+    }
+  }
+
+  var sources = Object.keys(this.sourceContents);
+
+  for (var i = 0, len = sources.length; i < len; i++) {
+    aFn(util.fromSetString(sources[i]), this.sourceContents[sources[i]]);
+  }
+};
+/**
+ * Return the string representation of this source node. Walks over the tree
+ * and concatenates all the various snippets together to one string.
+ */
+
+
+SourceNode.prototype.toString = function SourceNode_toString() {
+  var str = "";
+  this.walk(function (chunk) {
+    str += chunk;
+  });
+  return str;
+};
+/**
+ * Returns the string representation of this source node along with a source
+ * map.
+ */
+
+
+SourceNode.prototype.toStringWithSourceMap = function SourceNode_toStringWithSourceMap(aArgs) {
+  var generated = {
+    code: "",
+    line: 1,
+    column: 0
+  };
+  var map = new SourceMapGenerator(aArgs);
+  var sourceMappingActive = false;
+  var lastOriginalSource = null;
+  var lastOriginalLine = null;
+  var lastOriginalColumn = null;
+  var lastOriginalName = null;
+  this.walk(function (chunk, original) {
+    generated.code += chunk;
+
+    if (original.source !== null && original.line !== null && original.column !== null) {
+      if (lastOriginalSource !== original.source || lastOriginalLine !== original.line || lastOriginalColumn !== original.column || lastOriginalName !== original.name) {
+        map.addMapping({
+          source: original.source,
+          original: {
+            line: original.line,
+            column: original.column
+          },
+          generated: {
+            line: generated.line,
+            column: generated.column
+          },
+          name: original.name
+        });
+      }
+
+      lastOriginalSource = original.source;
+      lastOriginalLine = original.line;
+      lastOriginalColumn = original.column;
+      lastOriginalName = original.name;
+      sourceMappingActive = true;
+    } else if (sourceMappingActive) {
+      map.addMapping({
+        generated: {
+          line: generated.line,
+          column: generated.column
+        }
+      });
+      lastOriginalSource = null;
+      sourceMappingActive = false;
+    }
+
+    for (var idx = 0, length = chunk.length; idx < length; idx++) {
+      if (chunk.charCodeAt(idx) === NEWLINE_CODE) {
+        generated.line++;
+        generated.column = 0; // Mappings end at eol
+
+        if (idx + 1 === length) {
+          lastOriginalSource = null;
+          sourceMappingActive = false;
+        } else if (sourceMappingActive) {
+          map.addMapping({
+            source: original.source,
+            original: {
+              line: original.line,
+              column: original.column
+            },
+            generated: {
+              line: generated.line,
+              column: generated.column
+            },
+            name: original.name
+          });
+        }
+      } else {
+        generated.column++;
+      }
+    }
+  });
+  this.walkSourceContents(function (sourceFile, sourceContent) {
+    map.setSourceContent(sourceFile, sourceContent);
+  });
+  return {
+    code: generated.code,
+    map: map
+  };
+};
+
+({
+    _SOURCE_MAPS_
+});
+
+getSettings();
+
+new logger$1("indexingCollection");
+
+let locationMap = new Map();
+function getLocationId(x, y) {
+    return `${x}-${y}`;
+}
+class Location {
+    constructor(x, y, id) {
+        this._id = id || getLocationId(x, y);
+        this._x = x;
+        this._y = y;
+    }
+    static getLocationFromObj(loc) {
+        return Location.getLocation(loc.x, loc.y);
+    }
+    static getLocation(x, y) {
+        let locId = getLocationId(x, y);
+        if (locationMap.has(locId)) {
+            return locationMap.get(locId);
+        }
+        let location = new Location(x, y);
+        locationMap.set(locId, location);
+        return location;
+    }
+    get id() {
+        return this._id;
+    }
+    get x() {
+        return this._x;
+    }
+    get y() {
+        return this._y;
     }
 }
 
-let logger = new logger$2("objectManager");
-class objectManager {
-    constructor() {
-        this.objects = new IndexingCollection("id", ["type"], [10000, Infinity]);
-    }
-    updateobjects(objects) {
-        for (let object of objects) {
-            if (!this.objects.has(object)) {
-                this.objects.add(object);
-            }
-        }
-    }
-    runobjects() {
-        logger.log("running Objects", this.objects.getAll().length);
-        for (let object of this.objects.getAll()) {
-            this.runobject(object);
-        }
-    }
-    runobject(object) {
-        if (typeof object.run == "function") {
-            object.run();
-        }
-        else {
-            logger.log("object has no run func", object);
-        }
-    }
-}
-
-class planComponent {
-    constructor(id, parent = false) {
-        this.id = id;
-        this.parent = parent;
-    }
-    getParent() {
-        return this.parent;
-    }
-    getRoot() {
-        let root = this;
-        while (root.parent) {
-            root = root.parent;
-        }
-        return root;
-    }
-    serialize() {
-        throw new TypeError("Serialize not implemented");
-    }
-    deserialize(strValue) {
-        throw new TypeError("Serialize not implemented");
-    }
-}
-planComponent.type = "unimplemented";
-let goals = new Map();
-let jobs = new Map();
+new logger$1("util.actions");
 let actions = new Map();
-class baseAction extends planComponent {
-    constructor(id, parent) {
-        super(id, parent);
-        if (actions.has(id)) {
-            throw new TypeError(`ActionId already exists! ${id}`);
-        }
-        actions.set(id, this);
-    }
-    runAction(actor) {
-        throw new TypeError("runAction not implemented");
-    }
-}
-baseAction.type = "baseAction";
-class baseJob extends planComponent {
-    constructor(id, parent) {
-        super(id, parent);
-        if (jobs.has(id)) {
-            throw new TypeError(`JobId already exists! ${id}`);
-        }
-        jobs.set(id, this);
-    }
-    runJob() {
-        throw new TypeError("runJob not implemented");
-    }
-}
-baseJob.type = "baseJob";
-class baseGoal extends planComponent {
-    constructor(id, parent = false) {
-        super(id, parent);
-        if (goals.has(id)) {
-            throw new TypeError(`goalId already exists! ${id}`);
-        }
-        goals.set(id, this);
-    }
-}
-baseGoal.type = "baseGoal";
-
-function getDirectionPos(from, to) {
-    return getDirection(to.x - from.x, to.y - from.y);
-}
-function drawPath(path, color = "#00FF00") {
-    let style = { color: color };
-    var charMap = {};
-    charMap[TOP] = "⬆";
-    charMap[TOP_LEFT] = "↖";
-    charMap[TOP_RIGHT] = "↗";
-    charMap[LEFT] = "⬅";
-    charMap[RIGHT] = "➡";
-    charMap[BOTTOM] = "⬇";
-    charMap[BOTTOM_LEFT] = "↙";
-    charMap[BOTTOM_RIGHT] = "↘";
-    let lastPosition = path[0];
+function findClosestAction(obj, types) {
+    let closestAction = false;
+    let closestActionDist = Infinity;
     let settings = getSettings();
-    for (let position of path) {
-        if (lastPosition == position) {
-            settings.drawText("*", lastPosition, style);
-        }
-        else {
-            let direction = getDirectionPos(lastPosition, position);
-            settings.drawText(charMap[direction], lastPosition, style);
-        }
-        lastPosition = position;
-    }
-}
-let cm;
-let cmTime = 0;
-function addToCMInRange(cm, x_in, y_in, range, cost) {
-    var xStart = x_in - range;
-    var yStart = y_in - range;
-    var xEnd = x_in + range;
-    var yEnd = y_in + range;
-    for (var x = xStart; x < xEnd; x++) {
-        if (x >= 100 || x <= 0)
+    for (let action of actions.values()) {
+        if (!action.canDo(obj)) {
             continue;
-        for (var y = yStart; y < yEnd; y++) {
-            if (y >= 100 || y <= 0)
-                continue;
-            let currentValue = cm.get(x, y);
-            if (currentValue < 255) {
-                let newValue = Math.min(cost + currentValue, 254);
-                cm.set(x, y, newValue);
-            }
         }
-    }
-}
-function getWeightPenalty(x, y) {
-    let tile = getTerrainAt({ x: x, y: y });
-    if (tile === TERRAIN_WALL) {
-        return 20;
-    }
-    else if (tile === TERRAIN_SWAMP) {
-        return 5;
-    }
-    return 0;
-}
-function getSquareCost(x, y) {
-    let penalty = 0;
-    penalty += getWeightPenalty(x + 1, y);
-    penalty += getWeightPenalty(x, y + 1);
-    penalty += getWeightPenalty(x + 1, y + 1);
-    penalty += getWeightPenalty(x - 1, y);
-    penalty += getWeightPenalty(x, y - 1);
-    penalty += getWeightPenalty(x - 1, y - 1);
-    penalty += getWeightPenalty(x + 1, y - 1);
-    penalty += getWeightPenalty(x - 1, y + 1);
-    return penalty;
-}
-function resetCM() {
-    cm = new CostMatrix();
-    for (let y = 0; y < 100; y++) {
-        for (let x = 0; x < 100; x++) {
-            let tile = getTerrainAt({ x: x, y: y });
-            let swamps = 5;
-            let walls = 10;
-            let towerHere = getObjectsByPrototype(StructureTower).filter((t) => t.x == x && t.y == y).length > 0;
-            if (tile === TERRAIN_WALL || towerHere) {
-                cm.set(x, y, 255);
-                addToCMInRange(cm, x, y, 2, walls);
-            }
-            else if (tile === TERRAIN_SWAMP) {
-                addToCMInRange(cm, x, y, 3, swamps);
-            }
-            else ;
-        }
-    }
-    console.log("CM has been reset");
-}
-function getCM() {
-    let settings = getSettings();
-    if (settings.getTick() > (cmTime)) {
-        console.log("resetting CM!", cmTime);
-        resetCM();
-        cmTime = settings.getTick() + 2000;
-    }
-    return cm;
-}
-class Squad {
-    constructor(id, requiredParts, targets = [], creeps = []) {
-        this.targetDistance = 0;
-        this.targetRush = false;
-        this.maxFormationSize_attackers_min = 2;
-        this.maxFormationSize_attackers_max = 3;
-        this.maxFormationSize_ranged_min = 1;
-        this.maxFormationSize_ranged_max = 3;
-        this.maxFormationSize_healers_min = 0;
-        this.maxFormationSize_healers_max = 2;
-        this.retreatingToHeal = false;
-        this.retreating = false;
-        this.lastTarget = false;
-        this.initialWait = true;
-        this.leadSquad = false;
-        this.id = id;
-        this.requirements = requiredParts;
-        this.validTargets = targets;
-        this.targetLocation = { x: -1, y: -1 };
-        this.currentLocation = { x: -1, y: -1 };
-        this.path = false;
-        this.currentPathIndex = 0;
-        this.creeps = [];
-        this.healers = [];
-        this.attackers = [];
-        this.ranged = [];
-        if (creeps) {
-            for (let creep of creeps) {
-                this.addCreep(creep);
-            }
-        }
-    }
-    moveCurrentPositionToAMember() {
-        if (this.attackers.length > 0) {
-            this.currentLocation.x = this.attackers[0].x;
-            this.currentLocation.y = this.attackers[0].y;
-        }
-        if (this.ranged.length > 0) {
-            this.currentLocation.x = this.ranged[0].x;
-            this.currentLocation.y = this.ranged[0].y;
-        }
-        if (this.healers.length > 0) {
-            this.currentLocation.x = this.healers[0].x;
-            this.currentLocation.y = this.healers[0].y;
-        }
-    }
-    reparseCreeps() {
-        let creeps = this.creeps;
-        this.creeps = [];
-        this.healers = [];
-        this.attackers = [];
-        this.ranged = [];
-        if (creeps) {
-            for (let creep of creeps) {
-                this.addCreep(creep);
-            }
-        }
-    }
-    addCreep(creep) {
-        if (!creep.exists) {
-            return;
-        }
-        creep.squadId = this.id;
-        this.creeps.push(creep);
-        if (creep.isHealer()) {
-            this.healers.push(creep);
-        }
-        if (creep.isAttacker()) {
-            this.attackers.push(creep);
-        }
-        if (creep.isRangedAttacker()) {
-            this.ranged.push(creep);
-        }
-    }
-    get inCombat() {
-        let enemyCreeps = getObjectsByPrototype(Creep).filter((c) => !c.my);
-        let squadWidth = Math.max(this.maxFormationSize_attackers_max, this.maxFormationSize_healers_max, this.maxFormationSize_ranged_max);
-        let secondaryTargets = findInRange(this.currentLocation, enemyCreeps, squadWidth);
-        let inCombat = secondaryTargets.length > 1;
-        if (inCombat && !(this.lastTarget instanceof Creep)) {
-            this.moveToClosestTarget();
-        }
-        return inCombat;
-    }
-    get squadInPosition() {
-        if (this.initialWait) {
-            return this.creepsInPosition;
-        }
-        let dist = getRange(this.currentLocation, this.targetLocation);
-        if (dist > this.targetDistance)
-            return false;
-        return true;
-    }
-    creepDistFromPosition(creep, includeDest = false) {
-        let creepDist = getRange(this.currentLocation, creep);
-        if (includeDest) {
-            let creepDistFromTarget = getRange(this.targetLocation, creep);
-            return Math.min(creepDist, creepDistFromTarget);
-        }
-        else {
-            return creepDist;
-        }
-    }
-    creepInPosition(creep, includeDest = false) {
-        let creepDist = this.creepDistFromPosition(creep, includeDest);
-        let squareCost = getSquareCost(this.currentLocation.x, this.currentLocation.y);
-        let extraBuffer = 0;
-        if (squareCost > 20) {
-            extraBuffer = 2;
-        }
-        if (creep.isAttacker() && (creepDist > (this.maxFormationSize_attackers_max + extraBuffer))) {
-            console.log(creep.id, "is out of position!(attacker)", creepDist, this.maxFormationSize_attackers_max, squareCost, extraBuffer);
-            return false;
-        }
-        else if (creep.isRangedAttacker() && (creepDist > (this.maxFormationSize_ranged_max + extraBuffer))) {
-            console.log(creep.id, "is out of position!(ranged)", creepDist, this.maxFormationSize_ranged_max, squareCost, extraBuffer);
-            return false;
-        }
-        else if (creep.isHealer() && (creepDist > (this.maxFormationSize_healers_max + extraBuffer))) {
-            console.log(creep.id, "is out of position!(healer)", creepDist, this.maxFormationSize_healers_max, squareCost, extraBuffer);
-            return false;
-        }
-        return true;
-    }
-    get creepsInPosition() {
-        if (this.inCombat) {
-            return true;
-        }
-        let creepOnLoc = getObjectsByPrototype(Creep).filter(c => c.my && c.x == this.currentLocation.x && c.y == this.currentLocation.y).length > 0;
-        let onLocation = creepOnLoc;
-        for (let creep of this.creeps) {
-            let creepInPosition = this.creepInPosition(creep);
-            if (!creepInPosition) {
-                return false;
-            }
-        }
-        return onLocation;
-    }
-    getClosestTargetToOurFlag() {
-        this.clearInvalidTargets();
-        if (this.validTargets.length == 0) {
-            console.log(this.id, "no targets, so none are close");
-            return false;
-        }
-        let ourFlag = getObjectsByPrototype(Flag).filter((f) => f.my)[0];
-        let closestEnemyCreep = findClosestByRange(this.currentLocation, getObjectsByPrototype(Creep).filter(c => !c.my));
-        let enemyCreepDist = 100;
-        if (closestEnemyCreep)
-            enemyCreepDist = getRange(this.currentLocation, closestEnemyCreep);
-        let closestTarget = findClosestByPath(ourFlag, this.validTargets.filter(t => {
-            if (!(t instanceof Creep) && (enemyCreepDist < 20 || this.lastTarget instanceof Creep)) {
-                return false;
-            }
-            return true;
-        }));
-        if (closestTarget) {
-            return closestTarget;
-        }
-        return false;
-    }
-    getClosestTarget() {
-        this.clearInvalidTargets();
-        if (this.validTargets.length == 0) {
-            console.log(this.id, "no targets, so none are close");
-            return false;
-        }
-        let closestTarget = findClosestByRange(this.currentLocation, this.validTargets);
-        console.log(this.id, "getting closest target", closestTarget.id);
-        if (closestTarget) {
-            return closestTarget;
-        }
-        return false;
-    }
-    moveToClosestTarget() {
-        let settings = getSettings();
-        if (this.retreatingToHeal)
-            return;
-        this.retreating = false;
-        this.retreatingToHeal = false;
-        console.log(this.id, "ct:", this.currentLocation, this.validTargets.length);
-        let closestTarget = this.getClosestTargetToOurFlag();
-        if (!closestTarget) {
-            closestTarget = this.getClosestTarget();
-        }
-        console.log(this.id, 'moving to closest target', closestTarget ? closestTarget.constructor.name : false);
-        if (closestTarget) {
-            if (this.lastTarget instanceof Flag && this.currentLocation.x == this.lastTarget.x && this.currentLocation.y == this.lastTarget.y) {
-                this.moveCurrentPositionToAMember();
-            }
-            this.lastTarget = closestTarget;
-            let targetIsBodyPart = closestTarget instanceof BodyPart;
-            getObjectsByPrototype(Creep).filter(c => !c.my && getRange(c, closestTarget) < 10);
-            let targetIsValidFlag = closestTarget instanceof Flag && (!closestTarget.my || (settings.getTick() < 10));
-            if (targetIsBodyPart) {
-                this.moveCurrentPositionToAMember();
-            }
-            this.assignLocation(closestTarget.x, closestTarget.y, (targetIsBodyPart || targetIsValidFlag) ? 0 : 1);
-        }
-    }
-    assignLocation(x, y, targetDistance = 0, regroup = false, rushTarget = false) {
-        if (this.lastTarget && (this.lastTarget.x != x || this.lastTarget.y != y)) {
-            this.lastTarget = false;
-        }
-        this.path = false;
-        this.currentPathIndex = 0;
-        this.targetLocation.x = x;
-        this.targetLocation.y = y;
-        this.targetDistance = targetDistance;
-        this.targetRush = rushTarget;
-        console.log(this.id, "got loc assigned", x, y, targetDistance);
-        if ((this.currentLocation.x == -1 && this.currentLocation.y == -1) || regroup) {
-            this.currentLocation.x = x;
-            this.currentLocation.y = y;
-        }
-    }
-    assignTarget(target, doNow = false) {
-        if (this.validTargets.includes(target)) {
-            this.validTargets = this.validTargets.filter((t) => t.id != target.id);
-        }
-        if (this.validTargets.length < 100 && !this.validTargets.includes(target)) {
-            this.validTargets.push(target);
-        }
-        if (doNow) {
-            this.lastTarget = target;
-            this.assignLocation(target.x, target.y, 0);
-        }
-        return false;
-    }
-    assignCreep(creep) {
-        let curentHealParts = this.creeps.reduce((acc, creep) => acc + creep.body.filter((part) => part.type == HEAL).length, 0);
-        let curentAttackParts = this.creeps.reduce((acc, creep) => acc + creep.body.filter((part) => part.type == ATTACK).length, 0);
-        let curentRangedParts = this.creeps.reduce((acc, creep) => acc + creep.body.filter((part) => part.type == RANGED_ATTACK).length, 0);
-        let numHealParts = creep.body.filter((part) => part.type == HEAL).length;
-        let numAttackParts = creep.body.filter((part) => part.type == ATTACK).length;
-        let numRangedParts = creep.body.filter((part) => part.type == RANGED_ATTACK).length;
-        if (curentHealParts < this.requirements.heal && numHealParts > 0) {
-            this.addCreep(creep);
-            return true;
-        }
-        if (curentAttackParts < this.requirements.attack && numAttackParts > 0) {
-            this.addCreep(creep);
-            return true;
-        }
-        if (curentRangedParts < this.requirements.ranged && numRangedParts > 0) {
-            this.addCreep(creep);
-            return true;
-        }
-        return false;
-    }
-    clearDeadCreeps() {
-        let haveDeadCreeps = false;
-        for (let creep of this.creeps) {
-            if (!creep.exists) {
-                haveDeadCreeps = true;
+        let validType = false;
+        for (let type of types) {
+            if (action instanceof type) {
+                validType = true;
                 break;
             }
         }
-        if (haveDeadCreeps) {
-            this.reparseCreeps();
+        if (!validType)
+            continue;
+        let actionDist = settings.getRange(action, obj);
+        console.log("wtf", action.x, action.y, obj.x, obj.y);
+        console.log(obj.id, "checking action", action.id, actionDist, closestActionDist);
+        if (actionDist < closestActionDist) {
+            console.log(obj.id, "found closer action", action.id, actionDist);
+            closestAction = action;
+            closestActionDist = actionDist;
         }
     }
-    clearInvalidTargets() {
-        let invalidTargets = [];
-        for (let target of this.validTargets) {
-            if (!target.exists) {
-                invalidTargets.push(target);
-            }
+    console.log('found closest Action:', closestAction && closestAction.id, "at range", closestActionDist);
+    return closestAction;
+}
+function deleteAction(action) {
+    actions.delete(action.id);
+}
+class ActionAssignment {
+    constructor(action, assigned, priority = 0) {
+        this._distanceToTarget = new CachedValue(() => {
+            return getSettings().getRange(this.action.target, this.assigned);
+        });
+        this.action = action;
+        this.assigned = assigned;
+        this.priority = priority;
+        this._id = this.action.id + "-" + this.assigned.id;
+    }
+    get distanceToTarget() {
+        return this._distanceToTarget.get();
+    }
+    get id() {
+        return this._id;
+    }
+}
+class BaseAction extends Location {
+    constructor(actionType = "not implemented!!!", assignmentConstructor, target) {
+        super(target.x, target.y, `${actionType}-${target.id}`);
+        this.assignments = new Map();
+        this.maxRange = 1;
+        this.maxAssignments = Infinity;
+        this.displayTask = false;
+        this.target = target;
+        this.actionType = actionType;
+        this.assignmentConstructor = assignmentConstructor;
+        if (!actions.has(this.id)) {
+            actions.set(this.id, this);
         }
-        if (invalidTargets.length) {
-            this.path = false;
-            this.currentPathIndex = 0;
-            this.validTargets = this.validTargets.filter((t) => !invalidTargets.includes(t));
-            this.reparseCreeps();
-            console.log("moving to closest target, was an invalid target");
-            this.moveToClosestTarget();
+        else {
+            throw new Error("action id already exists!!" + this.id);
         }
     }
-    runSquad(minDistToEnemyFlag = 0, maxDistFromOurFlag = 200, noCombatMovement = false, otherSquads = []) {
-        if (this.lastTarget instanceof BodyPart && !this.lastTarget.exists) {
-            this.moveToClosestTarget();
-        }
-        console.log(this.id, "running squad", minDistToEnemyFlag, maxDistFromOurFlag, noCombatMovement, this.retreating);
-        console.log(this.id, "path info", this.path && this.path.length, this.currentPathIndex);
-        if (this.creeps.length == 0)
-            return;
-        if (this.retreating) ;
-        if (this.attackers.length == 0) {
-            this.maxFormationSize_attackers_max = 0;
-            this.maxFormationSize_attackers_min = 0;
-            this.maxFormationSize_ranged_max = 1;
-            this.maxFormationSize_ranged_min = 0;
-            this.maxFormationSize_healers_max = 1;
-            this.maxFormationSize_healers_min = 0;
-        }
+    get x() {
+        return this.target.x;
+    }
+    get y() {
+        return this.target.y;
+    }
+    display() {
+        getSettings().drawText(this.actionType + "(" + this.assignments.size + ")", this.target.location);
+    }
+    isAssigned(obj) {
+        return this.assignments.has(obj.id);
+    }
+    valid() {
+        return this.target.get().exists;
+    }
+    assign(obj, priority = 1) {
+        console.log("assigning", obj.id, "to", this.id);
         let settings = getSettings();
-        settings.drawText("c", this.currentLocation);
-        settings.drawText("g", this.targetLocation);
-        this.clearDeadCreeps();
-        let enemyCreeps = getObjectsByPrototype(Creep).filter(c => !c.my);
-        let enemyAttackers = enemyCreeps.filter(c => c.isAttacker() || c.isRangedAttacker());
-        let enemyAttackersActive = enemyAttackers.filter(c => c.isAttacker(true) || c.isRangedAttacker(true));
-        let myCreeps = getObjectsByPrototype(Creep).filter(c => c.my);
-        let secondaryTargets = findInRange(this.currentLocation, enemyCreeps, 7);
-        let injuredMembers = findInRange(this.currentLocation, myCreeps.filter(c => c.hits < c.hitsMax), 10).sort((a, b) => (a.hits / a.hitsMax) - (b.hits / b.hitsMax));
-        enemyCreeps.sort((a, b) => (a.hits / a.hitsMax) - (b.hits / b.hitsMax));
-        let primaryTarget = this.getClosestTarget();
-        if (primaryTarget instanceof Flag) {
-            primaryTarget = false;
-        }
-        let ourFlag = getObjectsByPrototype(Flag).filter((f) => f.my)[0];
-        let enemyFlag = getObjectsByPrototype(Flag).filter((f) => !f.my)[0];
-        let closestEnemy = false;
-        let closestAttacker = false;
-        if (enemyCreeps.length > 0)
-            closestEnemy = findClosestByRange(ourFlag, enemyCreeps);
-        if (enemyAttackers.length > 0) {
-            closestAttacker = findClosestByRange(ourFlag, enemyAttackers);
-        }
-        let ourClosestCreep = findClosestByRange(ourFlag, this.creeps);
-        let enemyDistToOurFlag = 100;
-        let distToClosetEnemyToOurFlag = 0;
-        let minDistToClosetEnemyToOurFlag = 0;
-        if (closestEnemy) {
-            enemyDistToOurFlag = getRange(ourFlag, closestEnemy);
-            distToClosetEnemyToOurFlag = getRange(this.currentLocation, closestEnemy);
-            if (closestAttacker) {
-                let ourClosestCreepToTheirLeader = findClosestByRange(closestAttacker, this.creeps);
-                if (ourClosestCreepToTheirLeader) {
-                    minDistToClosetEnemyToOurFlag = getRange(closestAttacker, ourClosestCreepToTheirLeader);
-                }
-            }
-        }
-        let ourDistToFlag = getRange(ourFlag, ourClosestCreep);
-        let distToFarthestSquad = 0;
-        let farthestSquad = false;
-        let leadSquad = false;
-        for (let squad of otherSquads) {
-            if (squad.leadSquad) {
-                leadSquad = squad;
-            }
-            let distToThisSquad = getRange(this.currentLocation, squad.currentLocation);
-            if (distToThisSquad > distToFarthestSquad) {
-                distToFarthestSquad = distToThisSquad;
-                farthestSquad = squad;
-            }
-        }
-        if (!this.leadSquad && farthestSquad && distToFarthestSquad > distToClosetEnemyToOurFlag - 5) {
-            if (leadSquad) {
-                this.assignLocation(leadSquad.currentLocation.x, leadSquad.currentLocation.y);
-            }
-            else {
-                this.assignLocation(farthestSquad.currentLocation.x, farthestSquad.currentLocation.y);
-            }
-        }
-        let wounded = this.creeps.filter(c => c.hits < c.hitsMax * 0.50);
-        function getHealTarget(creep, targets = injuredMembers, range = 3) {
-            let inRange = findInRange(creep, targets, range);
-            if (inRange.length > 0) {
-                return inRange[0];
+        this.clearLosers(settings, obj, priority);
+        let assignment = new this.assignmentConstructor(this, obj, priority);
+        this.assignments.set(obj.id, assignment);
+        console.log("assigned", obj.id, "to", this.id, this.assignments.size);
+        return true;
+    }
+    clearLosers(settings, obj, priority) {
+        let newObjRange = settings.getRange(obj, this.target.location);
+        let loserAssignments = Array.from(this.assignments.values()).filter((assignment) => {
+            let newObjCloser = assignment.distanceToTarget > newObjRange;
+            let samePriority = priority == assignment.priority;
+            let higherPriority = priority > assignment.priority;
+            if (higherPriority || newObjCloser && samePriority) {
+                return true;
             }
             return false;
+        }).sort((a, b) => {
+            if (a.priority != b.priority) {
+                return a.priority - b.priority;
+            }
+            return a.distanceToTarget - b.distanceToTarget;
+        });
+        while (this.overAllowedAssignments()) {
+            let loser = loserAssignments.shift();
+            if (!loser)
+                break;
+            this.unassign(loser.assigned);
         }
-        for (let healer of this.healers) {
-            let healTarget = false;
-            if (healer.hits < healer.hitsMax * .9)
-                healTarget = healer;
-            if (injuredMembers.length > 0) {
-                if (!healTarget)
-                    healTarget = getHealTarget(healer, wounded, 1);
-                if (!healTarget)
-                    healTarget = getHealTarget(healer, injuredMembers.filter(c => c.isAttacker()), 1);
-                if (!healTarget)
-                    healTarget = getHealTarget(healer, injuredMembers.filter(c => c.isHealer()), 1);
-                if (!healTarget)
-                    healTarget = getHealTarget(healer, injuredMembers.filter(c => c.isRangedAttacker()), 1);
-                if (!healTarget)
-                    healTarget = getHealTarget(healer, injuredMembers.filter(c => c.isAttacker()), 2);
-                if (!healTarget)
-                    healTarget = getHealTarget(healer, injuredMembers.filter(c => c.isAttacker()), 3);
-                if (!healTarget)
-                    healTarget = getHealTarget(healer, injuredMembers.filter(c => c.isRangedAttacker()), 2);
-                if (!healTarget)
-                    healTarget = findClosestByRange(healer, injuredMembers);
-            }
-            if (!healTarget) {
-                healTarget = findClosestByRange(healer, [...this.attackers, ...this.ranged]);
-            }
-            if (!healTarget) {
-                healTarget = findClosestByRange(healer, [...this.healers.filter(h => h.id != healer.id)]);
-            }
-            if (!healTarget || healTarget.id == healer.id) {
-                healer.heal(healer);
-                healTarget = false;
-            }
-            if (healTarget) {
-                let dist = getRange(healer, healTarget);
-                if (dist > 1) {
-                    if (dist <= 3)
-                        healer.rangedHeal(healTarget);
-                }
-                else {
-                    healer.heal(healTarget);
-                }
-                if (!noCombatMovement && !(primaryTarget instanceof BodyPart) && (!healer.isAttacker() && !healer.isRangedAttacker())) {
-                    if (findInRange(healer, enemyAttackersActive, 2).length > 0) {
-                        let goals = [];
-                        [...enemyAttackersActive].forEach((loc) => {
-                            goals.push({
-                                pos: loc,
-                                range: 4
-                            });
-                        });
-                        let fleePath = searchPath(healer, goals, { flee: true });
-                        drawPath(fleePath.path);
-                        console.log(this.id, "fleeing", fleePath);
-                        if (fleePath.path.length > 0) {
-                            let fleePos = fleePath.path[0];
-                            let fleeDir = getDirection(fleePos.x - healer.x, fleePos.y - healer.y);
-                            console.log(this.id, "fleeing", fleeDir);
-                            healer.smartMove(fleeDir);
-                        }
-                    }
-                    else if (healer.hits < healer.hitsMax * 0.7) {
-                        let closestHealer = findClosestByRange(healer, this.healers.filter(h => h.hits == h.hitsMax && !h.isAttacker() && !h.isRangedAttacker() && h.id != healer.id));
-                        if (!closestHealer)
-                            closestHealer = findClosestByRange(healer, this.healers.filter(h => !h.isAttacker() && !h.isRangedAttacker() && h.id != healer.id));
-                        if (closestHealer) {
-                            console.log(healer.id, "running for nearest healer", closestHealer.id);
-                            healer.moveTo(closestHealer);
-                        }
-                    }
-                    else if ((primaryTarget instanceof BodyPart) && [HEAL, MOVE].includes(target.type)) {
-                        healer.moveTo(primaryTarget);
-                    }
-                    else if (!this.retreating && !this.targetRush && this.creepInPosition(healer) && (!healer.isAttacker() && !healer.isRangedAttacker())) {
-                        let distFromLoc = getRange(healer, this.currentLocation);
-                        let targetDistFromLoc = getRange(healTarget, this.currentLocation);
-                        if (distFromLoc <= this.maxFormationSize_healers_max || targetDistFromLoc <= this.maxFormationSize_healers_max)
-                            healer.moveTo(healTarget);
-                        else
-                            console.log(healer.id, "isn't moving because of range issues", distFromLoc, targetDistFromLoc);
-                    }
-                    else {
-                        console.log(healer.id, "isn't moving, is he doing anything?", primaryTarget.id, secondaryTargets.length);
-                    }
-                }
-            }
+    }
+    overAllowedAssignments() {
+        return this.assignments.size >= (this.maxAssignments);
+    }
+    unassign(obj) {
+        console.log("-----------------------unassigning------------------------------------------");
+        if (!this.assignments.has(obj.id)) {
+            throw new Error("trying to unassign object that isn't assigned. " + this.id + " " + obj.id);
         }
-        for (let ranged of this.ranged) {
-            let target = false;
-            if (primaryTarget && getRange(ranged, primaryTarget) <= 3) {
-                target = primaryTarget;
-            }
-            if (!target) {
-                target = findClosestByRange(ranged, secondaryTargets);
-            }
-            let secondaryTargetsInRange1 = findInRange(ranged, secondaryTargets, 1);
-            let secondaryTargetsInRange2 = findInRange(ranged, secondaryTargets, 2);
-            let secondaryTargetsInRange3 = findInRange(ranged, secondaryTargets, 3);
-            if (target && (secondaryTargetsInRange1.length < 1 && secondaryTargetsInRange2.length < 3 && secondaryTargetsInRange3.length < 10)) {
-                let ret = ranged.rangedAttack(target);
-                console.log(ranged.id, "tried to ranged attack", ret);
-            }
-            else {
-                ranged.rangedMassAttack();
-            }
-            if (this.creepInPosition(ranged) && target && !noCombatMovement && (!ranged.isAttacker() && !ranged.isHealer())) {
-                let targetRange = getRange(ranged, target);
-                if (ranged.hits < ranged.hitsMax * 0.85) {
-                    let closestHealer = findClosestByRange(ranged, this.healers.filter(h => h.hits == h.hitsMax && !h.isAttacker() && !h.isRangedAttacker()));
-                    if (!closestHealer)
-                        closestHealer = findClosestByRange(ranged, this.healers.filter(h => !h.isAttacker() && !h.isRangedAttacker()));
-                    if (closestHealer) {
-                        console.log(ranged.id, "running for nearest healer", closestHealer.id);
-                        ranged.moveTo(closestHealer);
-                    }
-                }
-                else if ((target instanceof BodyPart) && [HEAL, RANGED_ATTACK, MOVE].includes(target.type)) {
-                    ranged.moveTo(target);
-                }
-                else if (targetRange <= 1) {
-                    ranged.moveTo(target, { flee: true, range: 4 });
-                }
-                else if (targetRange > 2) {
-                    let distFromLoc = getRange(ranged, this.currentLocation);
-                    let targetDistFromLoc = getRange(target, this.currentLocation);
-                    if (distFromLoc < this.maxFormationSize_ranged_max || targetDistFromLoc <= this.maxFormationSize_ranged_max)
-                        ranged.moveTo(target);
-                }
-                else {
-                    console.log(ranged.id, "isn't moving, is he doing anything?", primaryTarget.id, secondaryTargets.length);
-                }
-            }
-        }
-        for (let attacker of this.attackers) {
-            let target = false;
-            if (primaryTarget && getRange(attacker, primaryTarget) <= 1) {
-                target = primaryTarget;
-            }
-            if (!target) {
-                target = findClosestByRange(attacker, secondaryTargets);
-            }
-            if (target) {
-                let ret = attacker.attack(target);
-                console.log(attacker.id, "tried to attack", target.id, "ret:", ret);
-            }
-            if (this.creepInPosition(attacker) && target && !noCombatMovement) {
-                let targetRange = getRange(attacker, target);
-                if (attacker.hits < attacker.hitsMax * 0.75) {
-                    let closestHealer = findClosestByRange(attacker, this.healers.filter(h => h.hits == h.hitsMax && !h.isAttacker() && !h.isRangedAttacker()));
-                    if (!closestHealer)
-                        closestHealer = findClosestByRange(attacker, this.healers.filter(h => !h.isAttacker() && !h.isRangedAttacker()));
-                    if (closestHealer) {
-                        console.log(attacker.id, "running for nearest healer", closestHealer.id);
-                        attacker.moveTo(closestHealer);
-                    }
-                }
-                else if ((target instanceof BodyPart) && [ATTACK, MOVE].includes(target.type)) {
-                    attacker.moveTo(target);
-                }
-                else if (targetRange >= 1) {
-                    let distFromLoc = getRange(attacker, this.currentLocation);
-                    let targetDistFromLoc = getRange(target, this.currentLocation);
-                    if (distFromLoc < this.maxFormationSize_attackers_max || targetDistFromLoc <= this.maxFormationSize_attackers_max)
-                        attacker.moveTo(target);
-                }
-                else {
-                    console.log(attacker.id, "isn't moving, is he doing anything?", primaryTarget.id, secondaryTargets.length);
-                }
-            }
-        }
-        if (this.targetLocation.x != ourFlag.x && this.targetLocation.y != ourFlag.y && !this.retreating) {
-            let retreatToHeal = false;
-            if (wounded.length > 0 && this.inCombat) {
-                retreatToHeal = true;
-                this.retreatingToHeal = true;
-                this.retreating = true;
-            }
-            if (closestEnemy)
-                getRange(closestEnemy, enemyFlag);
-            let amtToAdd = Math.min(minDistToClosetEnemyToOurFlag, 10);
-            let distToOurFlag = ourDistToFlag;
-            console.log(this.id, "checking for too far from our flag", distToOurFlag, maxDistFromOurFlag, wounded.length, retreatToHeal, amtToAdd);
-            if (!this.targetRush && (distToOurFlag > maxDistFromOurFlag || retreatToHeal)) {
-                console.log(this.id, "too far from our flag", distToOurFlag, maxDistFromOurFlag);
-                this.retreatToOurFlag(ourFlag, retreatToHeal, distToOurFlag);
-                return;
-            }
-            let distToEnemyFlag = getRange(this.currentLocation, enemyFlag);
-            console.log(this.id, "checking for too close to enemy flag", distToEnemyFlag, minDistToEnemyFlag);
-            if (!this.targetRush && distToEnemyFlag < minDistToEnemyFlag) {
-                console.log(this.id, "too close to enemy flag", distToEnemyFlag, minDistToEnemyFlag);
-                for (let creep of this.creeps) {
-                    let ret = creep.moveTo(ourFlag);
-                    console.log(creep.id, "tried to get behind frontline", "got", ret);
-                }
-                return;
-            }
+        this.assignments.delete(obj.id);
+        console.log("unassigned", obj.id, "from", this.id, this.assignments.size);
+    }
+    canDo(object) {
+        if (object.id == this.target.id)
+            return false;
+        if (this.assignments.size >= (this.maxAssignments))
+            return false;
+        return true;
+    }
+    predictedDoneTick(object) {
+        let settings = getSettings();
+        let currentTick = settings.getTick();
+        let pathToTarget = settings.getPath(this.target.location, object);
+        let ticksFromTarget = pathToTarget.cost;
+        return currentTick + ticksFromTarget;
+    }
+}
+
+class TypeInfo {
+    constructor(type) {
+        this.amount = 0;
+        this.type = type;
+    }
+}
+class TypeInfoCollection {
+    constructor(infoConstructor) {
+        this.types = new Map();
+        this.infoConstructor = infoConstructor;
+    }
+    get total() {
+        let amt = 0;
+        this.types.forEach((type) => {
+            amt += type.amount;
+        });
+        return amt;
+    }
+    getInfos() {
+        return Array.from(this.types.values());
+    }
+    getTypes() {
+        return Array.from(this.types.keys());
+    }
+    getAmount(type) {
+        let itemType = this.get(type);
+        return itemType.amount;
+    }
+    setAmount(type, amt) {
+        let itemType = this.get(type);
+        itemType.amount = amt;
+    }
+    addAmount(type, amt) {
+        let itemType = this.get(type);
+        itemType.amount += amt;
+    }
+    has(type) {
+        return this.types.has(type);
+    }
+    get(type) {
+        let typeInfo;
+        if (this.types.has(type)) {
+            typeInfo = this.types.get(type);
         }
         else {
-            if (this.retreatingToHeal && injuredMembers.length == 0) {
-                this.retreatingToHeal = false;
-                this.retreating = false;
-                console.log("moving to closest target, no longer healing");
-                this.moveToClosestTarget();
+            typeInfo = new this.infoConstructor(type);
+            this.types.set(type, typeInfo);
+        }
+        return typeInfo;
+    }
+    getByAmount() {
+        let byAmount = [];
+        let validSortedTypes = Array.from(this.types.values()).filter(r => r.amount > 0).sort((a, b) => a.amount - b.amount);
+        validSortedTypes.forEach(type => {
+            let info = new this.infoConstructor(type.type);
+            info.amount = type.amount;
+            byAmount.push(info);
+        });
+        return byAmount;
+    }
+    delete(type) {
+        this.types.delete(type);
+    }
+    diff(otherCollection, allowNegitive = true) {
+        let diff = new TypeInfoCollection(this.infoConstructor);
+        let allTypes = [...this.getTypes(), ...otherCollection.getTypes()];
+        for (let type of allTypes) {
+            let ourVal = 0;
+            let theirVal = 0;
+            if (this.has(type)) {
+                ourVal = this.get(type).amount;
             }
-            this.targetDistance = enemyDistToOurFlag;
-            if (!this.retreatingToHeal && this.squadInPosition && enemyDistToOurFlag > (ourDistToFlag + 40)) {
-                console.log("moving to closest target, we're way closer than the enemy");
-                this.moveToClosestTarget();
-                this.currentLocation.x = ourClosestCreep.x;
-                this.currentLocation.y = ourClosestCreep.y;
-                console.log(this.id, "returning to the fight!", this.currentLocation);
+            if (otherCollection.has(type)) {
+                theirVal = otherCollection.get(type).amount;
+            }
+            let newVal = ourVal - theirVal;
+            if (newVal < 0 && !allowNegitive) {
+                newVal = 0;
+            }
+            diff.setAmount(type, newVal);
+        }
+        return diff;
+    }
+    sub(otherCollection) {
+        let typesToSub = otherCollection.getTypes();
+        for (let type of typesToSub) {
+            let otherAmt = otherCollection.get(type).amount;
+            this.addAmount(type, -otherAmt);
+        }
+    }
+    add(otherCollection) {
+        let typesToAdd = otherCollection.getTypes();
+        for (let type of typesToAdd) {
+            let otherAmt = otherCollection.get(type).amount;
+            this.addAmount(type, otherAmt);
+        }
+    }
+    updateFromCollection(types) {
+        let unUpdatedType = new Set(this.getTypes());
+        let keys = types.getTypes();
+        keys.forEach(key => {
+            let type = types.get(key);
+            this.setAmount(type.type, type.amount);
+            unUpdatedType.delete(type.type);
+        });
+        unUpdatedType.forEach(type => {
+            this.types.delete(type);
+        });
+    }
+    updateFromArray(types) {
+        let unUpdatedType = new Set(this.getTypes());
+        types.forEach(type => {
+            this.setAmount(type.type, type.amount);
+            unUpdatedType.delete(type.type);
+        });
+        unUpdatedType.forEach(type => {
+            this.types.delete(type);
+        });
+    }
+    updateFromStore(store) {
+        let unUpdatedType = new Set(this.getTypes());
+        for (let resourceName in store) {
+            let typeName = resourceName;
+            let typeAmt = store[typeName];
+            if (typeAmt > 0) {
+                this.setAmount(typeName, typeAmt);
+                unUpdatedType.delete(typeName);
             }
         }
-        if (this.inCombat && !this.retreating) {
-            console.log(this.id, "holding for combat");
+        unUpdatedType.forEach(type => {
+            this.types.delete(type);
+        });
+    }
+}
+
+class RequiredInfo extends TypeInfo {
+    constructor(item) {
+        super(item);
+        this.min = 0;
+        this.max = 0;
+    }
+    get amountAllowed() {
+        return Math.max(this.max - this.amount, 0);
+    }
+    get amountRequired() {
+        return Math.max(this.min - this.amount, 0);
+    }
+    get amountAvailable() {
+        return Math.max(this.amount - this.min, 0);
+    }
+    get amountOverMax() {
+        return Math.max(this.amount - this.max, 0);
+    }
+}
+class RequiredInfoCollection extends TypeInfoCollection {
+    constructor(infoConstructor, store = false, maxTotalAmount = false) {
+        super(infoConstructor);
+        this.maxTotalAmount = false;
+        this.maxTotalAmount = maxTotalAmount;
+        if (store instanceof RequiredInfoCollection) {
+            this.updateFromCollection(store);
+        }
+        else if (store) {
+            this.updateFromStore(store);
+        }
+    }
+    getTypesByAmountRequired() {
+        let typesRequired = new RequiredInfoCollection(this.infoConstructor);
+        let validTypes = Array.from(this.types.values()).filter(r => r.amountRequired > 0).sort((a, b) => a.amountRequired - b.amountRequired);
+        validTypes.forEach(type => {
+            typesRequired.setAmount(type.type, type.amountRequired);
+        });
+        return typesRequired;
+    }
+    getTypesByAmountOverMax() {
+        let typesOverMax = new RequiredInfoCollection(this.infoConstructor);
+        let validTypes = Array.from(this.types.values()).filter(r => r.amountOverMax > 0).sort((a, b) => a.amountOverMax - b.amountOverMax);
+        validTypes.forEach(type => {
+            typesOverMax.setAmount(type.type, type.amountOverMax);
+        });
+        return typesOverMax;
+    }
+    getTypesByAmountAllowed() {
+        let typesAllowed = new RequiredInfoCollection(this.infoConstructor);
+        let validTypes = Array.from(this.types.values()).filter(r => r.amountAllowed > 0).sort((a, b) => a.amountAllowed - b.amountAllowed);
+        validTypes.forEach(type => {
+            typesAllowed.setAmount(type.type, type.amountAllowed);
+        });
+        return typesAllowed;
+    }
+    getTypesByAmountAvailable() {
+        let typesAvailable = new RequiredInfoCollection(this.infoConstructor);
+        let validTypes = Array.from(this.types.values()).filter(r => r.amountAvailable > 0).sort((a, b) => a.amountAvailable - b.amountAvailable);
+        validTypes.forEach(type => {
+            typesAvailable.setAmount(type.type, type.amountAvailable);
+        });
+        return typesAvailable;
+    }
+    setMaxTotal(newMax) {
+        this.maxTotalAmount = newMax;
+    }
+    get maxTotal() {
+        if (this.maxTotalAmount)
+            return this.maxTotalAmount;
+        return 0;
+    }
+    get totalFree() {
+        return this.maxTotal - this.total;
+    }
+    updateMaxTotal(newTotal) {
+        this.maxTotalAmount = newTotal;
+    }
+    getConflictingAmounts(otherCollection) {
+        let conflictingAmounts = new RequiredInfoCollection(this.infoConstructor);
+        let typeInOtherCollection = otherCollection.getTypes();
+        for (let type of typeInOtherCollection) {
+            let ourTypeInfo = this.get(type);
+            let theirTypeInfo = otherCollection.get(type);
+            console.log("checking for conflict", ourTypeInfo, theirTypeInfo);
+            if ((theirTypeInfo.amount + ourTypeInfo.amount) > ourTypeInfo.amountAllowed) {
+                let conflictAmt = theirTypeInfo.amount - ourTypeInfo.amountAllowed;
+                conflictingAmounts.setAmount(type, conflictAmt);
+            }
+        }
+        return conflictingAmounts;
+    }
+    getMin(type) {
+        if (!this.has(type))
+            return 0;
+        let tInfo = this.get(type);
+        return tInfo.min;
+    }
+    getMax(type) {
+        if (!this.has(type))
+            return 0;
+        let tInfo = this.get(type);
+        return tInfo.max;
+    }
+    setMin(type, amount) {
+        let tInfo = this.get(type);
+        tInfo.min = amount;
+    }
+    setMax(type, amount) {
+        let tInfo = this.get(type);
+        tInfo.max = amount;
+    }
+}
+
+class BodyPartInfo extends RequiredInfo {
+    constructor(type) {
+        super(type);
+    }
+}
+class BodyPartInfoCollection extends RequiredInfoCollection {
+    constructor(store = false, maxTotalAmount = false) {
+        super(BodyPartInfo, store, maxTotalAmount);
+    }
+}
+
+class BasePartActionAssignment extends ActionAssignment {
+    constructor(action, assigned, priority = 0) {
+        super(action, assigned, priority);
+        this.partAmounts = new BodyPartInfoCollection();
+    }
+}
+class BasePartAction extends BaseAction {
+    constructor(actionType, target, requiredParts) {
+        super(actionType, BasePartActionAssignment, target);
+        this.requiredParts = new BodyPartInfoCollection();
+        for (let part of requiredParts) {
+            this.requiredParts.setMin(part, 1);
+        }
+    }
+    canDo(object) {
+        if (!super.canDo(object))
+            return false;
+        let hasRequiredParts = false;
+        this.requiredParts.getTypes().forEach(part => {
+            if (object.hasBodyPart(part))
+                hasRequiredParts = true;
+        });
+        return hasRequiredParts;
+    }
+    overAllowedAssignments() {
+        if (super.overAllowedAssignments())
+            return true;
+        for (let info of this.requiredParts.getInfos()) {
+            if (info.max != 0 && info.amountOverMax > 0) {
+                console.log("action over allowed part limit", this.id, info.type, info.amountOverMax);
+                return true;
+            }
+        }
+        return false;
+    }
+    getAssignmentAmount(object) {
+        let matchingParts = new BodyPartInfoCollection();
+        return matchingParts;
+    }
+    doJob(object) {
+        return false;
+    }
+}
+
+class ResourceInfo extends RequiredInfo {
+    constructor(type) {
+        super(type);
+    }
+}
+class ResourceInfoCollection extends RequiredInfoCollection {
+    constructor(store = false, maxTotalAmount = false) {
+        super(ResourceInfo, store, maxTotalAmount);
+    }
+}
+
+let logger = new logger$1("util.actions");
+class BaseResourceActionAssignment extends ActionAssignment {
+    constructor(action, assigned, priority = 0) {
+        super(action, assigned, priority);
+        let assignAmts = action.getAssignmentAmount(assigned);
+        this.assignAmounts = assignAmts;
+    }
+}
+class BaseResourceAction extends BaseAction {
+    constructor(actionType = "not implemented!!!", target) {
+        super(actionType, BaseResourceActionAssignment, target);
+        let targetStore = target ? target.get().store : undefined;
+        if (targetStore) {
+            this.resourceAmounts = new ResourceInfoCollection(targetStore);
+        }
+        else {
+            this.resourceAmounts = new ResourceInfoCollection();
+        }
+    }
+    canDo(object) {
+        return super.canDo(object);
+    }
+    doJob(object) {
+        console.log("you forgot to implement doJob on one of your actions", this.actionType);
+        return true;
+    }
+    overAllowedAssignments() {
+        if (super.overAllowedAssignments())
+            return true;
+        let resourcesRemaining = this.resourcesRemaining;
+        let typesRemaining = resourcesRemaining.getTypes();
+        for (let resource in typesRemaining) {
+            let info = resourcesRemaining.get(resource);
+            if (info.amount < 0)
+                return true;
+        }
+        return false;
+    }
+    get resourcesAssigned() {
+        let total = new ResourceInfoCollection();
+        this.assignments.forEach((assignment) => {
+            total.add(assignment.assignAmounts);
+        });
+        return total;
+    }
+    get resourcesRemaining() {
+        return this.resourceAmounts.diff(this.resourcesAssigned);
+    }
+    resourcesAssignedUnderPriority(priority) {
+        let total = new ResourceInfoCollection();
+        this.assignments.forEach((assignment) => {
+            if (assignment.priority < priority) {
+                total.add(assignment.assignAmounts);
+            }
+        });
+        return total;
+    }
+    amountRemainingByPriority(priority) {
+        let resourcesAssignedUnderPriority = this.resourcesAssignedUnderPriority(priority);
+        return this.resourceAmounts.diff(resourcesAssignedUnderPriority);
+    }
+    amountRemainingByPriorityAndLocation(priority, pos) {
+        let settings = getSettings();
+        let amountRemaining = new ResourceInfoCollection(this.resourceAmounts);
+        let assignmentsCounted = 0;
+        let targetRange = settings.getRange(pos, this.target.location);
+        this.assignments.forEach((assignment) => {
+            if (assignment.priority <= priority && assignment.distanceToTarget <= targetRange) {
+                amountRemaining.sub(assignment.assignAmounts);
+                assignmentsCounted++;
+            }
+        });
+        logger.log(this.id, 'remaining amount:', amountRemaining, assignmentsCounted, this.maxAssignments);
+        return assignmentsCounted >= this.maxAssignments ? 0 : amountRemaining;
+    }
+}
+
+let gameObjectWrappers = new Map();
+setInterval(() => {
+    gameObjectWrappers.forEach(wrapper => {
+        if (!wrapper.get().exists) {
+            gameObjectWrappers.delete(wrapper.id);
             return;
         }
-        console.log(this.id, "moving creeps", this.retreating, this.retreatingToHeal, this.targetRush);
-        if (this.retreating && !this.creepsInPosition) {
-            console.log('retreating to ', typeof this.lastTarget, ', run for it!!', this.currentLocation);
-            for (let creep of this.creeps) {
-                creep.moveTo(this.currentLocation);
+        console.log("updating wrapper", wrapper.id, wrapper.constructor.name);
+        wrapper.update();
+    });
+}, 1, builtInQueues.UPDATE);
+setInterval(() => {
+    gameObjectWrappers.forEach(wrapper => {
+        if (!wrapper.get().exists) {
+            gameObjectWrappers.delete(wrapper.id);
+            return;
+        }
+        wrapper.run();
+    });
+}, 1, builtInQueues.ACTIONS);
+function getObjectWrapper(gameObject) {
+    if (gameObjectWrappers.has(gameObject.id)) {
+        return gameObjectWrappers.get(gameObject.id);
+    }
+    return false;
+}
+function createObjectWrapper(constructor, obj, ...args) {
+    let wrapper = new constructor(obj, ...args);
+    gameObjectWrappers.set(wrapper.id, wrapper);
+    return wrapper;
+}
+class GameObjectWrapper {
+    constructor(gameObject) {
+        this.gameObject = gameObject;
+        this.id = gameObject.id;
+    }
+    get x() {
+        return this.get().x;
+    }
+    get y() {
+        return this.get().y;
+    }
+    get location() {
+        return Location.getLocationFromObj(this);
+    }
+    get() {
+        return this.gameObject;
+    }
+    update() {
+        console.log("in GOW update!");
+    }
+    run() {
+        console.log("in GOW run!");
+    }
+}
+
+class Dropoff extends BaseResourceAction {
+    constructor(target) {
+        super(Dropoff.actionType, target);
+    }
+    canDo(object) {
+        if (!super.canDo(object))
+            return false;
+        return object.store.total > 0;
+    }
+    getAssignmentAmount(object) {
+        console.log(this.id, "getting assign amount for", object.id);
+        let assignAmts = new ResourceInfoCollection();
+        let stuffInCreep = object.store.getByAmount();
+        console.log("stuff in creep");
+        for (let resource of stuffInCreep) {
+            let ourResourceInfo = this.resourceAmounts.get(resource.type);
+            console.log(resource.type, ourResourceInfo, resource);
+            if (ourResourceInfo.amount > 0) {
+                let assignAmt = Math.min(resource.amount, ourResourceInfo.amount);
+                assignAmts.setAmount(resource.type, assignAmt);
             }
         }
-        else if (this.targetRush || (this.targetLocation.x == enemyFlag.x && this.targetLocation.y == enemyFlag.y && this.lastTarget instanceof Flag)) {
-            console.log('target is ', typeof this.lastTarget, ', run for it!!', this.lastTarget);
-            for (let creep of this.creeps) {
-                creep.moveTo(this.targetLocation);
-            }
+        return assignAmts;
+    }
+    doJob(object) {
+        let assignment = this.assignments.get(object.id);
+        if (!assignment) {
+            return false;
         }
-        else if (!this.creepsInPosition) {
-            if (this.squadInPosition) {
-                console.log(this.id, "in position, even tho creeps aren't moving to next target");
-                this.moveToClosestTarget();
+        if (getSettings().getRange(object, this.target) <= 1) {
+            let resourcesInAssignment = assignment.assignAmounts.getByAmount();
+            if (resourcesInAssignment.length == 0) {
+                return true;
             }
-            console.log(this.id, "creeps not in position", this.currentLocation, this.targetLocation, this.targetDistance, this.targetRush);
-            for (let creep of this.creeps) {
-                if (creep.isHealer() && !creep.isRangedAttacker() && !creep.isAttacker()) {
-                    let dist = getRange(creep, this.currentLocation);
-                    console.log(creep.id, "healer", dist, this.maxFormationSize_ranged_max, this.maxFormationSize_healers_max);
-                    if (dist < this.maxFormationSize_healers_min) {
-                        let goals = [];
-                        [this.currentLocation, ...this.creeps, ...enemyCreeps].forEach((loc) => {
-                            goals.push({
-                                pos: loc,
-                                range: this.maxFormationSize_healers_max
-                            });
-                        });
-                        let fleePath = searchPath(creep, goals, { flee: true });
-                        drawPath(fleePath.path);
-                        console.log(creep.id, "got flee path", fleePath.path);
-                        if (fleePath.path.length > 0) {
-                            let fleePos = fleePath.path[0];
-                            let fleeDir = getDirection(fleePos.x - creep.x, fleePos.y - creep.y);
-                            console.log(creep.id, "fleeing to free pos", fleeDir);
-                            creep.smartMove(fleeDir);
-                        }
-                    }
-                    if (dist > this.maxFormationSize_healers_min)
-                        creep.moveTo(this.currentLocation, { range: this.maxFormationSize_healers_min });
-                }
-                else if (creep.isRangedAttacker() && !creep.isAttacker()) {
-                    let dist = getRange(creep, this.currentLocation);
-                    console.log(creep.id, "ranged", dist, this.maxFormationSize_attackers_max, this.maxFormationSize_ranged_max);
-                    if (dist < this.maxFormationSize_ranged_min) {
-                        let goals = [];
-                        [this.currentLocation, ...this.attackers].forEach((loc) => {
-                            goals.push({
-                                pos: loc,
-                                range: this.maxFormationSize_healers_max
-                            });
-                        });
-                        let fleePath = searchPath(creep, goals, { flee: true });
-                        drawPath(fleePath.path);
-                        console.log(this.id, "got flee path", fleePath);
-                        if (fleePath.path.length > 0) {
-                            let fleePos = fleePath.path[0];
-                            let fleeDir = getDirection(fleePos.x - creep.x, fleePos.y - creep.y);
-                            console.log(this.id, "fleeing to free pos", fleeDir);
-                            creep.smartMove(fleeDir);
-                        }
-                    }
-                    if (dist > this.maxFormationSize_ranged_min)
-                        creep.moveTo(this.currentLocation, { range: this.maxFormationSize_ranged_min });
-                }
-                else {
-                    let dist = getRange(creep, this.currentLocation);
-                    console.log(creep.id, "attack", dist, this.maxFormationSize_attackers_max, this.maxFormationSize_ranged_max);
-                    creep.moveTo(this.currentLocation, { range: this.maxFormationSize_attackers_min });
-                }
-            }
-            this.path = false;
-            this.currentPathIndex = 0;
-        }
-        else {
-            console.log(this.id, "creeps in position!", this.squadInPosition);
-            if (this.squadInPosition && !this.retreating) {
-                console.log(this.id, "squad in position!!");
-                if (this.initialWait && settings.getTick() < 100) {
-                    let enemyCreepsNotByTheirFlag = getObjectsByPrototype(Creep).filter(c => {
-                        return !c.my && getRange(c, enemyFlag) > 20;
-                    });
-                    let enemyClosestToOurFlag = findClosestByRange(ourFlag, enemyCreeps);
-                    let enemyDistToFlag = 100;
-                    if (enemyClosestToOurFlag) {
-                        enemyDistToFlag = getRange(ourFlag, enemyClosestToOurFlag);
-                    }
-                    console.log(this.id, "waiting to start");
-                    let ticksToWait = 100;
-                    if (settings.getTick() >= 10 && enemyCreepsNotByTheirFlag.length < 2) {
-                        console.log(this.id, "They're idle, we're advancing");
-                        ticksToWait = 0;
-                    }
-                    else if (settings.getTick() <= 60 && enemyCreepsNotByTheirFlag.length >= 10) {
-                        console.log(this.id, "They're advancing, protect the flag!");
-                        ticksToWait = 0;
-                        this.retreatToOurFlag(ourFlag, false, ourDistToFlag);
-                        this.initialWait = false;
-                        return;
-                    }
-                    else if (settings.getTick() >= 60 && enemyDistToFlag > 60 && enemyCreepsNotByTheirFlag.length != 0) {
-                        console.log(this.id, "kinda in the middle.. fight there");
-                        ticksToWait = 0;
-                        this.lastTarget = closestEnemy;
-                    }
-                    console.log(this.id, "waiting to start", ticksToWait, enemyDistToFlag, enemyCreepsNotByTheirFlag.length);
-                    if (settings.getTick() < ticksToWait) {
-                        return;
-                    }
-                    else {
-                        this.initialWait = false;
-                    }
-                }
-                if (!this.retreating) {
-                    if (this.validTargets.length > 0) {
-                        console.log(this.id, "has reached it's target, moving to next target!");
-                        this.moveToClosestTarget();
-                    }
-                    else {
-                        console.log(this.id, "out of targets!");
-                        let enemyFlag = getObjectsByPrototype(Flag).filter((f) => !f.my)[0];
-                        this.lastTarget = enemyFlag;
-                        this.assignLocation(enemyFlag.x, enemyFlag.y, 0);
-                    }
+            let resourceToTransfer = resourcesInAssignment[0];
+            let target = this.target.get();
+            if (target instanceof Creep) {
+                let ret = object.get().transfer(target, resourceToTransfer.type);
+                console.log(object.id, "xfered to creep", target.id, "got", ret, resourceToTransfer.type, resourceToTransfer.amount);
+                if (ret != 0) {
+                    console.log(object.id, "got", ret, "while trying to give resource to a creep", target.id);
                 }
             }
             else {
-                if (this.lastTarget) {
-                    console.log("last target exists", this.lastTarget.id);
-                    let targetDistFromLastPath = getRange(this.targetLocation, this.lastTarget);
-                    console.log("last target exists", this.lastTarget.id, targetDistFromLastPath);
-                    if (targetDistFromLastPath > 1) {
-                        this.path = false;
-                        this.currentPathIndex = 0;
-                        console.log("moving to closest target, current target has moved");
-                        this.moveToClosestTarget();
-                        this.targetLocation.x = this.lastTarget.x;
-                        this.targetLocation.y = this.lastTarget.y;
+                let ret = object.get().transfer(target, resourceToTransfer.type);
+                console.log(object.id, "xfered to building", target.id, "got", ret, resourceToTransfer.type, resourceToTransfer.amount);
+                if (ret != 0) {
+                    console.log(object.id, "got", ret, "while trying to give resource to a structure", target.id);
+                }
+            }
+            assignment.assignAmounts.delete(resourceToTransfer.type);
+            if (assignment.assignAmounts.total == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+Dropoff.actionType = "📥";
+
+class Pickup extends BaseResourceAction {
+    constructor(target) {
+        super(Pickup.actionType, target);
+    }
+    canDo(object) {
+        if (!super.canDo(object))
+            return false;
+        return object.store.totalFree > 0;
+    }
+    getAssignmentAmount(object) {
+        if (!object.store) {
+            console.log('why is there no store? its defined in the constructor', object);
+        }
+        let roomInCreep = object.store.totalFree;
+        let assignAmts = new ResourceInfoCollection();
+        let overMax = this.target.store.getTypesByAmountOverMax();
+        let i = 0;
+        let overMaxTypes = overMax.getTypes();
+        while (assignAmts.total < roomInCreep && i < overMaxTypes.length) {
+            let typeKey = overMaxTypes[i++];
+            let type = overMax.get(typeKey);
+            let assignAmt = Math.min(type.amountOverMax, roomInCreep - assignAmts.total);
+            assignAmts.setAmount(type.type, assignAmt);
+        }
+        return assignAmts;
+    }
+    doJob(object) {
+        let assignment = this.assignments.get(object.id);
+        if (!assignment) {
+            console.log(object.id, "no valid assignment for this creep, wtf bro?");
+            return false;
+        }
+        if (getSettings().getRange(object, this.target) <= 1) {
+            let resourcesInAssignment = assignment.assignAmounts.getByAmount();
+            if (resourcesInAssignment.length == 0) {
+                console.log("no assignments left for this creep, wtf bro?!!?!?");
+                return true;
+            }
+            let resourceToTransfer = resourcesInAssignment[0];
+            resourceToTransfer.amount = Math.min(resourceToTransfer.amount, this.target.store.getAmount(resourceToTransfer.type));
+            let target = this.target.get();
+            if (target instanceof Creep) {
+                console.log(object.id, "pulling from creep", target.id);
+                let ret = target.transfer(object.get(), resourceToTransfer.type, resourceToTransfer.amount);
+                console.log(object.id, "pulled from creep", target.id, "got", ret, resourceToTransfer.type, resourceToTransfer.amount);
+                if (ret != 0) {
+                    console.log(object.id, "got", ret, "while trying to get energy from creep", target.id);
+                }
+            }
+            else {
+                console.log(object.id, "pulling from building", target.id);
+                let ret = object.get().withdraw(target, resourceToTransfer.type, resourceToTransfer.amount);
+                console.log(object.id, "pulled from building", target.id, "got", ret, resourceToTransfer.type, resourceToTransfer.amount);
+                if (ret != 0) {
+                    console.log(object.id, "got", ret, "while trying to get energy from structure", target.id);
+                }
+            }
+            assignment.assignAmounts.delete(resourceToTransfer.type);
+            if (assignment.assignAmounts.total == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+Pickup.actionType = "📤";
+
+class KillBuilding extends BasePartAction {
+    constructor(target) {
+        super(KillBuilding.actionType, target, []);
+    }
+    canDo(object) {
+        if (!super.canDo(object))
+            return false;
+        let creepClassification = object.getBodyClassification();
+        if (creepClassification.hasAttackActive || creepClassification.hasRangedActive) {
+            return true;
+        }
+        return false;
+    }
+    getAssignmentAmount(object) {
+        let validParts = new BodyPartInfoCollection();
+        let creepClassification = object.getBodyClassification();
+        validParts.setAmount(ATTACK, creepClassification.numAttackActive);
+        validParts.setMax(ATTACK, 100);
+        validParts.setAmount(RANGED_ATTACK, creepClassification.numRangedActive);
+        validParts.setMax(RANGED_ATTACK, 100);
+        return validParts;
+    }
+    doJob(object) {
+        if (!this.target.get().exists) {
+            console.log(object.id, "attaking dead object", this.id);
+            return true;
+        }
+        let assignment = this.assignments.get(object.id);
+        if (!assignment) {
+            console.log(object.id, "not assigned to", this.id, "wtf you doin?");
+            return true;
+        }
+        let creepClassification = object.getBodyClassification();
+        if (creepClassification.hasAttackActive && assignment.distanceToTarget <= 1) {
+            let ret = object.get().attack(this.target.get());
+            if (!ret) {
+                console.log(object.id, "tried to attack", this.target.id, "got", ret);
+                return true;
+            }
+        }
+        if (creepClassification.hasRangedActive && assignment.distanceToTarget <= 3) {
+            let ret = object.get().rangedAttack(this.target.get());
+            if (!ret) {
+                console.log(object.id, "tried to ranged attack", this.target.id, "got", ret);
+                return true;
+            }
+        }
+        return false;
+    }
+}
+KillBuilding.actionType = "🧨";
+
+class StructureWrapper extends GameObjectWrapper {
+    constructor(structure) {
+        super(structure);
+        this.actionKill = false;
+    }
+    get hits() {
+        return this.get().hits;
+    }
+    get hitsMax() {
+        return this.get().hitsMax;
+    }
+    get my() {
+        return !!this.get().my;
+    }
+    get enemy() {
+        return !!(this.get().my === false);
+    }
+    get neutral() {
+        return !!(this.get().my === undefined);
+    }
+    update() {
+        console.log("struct update", this.id, this.my);
+        if (this.enemy)
+            this.updateKill();
+    }
+    updateKill() {
+        if (!this.actionKill) {
+            this.actionKill = new KillBuilding(this);
+        }
+        if (this.actionKill)
+            this.actionKill.display();
+        this.actionKill.requiredParts.setAmount(ATTACK, 1);
+        this.actionKill.requiredParts.setAmount(RANGED_ATTACK, 1);
+    }
+}
+
+class HasStorageWrapper extends StructureWrapper {
+    constructor(structure) {
+        super(structure);
+        this.actionPickup = false;
+        this.actionDropoff = false;
+        this.store = new ResourceInfoCollection();
+        this.store.updateFromStore(structure.store);
+    }
+    update(autoPickup = true, autoDropoff = true) {
+        super.update();
+        if (this.my || this.neutral) {
+            this.store.updateFromStore(this.get().store);
+            let maybeMax = this.get().store.getCapacity();
+            if (maybeMax == null)
+                maybeMax = this.get().store.getCapacity(RESOURCE_ENERGY);
+            if (maybeMax)
+                this.store.setMaxTotal(maybeMax);
+            if (autoPickup)
+                this.updatePickup();
+            if (autoDropoff)
+                this.updateDropoff();
+            if (this.actionDropoff)
+                this.actionDropoff.display();
+            if (this.actionPickup)
+                this.actionPickup.display();
+        }
+    }
+    updateDropoff() {
+        let dropoffResources = this.store.getTypesByAmountAllowed();
+        let dropoffResourceKeys = dropoffResources.getTypes();
+        if (dropoffResourceKeys.length > 0) {
+            if (!this.actionDropoff) {
+                console.log(this.id, "making dropoff");
+                this.actionDropoff = new Dropoff(this);
+            }
+            this.actionDropoff.resourceAmounts.updateFromCollection(dropoffResources);
+        }
+        else if (this.actionDropoff) {
+            console.log(this.id, "deleting dropoff");
+            this.cancelDropoff();
+        }
+    }
+    cancelDropoff() {
+        if (this.actionDropoff)
+            deleteAction(this.actionDropoff);
+        this.actionDropoff = false;
+    }
+    updatePickup() {
+        let pickupResources = this.store.getTypesByAmountOverMax();
+        let pickupResourceKeys = pickupResources.getTypes();
+        if (pickupResourceKeys.length > 0) {
+            if (!this.actionPickup) {
+                console.log(this.id, "making Pickup");
+                this.actionPickup = new Pickup(this);
+            }
+            this.actionPickup.resourceAmounts.updateFromCollection(pickupResources);
+        }
+        else if (this.actionPickup) {
+            console.log(this.id, "deleting pickup");
+            this.cancelPickup();
+        }
+    }
+    cancelPickup() {
+        if (this.actionPickup)
+            deleteAction(this.actionPickup);
+        this.actionPickup = false;
+    }
+}
+
+Creep.prototype.structureType = "creep";
+Creep.prototype.getWrapper = function () {
+    let wrapper = getObjectWrapper(this);
+    if (wrapper)
+        return wrapper;
+    wrapper = createObjectWrapper(CreepWrapper, this);
+    creepWrappers.set(wrapper.id, wrapper);
+    return wrapper;
+};
+let creepWrappers = new Map();
+setInterval(() => {
+    creepWrappers.forEach(wrapper => {
+        if (!wrapper.get().exists) {
+            creepWrappers.delete(wrapper.id);
+            return;
+        }
+        wrapper.move();
+    });
+}, 1, builtInQueues.MOVEMENT);
+function newBodyClassification() {
+    return {
+        hasAttack: false, hasRanged: false, hasHeal: false,
+        hasAttackActive: false, hasRangedActive: false, hasHealActive: false,
+        numAttack: 0, numRanged: 0, numHeal: 0,
+        numAttackActive: 0, numRangedActive: 0, numHealActive: 0,
+        hasWork: false, hasCarry: false,
+        numWork: 0, numCarry: 0,
+        fatness: 0, toughness: 0
+    };
+}
+var CreepClass;
+(function (CreepClass) {
+    CreepClass["healer"] = "\uD83D\uDC68\u200D\u2695\uFE0F";
+    CreepClass["ranged"] = "\uD83C\uDFF9";
+    CreepClass["attacker"] = "\uD83E\uDD3A";
+    CreepClass["sheild"] = "\uD83D\uDEE1";
+    CreepClass["paladin"] = "\uD83C\uDFC7";
+    CreepClass["poop"] = "\uD83D\uDCA9";
+    CreepClass["wounded"] = "\uD83E\uDE79";
+    CreepClass["hauler"] = "\uD83D\uDE9A";
+    CreepClass["worker"] = "\uD83D\uDE9C";
+    CreepClass["miner"] = "\u26CF";
+})(CreepClass || (CreepClass = {}));
+function classifyCreep(creepWrapper, woundedThreshold = 0.5) {
+    if (creepWrapper instanceof Creep) {
+        creepWrapper = creepWrapper.getWrapper();
+    }
+    let creep = creepWrapper.get();
+    let bodyClass = creepWrapper.getBodyClassification();
+    let highestPartCount = Math.max(bodyClass.numAttack, bodyClass.numRanged, bodyClass.numHeal);
+    let activePartCount = bodyClass.numAttackActive + bodyClass.numHealActive + bodyClass.numRangedActive;
+    if (creep.hits <= creep.hitsMax * woundedThreshold || activePartCount == 0) {
+        return CreepClass.wounded;
+    }
+    else if (bodyClass.numAttack == highestPartCount) {
+        if (bodyClass.hasHeal && bodyClass.numAttack * 0.5 <= bodyClass.numHeal) {
+            return CreepClass.sheild;
+        }
+        if (bodyClass.hasRanged && bodyClass.numAttack * 0.5 <= bodyClass.numRanged) {
+            return CreepClass.poop;
+        }
+        return CreepClass.attacker;
+    }
+    else if (bodyClass.numRanged == highestPartCount) {
+        if (bodyClass.numRanged * 0.5 <= bodyClass.numHeal) {
+            return CreepClass.paladin;
+        }
+        if (bodyClass.hasAttack && bodyClass.numRanged * 0.5 <= bodyClass.numAttack) {
+            return CreepClass.poop;
+        }
+        return CreepClass.ranged;
+    }
+    else if (bodyClass.numHeal == highestPartCount) {
+        if (bodyClass.hasAttack && bodyClass.numHeal * 0.5 <= bodyClass.numAttack) {
+            return CreepClass.poop;
+        }
+        if (bodyClass.hasRanged && bodyClass.numHeal * 0.5 <= bodyClass.numRanged) {
+            return CreepClass.poop;
+        }
+        return CreepClass.healer;
+    }
+    else if (bodyClass.numWork == highestPartCount) {
+        if (bodyClass.hasCarry && bodyClass.numWork * 0.5 <= bodyClass.numCarry) {
+            return CreepClass.miner;
+        }
+        return CreepClass.worker;
+    }
+    else if (bodyClass.numCarry == highestPartCount) {
+        if (bodyClass.hasWork) {
+            return CreepClass.worker;
+        }
+        return CreepClass.hauler;
+    }
+    return CreepClass.poop;
+}
+class CreepBody {
+    constructor(creepWrapper) {
+        this.woundedThreshold = 0.55;
+        this.creepWrapper = creepWrapper;
+        this.body = creepWrapper.get().body;
+        this.updateBody();
+        this.bodyClassification = this.setupBodyClassification(creepWrapper);
+        this.creepClass = new CachedValue(() => {
+            return classifyCreep(creepWrapper.get(), this.woundedThreshold);
+        }, getSettings().creepClassCacheTicks, false);
+    }
+    updateBody() {
+        this.body = this.creepWrapper.get().body;
+    }
+    getBodyClassification() {
+        let classification = this.bodyClassification.get();
+        return classification;
+    }
+    setupBodyClassification(creepWrapper) {
+        return new CachedValue(() => {
+            let creep = creepWrapper.get();
+            let ret = newBodyClassification();
+            if (!creep.exists)
+                return ret;
+            console.log("counting body parts", creep.body.length);
+            ret.hasAttack = ret.hasRanged = ret.hasHeal = false;
+            ret.numAttack = ret.numRanged = ret.numHeal = 0;
+            ret.hasAttackActive = ret.hasRangedActive = ret.hasHealActive = false;
+            ret.numAttackActive = ret.numRangedActive = ret.numHealActive = 0;
+            for (let part of creep.body) {
+                if (part.type == ATTACK) {
+                    ret.hasAttack = true;
+                    ret.numAttack++;
+                    if (part.hits > 0) {
+                        ret.hasAttackActive = true;
+                        ret.numAttackActive++;
                     }
                 }
-                if (!this.path) {
-                    let ret = searchPath(this.currentLocation, this.targetLocation, { range: this.targetDistance, costMatrix: getCM() });
-                    this.path = ret.path;
-                    this.currentPathIndex = 0;
-                    console.log(this.id, "got path", ret);
-                    drawPath(this.path, "#0000ff");
+                if (part.type == RANGED_ATTACK) {
+                    ret.numRanged++;
+                    ret.hasRanged = true;
+                    if (part.hits > 0) {
+                        ret.hasRangedActive = true;
+                        ret.numRangedActive++;
+                    }
                 }
-                let nextPos = this.path[this.currentPathIndex];
-                if (!nextPos) {
-                    console.log(this.id, "is broken! no next path");
-                    this.currentPathIndex = 0;
-                    this.path = false;
-                    this.moveToClosestTarget();
+                if (part.type == HEAL) {
+                    ret.hasHeal = true;
+                    ret.numHeal++;
+                    if (part.hits > 0) {
+                        ret.hasHealActive = true;
+                        ret.numHealActive++;
+                    }
+                }
+                if (part.type == CARRY) {
+                    ret.hasCarry = true;
+                    ret.numCarry++;
+                }
+                if (part.type == WORK) {
+                    ret.hasWork = true;
+                    ret.numWork++;
+                }
+            }
+            return ret;
+        });
+    }
+    getCreepClass() {
+        return this.creepClass.get();
+    }
+    isAttacker(onlyActive = false) {
+        let description = this.bodyClassification.get();
+        if (onlyActive) {
+            return description.hasAttackActive;
+        }
+        else {
+            return description.hasAttack;
+        }
+    }
+    isRangedAttacker(onlyActive = false) {
+        let description = this.bodyClassification.get();
+        if (onlyActive) {
+            return description.hasRangedActive;
+        }
+        else {
+            return description.hasRanged;
+        }
+    }
+    isHealer(onlyActive = false) {
+        let description = this.bodyClassification.get();
+        if (onlyActive) {
+            return description.hasHealActive;
+        }
+        else {
+            return description.hasHeal;
+        }
+    }
+    isWorker() {
+        return this.body.some((part) => part.type == WORK);
+    }
+    isHauler() {
+        return this.body.some((part) => part.type == CARRY);
+    }
+    hasPart(partType) {
+        return this.body.some((part) => part.type == partType);
+    }
+    numParts(partType) {
+        return this.body.filter((part) => part.type == partType).length;
+    }
+}
+class CreepWrapper extends HasStorageWrapper {
+    constructor(creep) {
+        super(creep);
+        this._action = false;
+        this.targetPrimary = false;
+        this.targetsSecondary = [];
+        this.targetLocation = false;
+        this.forcedMoveDir = false;
+        this._spawning = false;
+        this.body = new CreepBody(this);
+        if (creepWrappers.has(this.id)) {
+            throw new Error("duplicate creep wrapper!" + this.id);
+        }
+        creepWrappers.set(this.id, this);
+    }
+    get action() {
+        if (!this._action || !this._action.valid()) {
+            this._action = findClosestAction(this, [BasePartAction, BaseResourceAction]);
+            if (!this._action)
+                console.log("no action found!!!");
+            else {
+                this._action.assign(this);
+            }
+        }
+        if (this._action) {
+            return this._action;
+        }
+        return false;
+    }
+    set action(newVal) {
+        this._action = newVal;
+    }
+    get spawning() {
+        return this._spawning;
+    }
+    set spawning(isSpawning) {
+        if (!isSpawning) {
+            this.body = new CreepBody(this);
+        }
+    }
+    getCreepClass() {
+        return this.body.getCreepClass();
+    }
+    getBodyClassification() {
+        return this.body.getBodyClassification();
+    }
+    hasBodyPart(part) {
+        return this.body.hasPart(part);
+    }
+    isFull() {
+        return this.get().store.getFreeCapacity() == 0;
+    }
+    update() {
+        super.update(false, false);
+        if (!this.my)
+            return;
+        let action = this.action;
+        if (action) {
+            console.log(this.id, "has action", action.id);
+        }
+    }
+    run() {
+        let action = this.action;
+        if (!action) {
+            console.log(this.id, "has no action, doing nothing");
+            return;
+        }
+        let rangeToAction = getSettings().getRange(this, action.target);
+        console.log(this.id, "range to action", rangeToAction, "max range", action.maxRange);
+        if (rangeToAction <= action.maxRange) {
+            let actionDone = action.doJob(this);
+            if (actionDone == true) {
+                console.log(this.id, "finished action", action.id);
+                this.action && this.action.unassign(this);
+                this.action = false;
+            }
+        }
+    }
+    move() {
+        let action = this.action;
+        if (!action) {
+            console.log(this.id, "has no action, not moving");
+            return;
+        }
+        let rangeToAction = getSettings().getRange(this, action.target);
+        if (rangeToAction > action.maxRange) {
+            this.get().moveTo(action.target);
+        }
+    }
+}
+
+class CreepSquad {
+    constructor() {
+        this.desiredParts = new BodyPartInfoCollection();
+        this._currentParts = new CachedValue(() => {
+            let currentParts = new BodyPartInfoCollection();
+            this.creeps.forEach(creep => {
+                let bodyInfo = creep.getBodyClassification();
+                if (bodyInfo.hasAttack) {
+                    currentParts.addAmount(ATTACK, bodyInfo.numAttack);
+                }
+                if (bodyInfo.hasRanged) {
+                    currentParts.addAmount(RANGED_ATTACK, bodyInfo.numRanged);
+                }
+                if (bodyInfo.hasHeal) {
+                    currentParts.addAmount(HEAL, bodyInfo.numHeal);
+                }
+                if (bodyInfo.hasCarry) {
+                    currentParts.addAmount(CARRY, bodyInfo.numCarry);
+                }
+                if (bodyInfo.hasWork) {
+                    currentParts.addAmount(WORK, bodyInfo.numWork);
+                }
+            });
+            return currentParts;
+        }, Infinity, false);
+        this.creeps = [];
+        let ttl = 1;
+        this.attackers = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.attacker);
+        }, ttl);
+        this.ranged = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.ranged);
+        }, ttl);
+        this.healers = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.healer);
+        }, ttl);
+        this.sheilds = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.sheild);
+        }, ttl);
+        this.paladins = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.paladin);
+        }, ttl);
+        this.poops = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.poop);
+        }, ttl);
+        this.wounded = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.wounded);
+        }, ttl);
+        this.haulers = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.hauler);
+        }, ttl);
+        this.workers = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.worker);
+        }, ttl);
+        this.miners = new CachedValue(() => {
+            return this.creeps.filter((creep) => creep.getCreepClass() == CreepClass.miner);
+        }, ttl);
+    }
+    get currentParts() {
+        return this._currentParts;
+    }
+    get missingParts() {
+        return this.desiredParts.diff(this.currentParts.value);
+    }
+    get avgLocation() {
+        let totalX = 0;
+        let totalY = 0;
+        this.creeps.forEach(creep => {
+            totalX += creep.x;
+            totalY += creep.y;
+        });
+        let numCreeps = this.creeps.length;
+        return {
+            x: totalX / numCreeps,
+            y: totalY / numCreeps
+        };
+    }
+    addCreep(creep) {
+        this._currentParts.clearValue();
+        this.creeps.push(creep);
+    }
+    setCreeps(creeps) {
+        this._currentParts.clearValue();
+        this.creeps = creeps;
+    }
+}
+
+function updateStructures(intel, roomIntel) {
+    let allBuildings = getObjectsByPrototype(Structure);
+    allBuildings.forEach((building) => {
+        if (!building.getWrapper)
+            return;
+        let wrapper = building.getWrapper();
+        if (building instanceof OwnedStructure) {
+            if (building.my) {
+                intel.myBuildings.set(wrapper.id, wrapper);
+                roomIntel.myBuildings.set(wrapper.id, wrapper);
+            }
+            else if (building.my === false) {
+                intel.enemyBuildings.set(wrapper.id, wrapper);
+                roomIntel.enemyBuildings.set(wrapper.id, wrapper);
+            }
+            else {
+                intel.neutralBuildings.set(wrapper.id, wrapper);
+                roomIntel.neutralBuildings.set(wrapper.id, wrapper);
+            }
+        }
+    });
+}
+function updateCreeps(intel, roomIntel) {
+    let allCreeps = getObjectsByPrototype(Creep);
+    allCreeps.forEach((creep) => {
+        if (creep.spawning) {
+            console.log("intel skipping spawnin creep");
+            return;
+        }
+        let wrapper = creep.getWrapper();
+        if (creep.my) {
+            intel.myCreeps.set(wrapper.id, wrapper);
+            roomIntel === null || roomIntel === void 0 ? void 0 : roomIntel.myCreeps.set(wrapper.id, wrapper);
+        }
+        else {
+            intel.enemyCreeps.set(wrapper.id, wrapper);
+            roomIntel === null || roomIntel === void 0 ? void 0 : roomIntel.enemyCreeps.set(wrapper.id, wrapper);
+        }
+    });
+}
+function updateRoomIntel(roomName, intel, allRooms) {
+    let roomIntel = intel.getRoomIntel(roomName);
+    if (!roomIntel)
+        return;
+    updateCreeps(intel, roomIntel);
+    updateStructures(intel, roomIntel);
+}
+class Intel {
+    constructor() {
+        this.rooms = new Map();
+        this.myCreeps = new Map();
+        this.mySquads = new Map();
+        this.myBuildings = new Map();
+        this.enemyCreeps = new Map();
+        this.enemySquads = new Map();
+        this.enemyBuildings = new Map();
+        this.neutralBuildings = new Map();
+    }
+    getRoomIntel(roomName = "arena") {
+        if (!this.rooms.has(roomName)) {
+            let roomIntel = new RoomIntel(roomName);
+            this.rooms.set(roomName, roomIntel);
+            return roomIntel;
+        }
+        return this.rooms.get(roomName);
+    }
+    updateIntel() {
+        this.rooms.forEach((roomIntel, roomName) => {
+            let nextUpdateTick = (roomIntel.updateLastTick + roomIntel.updateFrequency);
+            let currentTick = getSettings().getTick();
+            if (nextUpdateTick <= currentTick) {
+                updateRoomIntel(roomName, this, this.rooms);
+                roomIntel.updateLastTick = currentTick;
+            }
+        });
+    }
+}
+class RoomIntel {
+    constructor(name, updateFrequency = getSettings().intelUpdateFrequency) {
+        this.updateLastTick = -1;
+        this.myCreeps = new Map();
+        this.mySquads = new Map();
+        this.myBuildings = new Map();
+        this.enemyCreeps = new Map();
+        this.enemySquads = new Map();
+        this.enemyBuildings = new Map();
+        this.neutralBuildings = new Map();
+        this.name = name;
+        this.updateFrequency = updateFrequency;
+    }
+}
+let intel = new Intel();
+
+StructureContainer.prototype.getWrapper = function () {
+    let wrapper = getObjectWrapper(this);
+    if (wrapper)
+        return wrapper;
+    wrapper = createObjectWrapper(ContainerWrapper, this);
+    return wrapper;
+};
+class ContainerWrapper extends HasStorageWrapper {
+    static doUpdate(creep) {
+    }
+    static doRun(creep) {
+    }
+    constructor(container) {
+        super(container);
+        let capacity = container.store.getCapacity(RESOURCE_ENERGY) || 0;
+        this.store.updateMaxTotal(capacity);
+    }
+    update() {
+        super.update();
+        let energyInfo = this.store.get(RESOURCE_ENERGY);
+        energyInfo.min = energyInfo.max = 0;
+        ContainerWrapper.doUpdate(this);
+    }
+    run() {
+        ContainerWrapper.doRun(this);
+    }
+}
+
+StructureSpawn.prototype.getWrapper = function () {
+    let wrapper = getObjectWrapper(this);
+    if (wrapper)
+        return wrapper;
+    wrapper = createObjectWrapper(SpawnWrapper, this);
+    return wrapper;
+};
+class SpawnWrapper extends HasStorageWrapper {
+    constructor(spawn) {
+        super(spawn);
+        this.spawning = false;
+        let capacity = spawn.store.getCapacity(RESOURCE_ENERGY) || 0;
+        this.store.updateMaxTotal(capacity);
+    }
+    static doUpdate(spawn) {
+    }
+    static doRun(spawn) {
+    }
+    update() {
+        super.update();
+        let energyInfo = this.store.get(RESOURCE_ENERGY);
+        energyInfo.min = energyInfo.max = this.store.maxTotal;
+        SpawnWrapper.doUpdate(this);
+    }
+    run() {
+        SpawnWrapper.doRun(this);
+    }
+    getAvailEnergy() {
+        return this.get().store.getUsedCapacity(RESOURCE_ENERGY) || 0;
+    }
+    designBody(primaryPart, secondaryPart = false, secondaryPerPrimary = 0, fatness = 1, toughness = 0, energyAvail = false) {
+        if (!energyAvail) {
+            energyAvail = this.getAvailEnergy();
+        }
+        let toughPerPrimary = toughness + secondaryPerPrimary;
+        let movePerPrimary = fatness > 0 ? (1 + secondaryPerPrimary + toughPerPrimary) / (fatness) : 0;
+        let primaryCost = BODYPART_COST[primaryPart];
+        let secondaryCost = 0;
+        if (secondaryPart) {
+            secondaryCost = BODYPART_COST[secondaryPart] * secondaryPerPrimary;
+        }
+        let moveCost = BODYPART_COST[MOVE] * movePerPrimary;
+        let toughCost = BODYPART_COST[TOUGH] * toughPerPrimary;
+        let costPerPrimary = Math.floor(primaryCost + secondaryCost + moveCost + toughCost);
+        let totalParts = Math.floor(energyAvail / costPerPrimary);
+        let numMove = Math.floor(totalParts * movePerPrimary);
+        let numTough = Math.floor(totalParts * toughPerPrimary);
+        let numSecondary = Math.floor(totalParts * secondaryPerPrimary);
+        let numPrimary = totalParts;
+        let body = Array(numMove + numTough + numSecondary + numPrimary);
+        body.fill(TOUGH, 0, numTough);
+        body.fill(primaryPart, numTough, numTough + numPrimary);
+        if (secondaryPart) {
+            body.fill(secondaryPart, numTough + numPrimary, numTough + numPrimary + numSecondary);
+        }
+        body.fill(MOVE, numTough + numPrimary + numSecondary, numTough + numPrimary + numSecondary + numMove);
+        return body;
+    }
+    spawnCreep(body) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let spawn = this.get();
+            let res = spawn.spawnCreep(body);
+            return new Promise$1((resolve, reject) => {
+                if (res.error) {
+                    reject(res.error);
                     return;
                 }
-                let direction = getDirection(nextPos.x - this.currentLocation.x, nextPos.y - this.currentLocation.y);
-                console.log(this.id, "moving creeps", direction, this.creeps.length, this.retreating, this.retreatingToHeal);
-                for (let creep of this.creeps) {
-                    let thisDirection = direction;
-                    creep.smartMove(thisDirection);
-                }
-                this.currentPathIndex++;
-                if (direction == TOP_RIGHT || direction == RIGHT || direction == BOTTOM_RIGHT)
-                    this.currentLocation.x++;
-                if (direction == TOP_LEFT || direction == LEFT || direction == BOTTOM_LEFT)
-                    this.currentLocation.x--;
-                if (direction == TOP_RIGHT || direction == TOP || direction == TOP_LEFT)
-                    this.currentLocation.y--;
-                if (direction == BOTTOM_LEFT || direction == BOTTOM || direction == BOTTOM_RIGHT)
-                    this.currentLocation.y++;
-            }
-        }
-    }
-    retreatToOurFlag(ourFlag_in, retreatToHeal, distToOurFlag) {
-        console.log("---------------------Retreating!!!------------------", retreatToHeal);
-        let ourFlag = getObjectsByPrototype(Flag).filter((f) => f.my)[0];
-        let retreatPath;
-        if (retreatToHeal) {
-            let enemyAttackers = getObjectsByPrototype(Creep).filter(c => !c.my && (c.isAttacker(true) || c.isRangedAttacker(true)));
-            let goals = [];
-            [...enemyAttackers].forEach((loc) => {
-                goals.push({
-                    pos: loc,
-                    range: 20
-                });
+                this.spawning = true;
+                let spawningCreep = res.object;
+                spawningCreep.spawning = true;
+                let intId = setInterval(() => {
+                    getObjectsByPrototype(Creep);
+                    if (spawningCreep.x !== this.x || spawningCreep.y !== this.y) {
+                        this.spawning = false;
+                        spawningCreep.spawning = false;
+                        resolve(spawningCreep.getWrapper());
+                        clearInterval(intId);
+                    }
+                }, 1, builtInQueues.TICK_INIT);
             });
-            retreatPath = searchPath(this.currentLocation, goals, { flee: true });
-            retreatPath.path.reverse();
-            console.log("retreat got path", retreatPath);
-        }
-        else {
-            retreatPath = searchPath(this.currentLocation, ourFlag, { range: 1, costMatrix: getCM() });
-        }
-        drawPath(retreatPath.path, "#ff0000");
-        if (!retreatPath.incomplete && retreatPath.path.length > 4) {
-            let howFarToRetreat = Math.min(retreatPath.path.length - 1, 0);
-            if (!retreatToHeal) {
-                if (distToOurFlag < 15) {
-                    howFarToRetreat = Math.max(0, retreatPath.path.length - 2);
-                }
-                else {
-                    howFarToRetreat = Math.max(0, retreatPath.path.length - 2);
-                }
-            }
-            let retreatPos = retreatPath.path[howFarToRetreat];
-            if (!retreatPos) {
-                console.log('invalid retreat pos for first go, using end pos');
-                retreatPos = retreatPath.path[retreatPath.path.length - 1];
-            }
-            console.log(this.id, "retreating!", retreatPos, retreatPath.path.length, howFarToRetreat);
-            if (retreatToHeal) {
-                this.assignLocation(retreatPos.x, retreatPos.y, 1, false, false);
-            }
-            else {
-                this.lastTarget = ourFlag;
-                this.assignLocation(ourFlag.x, ourFlag.y, 3, true, false);
-            }
-            this.retreating = true;
-        }
+        });
     }
 }
 
-class defendLocation extends baseGoal {
-    constructor(id, parent = false, x, y) {
-        super(id, parent);
-        this.x = x;
-        this.y = y;
-        this.squad = new Squad("defense", { heal: 4, attack: 0, ranged: 4 });
-        this.squad.assignLocation(this.x, this.y, 0, true);
-    }
-    static makeId(x, y) {
-        return `${defendLocation.type}-${x}-${y}`;
-    }
-    assignCreep(creep) {
-        if (this.squad.assignCreep(creep)) {
-            creep.goalId = this.id;
-            return true;
-        }
-        return false;
-    }
-    assignTarget(target) {
-        console.log(this.id, "checking creep", target.id);
-        if (target instanceof Creep || (target instanceof Flag && target.my)) {
-            if (this.squad.assignTarget(target)) {
-                target.goalId = this.id;
-                return true;
-            }
-        }
-        return false;
-    }
-    runGoal() {
-        console.log("running goal", this.id);
-        this.squad.runSquad(75, 0, true);
-        this.squad.assignLocation(this.x, this.y, 0, true, true);
-        text("d", this);
-    }
-}
-defendLocation.type = "defend";
-
-let attackPath;
-class attackLocation extends baseGoal {
-    constructor(id, parent, x, y) {
-        super(id, parent);
-        this.x = x;
-        this.y = y;
-        this.squadL = new Squad("left", { heal: 0, attack: 0, ranged: 0 });
-        this.squadR = new Squad("right", { heal: 0, attack: 0, ranged: 0 });
-        this.squadF = new Squad("forward", { heal: 20, attack: 8, ranged: 20 });
-        this.squadF.leadSquad = true;
-        let ourFlag = getObjectsByPrototype(Flag).filter((f) => f.my)[0];
-        attackPath = searchPath(ourFlag, this, { costMatrix: getCM() });
-        let startPos = attackPath.path[Math.floor(attackPath.path.length / 3)];
-        this.squadF.assignLocation(startPos.x, startPos.y);
-    }
-    static makeId(x, y) {
-        return `${attackLocation.type}-${x}-${y}`;
-    }
-    assignCreep(creep) {
-        if (this.squadF.assignCreep(creep)) {
-            creep.goalId = this.id;
-            if (this.squadF.creeps.length == 1) ;
-            return true;
-        }
-        if (this.squadL.assignCreep(creep)) {
-            creep.goalId = this.id;
-            if (this.squadL.creeps.length == 1) {
-                this.squadL.assignLocation(creep.x, creep.y);
-            }
-            return true;
-        }
-        if (this.squadR.assignCreep(creep)) {
-            creep.goalId = this.id;
-            if (this.squadR.creeps.length == 1) {
-                this.squadR.assignLocation(creep.x, creep.y);
-            }
-            return true;
-        }
-        return false;
-    }
-    assignTarget(target) {
-        let settings = getSettings();
-        console.log(this.id, "checking target", target instanceof Creep, target instanceof BodyPart || target instanceof StructureTower || target instanceof Flag, target.constructor.name);
-        if (target instanceof Creep) {
-            if (this.squadL.assignTarget(target)) {
-                target.goalId = this.id;
-                return true;
-            }
-            if (this.squadR.assignTarget(target)) {
-                target.goalId = this.id;
-                return true;
-            }
-            if (this.squadF.assignTarget(target)) {
-                target.goalId = this.id;
-                return true;
-            }
-            return false;
-        }
-        if (target instanceof BodyPart || target instanceof StructureTower || target instanceof Flag) {
-            let myCreeps = getObjectsByPrototype(Creep).filter(c => c.my && (c.isRangedAttacker() || c.isAttacker()));
-            let enemyCreeps = getObjectsByPrototype(Creep).filter(c => !c.my && (c.isRangedAttacker() || c.isAttacker()));
-            let overPowered = myCreeps.length >= enemyCreeps.length * 2;
-            myCreeps.length * 2 <= enemyCreeps.length;
-            let closestCreep = findClosestByRange(target, myCreeps);
-            let closestEnemy = findClosestByRange(target, myCreeps);
-            let dist = 0;
-            if (closestCreep)
-                dist = getRange(target, closestCreep);
-            let enemyDist = 100;
-            if (closestEnemy)
-                enemyDist = getRange(target, closestEnemy);
-            let overPartCollectTime = settings.getTick() > 1700;
-            if (dist > enemyDist * 0.8 && !overPowered && enemyDist < 20 && !overPartCollectTime) {
-                return false;
-            }
-            let accepted = false;
-            if (!(this.squadF.lastTarget instanceof BodyPart))
-                accepted = this.squadF.assignTarget(target, dist < 20);
-            if (!(this.squadL.lastTarget instanceof BodyPart))
-                accepted = this.squadL.assignTarget(target, dist < 20) || accepted;
-            if (!(this.squadR.lastTarget instanceof BodyPart))
-                accepted = this.squadR.assignTarget(target, dist < 20) || accepted;
-            if (accepted) {
-                target.goalId = this.id;
-                return true;
-            }
-        }
-        return false;
-    }
-    runGoal() {
-        console.log("running goal", this.id);
-        let enemyFlag = getObjectsByPrototype(Flag).filter((f) => !f.my)[0];
-        let ourFlag = getObjectsByPrototype(Flag).filter((f) => f.my)[0];
-        let enemyAttackCreeps = getObjectsByPrototype(Creep).filter((c) => !c.my && (c.isRangedAttacker() || c.isAttacker()));
-        let enemyAttackCreepsWorking = getObjectsByPrototype(Creep).filter((c) => !c.my && (c.isRangedAttacker(true) || c.isAttacker(true)));
-        let enemyClosestToOurFlag = findClosestByPath(ourFlag, enemyAttackCreepsWorking);
-        let enemyClosestToTheirFlag = findClosestByRange(enemyFlag, enemyAttackCreepsWorking);
-        let enemyDistToFlag = 100;
-        let enemyDistToTheirFlag = 100;
-        if (enemyClosestToOurFlag) {
-            enemyDistToFlag = getRange(ourFlag, enemyClosestToOurFlag);
-        }
-        if (enemyClosestToTheirFlag) {
-            enemyDistToTheirFlag = getRange(enemyFlag, enemyClosestToTheirFlag);
-        }
-        let fSquadDistToEnemyFlag = getRange(this.squadF.currentLocation, enemyFlag);
-        if (this.squadF.creeps.length == 0) {
-            fSquadDistToEnemyFlag = 0;
-        }
-        let maxDistFromOurFlag;
-        if (enemyDistToFlag <= 30) {
-            maxDistFromOurFlag = enemyDistToFlag - 15;
-        }
-        else if (enemyDistToFlag <= 40) {
-            maxDistFromOurFlag = enemyDistToFlag - 5;
-        }
-        else if (enemyDistToFlag <= 50) {
-            maxDistFromOurFlag = enemyDistToFlag + 10;
-        }
-        else if (enemyDistToFlag <= 60) {
-            maxDistFromOurFlag = enemyDistToFlag + 15;
-        }
-        else {
-            maxDistFromOurFlag = enemyDistToFlag + 20;
-        }
-        maxDistFromOurFlag = Math.max(maxDistFromOurFlag, 5);
-        let minDistToEnemyFlag = fSquadDistToEnemyFlag + fSquadDistToEnemyFlag == 0 ? 0 : 5;
-        let minSideDistToEnemyFlag = Math.min(getRange(this.squadL.currentLocation, enemyFlag), getRange(this.squadR.currentLocation, enemyFlag));
-        let minFDistToEnemyFlag = minSideDistToEnemyFlag - (minSideDistToEnemyFlag == 0 ? 0 : 5);
-        let wereClosestToTheirFlag = ((enemyDistToTheirFlag) > fSquadDistToEnemyFlag && fSquadDistToEnemyFlag < 40);
-        if (enemyAttackCreeps.length < 1 || wereClosestToTheirFlag) {
-            minFDistToEnemyFlag = 0;
-            minDistToEnemyFlag = 0;
-            this.squadF.assignLocation(enemyFlag.x, enemyFlag.y, 0, true, true);
-            console.log("running for enemy flag!!!!!!!!!!!!!!!", enemyDistToTheirFlag, fSquadDistToEnemyFlag);
-        }
-        console.log("max dist info", fSquadDistToEnemyFlag, enemyDistToFlag, enemyClosestToOurFlag);
-        console.log('running squads', maxDistFromOurFlag, minDistToEnemyFlag, minSideDistToEnemyFlag, minFDistToEnemyFlag);
-        this.squadF.runSquad(0, maxDistFromOurFlag);
-        this.squadL.runSquad(minDistToEnemyFlag, maxDistFromOurFlag, false, [this.squadF, this.squadR]);
-        this.squadR.runSquad(minDistToEnemyFlag, maxDistFromOurFlag, false, [this.squadF, this.squadL]);
-        text("a", this);
-    }
-}
-attackLocation.type = "attackLocation";
-
-let settings = getSettings();
-class winCTF extends baseGoal {
-    constructor() {
-        let id = "winCTF";
-        super(id, false);
-        this.defenseGoals = [];
-        this.attackGoals = [];
-    }
-    runGoal() {
-        this.runChildGoals();
-    }
-    ;
-    runChildGoals() {
-        for (let goal of this.defenseGoals) {
-            goal.runGoal();
-        }
-        for (let goal of this.attackGoals) {
-            goal.runGoal();
-        }
-    }
-    assignCreep(creep) {
-        for (let dGoal of this.defenseGoals) {
-            if (dGoal.assignCreep(creep))
-                return true;
-        }
-        for (let aGoal of this.attackGoals) {
-            if (aGoal.assignCreep(creep))
-                return true;
-        }
-        return false;
-    }
-    assignTarget(target) {
-        let distToOurFlag = settings.getRange(this.defenseGoals[0], target);
-        if (distToOurFlag < 10) {
-            for (let dGoal of this.defenseGoals) {
-                if (dGoal.assignTarget(target))
-                    return true;
-            }
-        }
-        else {
-            for (let aGoal of this.attackGoals) {
-                if (aGoal.assignTarget(target))
-                    return true;
-            }
-        }
-        return false;
-    }
-    ;
-    setupChildGoals() {
-        let flags = getObjectsByPrototype(Flag);
-        console.log("checking flags", flags.length);
-        for (let flag of flags) {
-            console.log("setting up child goals", this.id);
-            if (flag.my) {
-                let goalId = `defend-${flag.x}-${flag.y}`;
-                if (!goals.has(goalId)) {
-                    console.log("making defend goal", flag);
-                    let defendGoal = new defendLocation(goalId, this, flag.x, flag.y);
-                    this.defenseGoals.push(defendGoal);
-                }
-            }
-            else {
-                let goalId = `attack-${flag.x}-${flag.y}`;
-                if (!goals.has(goalId)) {
-                    console.log("Making attack goal", flag);
-                    let attackGoal = new attackLocation(goalId, this, flag.x, flag.y);
-                    this.attackGoals.push(attackGoal);
-                    attackGoal.assignTarget(flag);
-                }
-            }
-        }
-    }
-}
-winCTF.type = "winCTF";
-
-new objectManager();
-console.log("Starting!");
-let init = false;
-let myTower;
-let handledBodyPartIds = [];
-let winGoal;
+runtimeSettings.getTick();
+let squad = new CreepSquad();
+squad.desiredParts.setAmount(ATTACK, 8);
+squad.desiredParts.setAmount(RANGED_ATTACK, 8);
+squad.desiredParts.setAmount(HEAL, 8);
+squad.desiredParts.setAmount(CARRY, 10);
+let mySpawn;
+let init = true;
+let rInfo = intel.getRoomIntel();
 function loop() {
-    let enemyCreeps = getObjectsByPrototype(Creep).filter(c => !c.my);
-    getObjectsByPrototype(Flag).filter((f) => f.my)[0];
-    if (!init) {
-        console.log("----------------running init code----------------------");
-        overrideSettings(runtimeSettings);
-        winGoal = new winCTF();
-        winGoal.setupChildGoals();
-        let towers = getObjectsByPrototype(StructureTower);
-        for (let tower of towers) {
-            if (tower.my) {
-                myTower = tower;
+    console.log("main loop start");
+    intel.updateIntel();
+    console.log("num neutral buildings", rInfo.neutralBuildings.size);
+    if (init) {
+        intel.myBuildings.forEach(building => {
+            if (building.my && building instanceof SpawnWrapper) {
+                mySpawn = building;
             }
-            else {
-                winGoal.assignTarget(tower);
-            }
-        }
-        let flags = getObjectsByPrototype(Flag);
-        for (let flag of flags) {
-            winGoal.assignTarget(flag);
-        }
-        init = true;
+            else if (!building.my && building instanceof SpawnWrapper) ;
+        });
+        init = false;
     }
-    console.log("------ start tick ----------");
-    let creeps = getObjectsByPrototype(Creep);
-    for (let creep of creeps) {
-        if (creep.my) {
-            if (!creep.goalId) {
-                console.log("orphaned creep, searching for goal", creep.id);
-                if (winGoal.assignCreep(creep)) {
-                    console.log(creep.id, "assigned!", creep.goalId, creep.squadId);
-                }
-                else {
-                    console.log(creep.id, "cound't find a goal!");
-                }
-            }
-        }
-        else {
-            if (!creep.goalId && (creep.isAttacker() || creep.isRangedAttacker())) {
-                winGoal.assignTarget(creep);
-            }
-        }
-    }
-    let bodyParts = getObjectsByPrototype(BodyPart);
-    for (let part of bodyParts) {
-        if (!handledBodyPartIds.includes(part.id)) {
-            winGoal.assignTarget(part);
-            handledBodyPartIds.push(part.id);
-        }
-    }
-    winGoal.runGoal();
-    let injuredCreeps = getObjectsByPrototype(Creep).filter(c => c.my && c.hits < c.hitsMax);
-    let secondaryTargets = findInRange(myTower, enemyCreeps, 10);
-    let injuredMembers = findInRange(myTower, injuredCreeps, 10);
-    if (injuredMembers.length > 0) {
-        let target = findClosestByRange(myTower, injuredMembers);
-        myTower.heal(target);
-    }
-    else if (secondaryTargets.length > 0) {
-        let target = findClosestByRange(myTower, secondaryTargets);
-        if (target.hits < target.hitsMax * 0.9) {
-            let ret = myTower.attack(target);
-            console.log("tower tried to attack", target.id, "got", ret);
-        }
-    }
+    startTick();
+    console.log("in regular main");
     endTick();
 }
+SpawnWrapper.doRun = function (wrapper) {
+    if (!wrapper.my) {
+        console.log("enemy spawn", wrapper.id);
+        return;
+    }
+    if (wrapper.spawning) {
+        console.log("already spawning");
+        return;
+    }
+    wrapper.get();
+    let neededParts = squad.missingParts;
+    if (neededParts.total == 0) {
+        return;
+    }
+    let energyAvail = wrapper.getAvailEnergy();
+    if (energyAvail < (wrapper.get().store.getCapacity(RESOURCE_ENERGY) || 0) * 0.5) {
+        return;
+    }
+    let body = false;
+    if (neededParts.getAmount(CARRY) > 0) {
+        neededParts.getAmount(CARRY);
+        body = mySpawn.designBody(CARRY);
+    }
+    else if (neededParts.getAmount(ATTACK) > 0) {
+        body = mySpawn.designBody(ATTACK, false, 0, 1, 1);
+    }
+    else if (neededParts.getAmount(RANGED_ATTACK) > 0) {
+        body = mySpawn.designBody(RANGED_ATTACK);
+    }
+    else if (neededParts.getAmount(HEAL) > 0) {
+        body = mySpawn.designBody(HEAL);
+    }
+    if (body) {
+        let ret = wrapper.spawnCreep(body);
+        ret.then((newCreep) => {
+            console.log("new creep spawned");
+            squad.addCreep(newCreep);
+        });
+    }
+};
 
 export { loop };
 

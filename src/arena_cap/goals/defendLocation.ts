@@ -2,7 +2,7 @@
 import { Squad } from "arena_cap/squad";
 import { Creep } from "game/prototypes";
 import { FakeGameObject } from "shared/utils/settings";
-import { baseGoal, Goal, idType } from "subsystems/goal";
+import { baseGoal, Goal, idType } from "shared/subsystems/planning/goal";
 //@ts-ignore
 import { text } from "game/visual";
 import { getObjectsByPrototype } from "game/utils";

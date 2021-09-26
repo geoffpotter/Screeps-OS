@@ -1,4 +1,6 @@
-
+//import to override defaults
+import settings from "./settings";
+settings.getTick();
 
 import {
   getObjectsByPrototype,
@@ -30,36 +32,28 @@ import {
 import {
   profiler,
   profile
-} from "profiler";
+} from "shared/utils/profiling/profiler";
 
-import "prototypeCreep"
+import "prototypes/prototypeCreep"
+import "prototypes/prototypeStructure"
 
-
-import {getSettings, overrideSettings} from "shared/utils/settings"
-
-import runtimeSettings from "./settings";
-
-
-import { objectManager } from "./objectManager";
-let om = new objectManager();
-
+import intel from "../shared/subsystems/intel/intel"
 import { winCTF } from './goals/winCTF';
-
-
-
-
-console.log("Starting!")
+import { arenaInfo } from 'game';
 
 let init = false;
 
-let myTower:StructureTower;
+let myTower: StructureTower;
 
-let handledBodyPartIds:string[] = [];
+let handledBodyPartIds: string[] = [];
 let winGoal: winCTF;
 //profiler.start();
 export function loop() {
-  let enemyCreeps =  getObjectsByPrototype(Creep).filter(c => !c.my);
-  let ourFlag = getObjectsByPrototype(Flag).filter((f)=> f.my)[0];
+  intel.updateIntel();
+  let arenaIntel = intel.getRoomIntel();
+  let enemyCreeps = Array.from(arenaIntel.enemyCreeps.values());
+  let ourFlag = arenaIntel.myFlags.values().next();
+
 
   // let closestRange = 100;
   // if(enemyCreeps.length > 0) {
@@ -71,16 +65,15 @@ export function loop() {
   //  return;
   // }
 
-  if(!init) {
+  if (!init) {
     console.log("----------------running init code----------------------")
-    overrideSettings(runtimeSettings);
 
     winGoal = new winCTF();
     winGoal.setupChildGoals();
 
     let towers = getObjectsByPrototype(StructureTower);
-    for(let tower of towers) {
-      if(tower.my) {
+    for (let tower of towers) {
+      if (tower.my) {
         myTower = tower;
       } else {
         winGoal.assignTarget(tower);
@@ -88,7 +81,7 @@ export function loop() {
     }
 
     let flags = getObjectsByPrototype(Flag);
-    for(let flag of flags) {
+    for (let flag of flags) {
       winGoal.assignTarget(flag);
     }
 
@@ -98,27 +91,27 @@ export function loop() {
   startTick();
 
   let creeps = getObjectsByPrototype(Creep);
-  for(let creep of creeps) {
-    if(creep.my) {
+  for (let creep of creeps) {
+    if (creep.my) {
       //console.log("checking creep", creep.id, creep.body.reduce<string>((acc, part) => acc + "|" + part.type, ''))
-      if(!creep.goalId) {
+      if (!creep.goalId) {
         console.log("orphaned creep, searching for goal", creep.id);
-        if(winGoal.assignCreep(creep)) {
+        if (winGoal.assignCreep(creep)) {
           console.log(creep.id, "assigned!", creep.goalId, creep.squadId)
         } else {
           console.log(creep.id, "cound't find a goal!")
         }
       }
     } else {
-      if(!creep.goalId && (creep.isAttacker() || creep.isRangedAttacker())) {
+      if (!creep.goalId && (creep.isAttacker() || creep.isRangedAttacker())) {
         winGoal.assignTarget(creep);
       }
     }
   }
 
   let bodyParts = getObjectsByPrototype(BodyPart);
-  for(let part of bodyParts) {
-    if(!handledBodyPartIds.includes(part.id)) {
+  for (let part of bodyParts) {
+    if (!handledBodyPartIds.includes(part.id)) {
       winGoal.assignTarget(part);
       handledBodyPartIds.push(part.id);
     }
@@ -133,13 +126,13 @@ export function loop() {
   let injuredCreeps = getObjectsByPrototype(Creep).filter(c => c.my && c.hits < c.hitsMax)
   let secondaryTargets = findInRange(myTower, enemyCreeps, 10);
   let injuredMembers = findInRange(myTower, injuredCreeps, 10);
-  if(injuredMembers.length > 0) {
+  if (injuredMembers.length > 0) {
     let target = findClosestByRange(myTower, injuredMembers);
     myTower.heal(target);
-  } else if(secondaryTargets.length > 0) {
+  } else if (secondaryTargets.length > 0) {
     let target = findClosestByRange(myTower, secondaryTargets);
-    if(target.hits < target.hitsMax * 0.9) {
-      let ret = myTower.attack(target);
+    if (target.hits < target.hitsMax * 0.9) {
+      let ret = myTower.attack(target.get());
       console.log("tower tried to attack", target.id, "got", ret);
     }
 
@@ -147,4 +140,6 @@ export function loop() {
 
   endTick();
   //console.log(settings.getMemory())
+  //@ts-ignore
+  console.log("tick over", settings.getCpu(), arenaInfo.cpuTimeLimit, arenaInfo.cpuTimeLimitFirstTick)
 }

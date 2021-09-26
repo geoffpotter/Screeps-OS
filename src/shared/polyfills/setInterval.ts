@@ -1,7 +1,7 @@
-import { queueTask, queueMicroTask } from "./tasks"
+import { queueTask, queueMicroTask, builtInQueues } from "./tasks"
 import {getSettings} from "shared/utils/settings"
-import { uuid } from "uuid";
-import { profile, profiler } from "profiler";
+import { uuid } from "shared/utils/uuid";
+import { profile, profiler } from "shared/utils/profiling/profiler";
 
 
 
@@ -10,63 +10,57 @@ interface intervalInstance {
   func: Function;
   ticks: number;
   startTick: any;
-  cpuUsed: number
+  cpuUsed: number;
+  queueName: string;
 }
 
 
 
-let intervals: { [id: string]: intervalInstance } = {};
+let intervals: Map<string, intervalInstance> = new Map();
 
 function processIntervals() {
-  let profilerName = "setInterval:processIntervals";
-  profiler.startCall(profilerName);
+  //let profilerName = "setInterval:processIntervals";
+  //profiler.startCall(profilerName);
 
   let settings = getSettings();
-  for (let intervalId in intervals) {
-    let interval = intervals[intervalId];
-    if (!intervals[intervalId]) {
-      console.log("interval canceled:", intervalId);
-      //tasks need to requeue themseleves to run next tick
-      // so all we should need to do to cancel is return before doing so.
-      return;
-    }
+  let currentTick = settings.getTick();
+  intervals.forEach((interval)=>{
     //starting an interval before loop in arean
     if (!(interval.startTick >= 0)) {
       interval.startTick = 0;
     }
-    let currentTick = settings.getTick();
     let ticksSinceStart = currentTick - interval.startTick;
     //console.log("checking interval", currentTick, ticksSinceStart)
     //compare ticks since start to ticks we were asked to wait.
-    //queue task should queue a task to run next tick.
     if (ticksSinceStart >= interval.ticks) {
       //queue our callback as a microTask to run this tick
-      queueMicroTask(interval.func);
+      queueMicroTask(interval.func, interval.queueName);
       //reset "timer"
       interval.startTick = currentTick;
     }
-  }
-
+  })
   //add our process back in to the task list. Gotta add every tick if you wanna run next tick.
-  queueTask(processIntervals);
-  profiler.endCall(profilerName);
+  //queueTask(processIntervals);
+  //profiler.endCall(profilerName);
+
+  return false; //can return false to rerun now
 }
+//check intervals at tick init and schedule microtasks in the proper queue for resolution
+queueTask(processIntervals, builtInQueues.TICK_INIT);
 
-queueTask(processIntervals);
 
 
-
-export function clearInterval(intervalId: string | number) {
-  if (intervals[intervalId]) {
-    console.log("deleting interval:", intervals[intervalId])
-    delete intervals[intervalId];
+export function clearInterval(intervalId: string) {
+  if (intervals.has(intervalId)) {
+    console.log("deleting interval:", intervalId)
+    intervals.delete(intervalId);
   }
 }
 
 
-export function setInterval(callback: Function, ticks: number) {
-  let profilerName = "setInterval";
-  profiler.startCall(profilerName);
+export function setInterval(callback: Function, ticks: number, queueName:string="default"):string {
+  //let profilerName = "setInterval";
+  //profiler.startCall(profilerName);
   if (!(ticks > 0)) {
     throw new Error("Interval ticks must be greater than 0!")
   }
@@ -75,14 +69,15 @@ export function setInterval(callback: Function, ticks: number) {
   //setup new instance and add it to the array
   let intervalId = uuid();
   //intervals[intId] = new intervalInstance(intId, callback, ticks, getTick());
-  intervals[intervalId] = {
+  intervals.set(intervalId, {
     id: intervalId,
     func: callback,
     ticks: ticks,
     startTick: getSettings().getTick(),
     cpuUsed: 0,
-  } as intervalInstance;
-  profiler.endCall(profilerName);
+    queueName: queueName
+  });
+  //profiler.endCall(profilerName);
 
   return intervalId;
 }

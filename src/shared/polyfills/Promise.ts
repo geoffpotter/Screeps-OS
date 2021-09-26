@@ -1,5 +1,5 @@
 import { queueMicroTask } from "./tasks";
-import { profiler, profile } from "profiler";
+import { profiler, profile } from "shared/utils/profiling/profiler";
 
 //Describe to TS how I want my types structured, hopefully this will keep me from fucking up.
 
