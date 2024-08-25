@@ -1,7 +1,7 @@
 
-import { get, set } from "polyfills/FakeDash";
+import { get, set } from 'polyfills/FakeDash';
 
-import { default as logClass } from "utils/logger";
+import { default as logClass } from 'utils/logger';
 let logger = new logClass("indexingCollection");
 
 

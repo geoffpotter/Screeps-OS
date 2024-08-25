@@ -14,9 +14,6 @@ module.exports = {
     "plugin:import/warnings",
     "plugin:import/typescript"
   ],
-  ignorePatterns: [
-    "exported-game-constants.js"
-  ],
   parser: "@typescript-eslint/parser",
   parserOptions: {
     project: "tsconfig.json",
@@ -29,8 +26,7 @@ module.exports = {
     },
     "import/resolver": {
       typescript: {}
-    },
-    "import/core-modules": ["game", "game/prototypes", "game/utils", "game/path-finder","game/constants", "arena", "arena/prototypes", "arena/constants"] // https://github.com/benmosher/eslint-plugin-import/blob/v2.22.1/README.md#importcore-modules
+    }
   },
   rules: {
     "@typescript-eslint/array-type": "error",
@@ -45,6 +41,12 @@ module.exports = {
     ],
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-parameter-properties": "off",
+    "@typescript-eslint/no-shadow": [
+      "error",
+      {
+        hoist: "all"
+      }
+    ],
     "@typescript-eslint/no-unused-expressions": "error",
     "@typescript-eslint/no-use-before-define": ["error", { functions: false }],
     "@typescript-eslint/prefer-for-of": "error",
@@ -71,12 +73,7 @@ module.exports = {
     "no-invalid-this": "off",
     "no-multiple-empty-lines": "off",
     "no-new-wrappers": "error",
-    "no-shadow": [
-      "error",
-      {
-        hoist: "all"
-      }
-    ],
+    "no-shadow": "off",
     "no-throw-literal": "error",
     "no-trailing-spaces": "off",
     "no-undef-init": "error",

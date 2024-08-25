@@ -1,1 +1,0 @@
-global.SCRIPT_VERSION = 0

@@ -25,11 +25,11 @@ module.exports = function(api) {
   const plugins = [
     //['@babel/plugin-transform-modules-commonjs'],
     //["@babel/plugin-transform-arrow-functions", { "spec": false }],
-    ["babel-plugin-transform-async-to-promises"],
-    ["@babel/plugin-proposal-decorators", {
-      decoratorsBeforeExport: true, 
-      //legacy:true
-    }],
+    // ["babel-plugin-transform-async-to-promises"],
+    // ["@babel/plugin-proposal-decorators", {
+    //   decoratorsBeforeExport: true, 
+    //   //legacy:true
+    // }],
     // [
     //   "@babel/plugin-transform-runtime",
     //   {
