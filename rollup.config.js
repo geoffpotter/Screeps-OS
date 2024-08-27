@@ -18,6 +18,9 @@ for (let i = 0; i < process.argv.length; i++) {
   }
 }
 
+/**
+ * @type {null}
+ */
 let cfg;
 const dest = process.env.DEST;
 if (!dest) {
@@ -29,10 +32,13 @@ console.log("cfg", cfg)
 
 const screepsExternals = ["game", "game/prototypes", "game/constants", "game/utils", "game/path-finder", "arena", "game/visual"];
 
+/**
+ * @param {string} botSrc
+ */
 function getOptions(botSrc) {
   const outDir = botSrc.replace("src/", "dist/");
   let mainFileName = fg.sync(`${botSrc}/main.*`, { onlyFiles: true });
-  console.log(mainFileName)
+  console.log('main filename:', mainFileName)
   const options = {
     input: `${mainFileName}`,
     external: screepsExternals, // <-- suppresses the warning
@@ -41,23 +47,24 @@ function getOptions(botSrc) {
       file: outDir + "/main.js",
       format: "cjs",
       entryFileNames: "[name].js",
-      
+
       sourcemap:  true,
       // preserveModules: true,
       // preserveModulesRoot: botSrc,
-      paths: path => {     
-        console.log("processing path", path)   
+      paths: (/** @type {string} */ path) => {
+        console.log("processing path", path)
         // https://rollupjs.org/guide/en/#outputpaths
         // TS requires that we use non-relative paths for these "ambient" modules
         // The game requires relative paths, so prefix all game modules with "/" in the output bundle
         if (path.startsWith("game") || path.startsWith("arena")) {
           return "/" + path;
         }
+        return
       }
     },
 
     plugins: [
-      fixGlobals(),
+      // fixGlobals(),
       clear({ targets: targetBot === "" ? ["dist"] : [outDir] }), // If targeted build, only clear target sub-directory
       //need this to resolve relative local paths
       includePaths({
@@ -74,14 +81,16 @@ function getOptions(botSrc) {
 
           moduleDirectories: [
             "node_modules",
-            // "src/shared"
+            "src/shared"
           ],
           rootDir: "src"
       }),
       resolve({ rootDir: "src"}),
-      commonjs({ 
-        include: ["src/**"], 
+      commonjs({
+        include: ["src/**", 'node_modules/**'],
         transformMixedEsModules: true,
+        esmExternals: true,
+        requireReturnsDefault: 'auto',
 
       }),
       typescript({ tsconfig: "./tsconfig.json" }),

@@ -1,19 +1,33 @@
 {
   "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
+    "module": "es6",
+    "lib": [
+      "es6"
+    ],
+    "target": "es2015",
+    "moduleResolution": "Node",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "baseUrl": "src/",
+    "sourceMap": false,
     "strict": true,
+    "allowJs": true,
+    "checkJs": true,
+    "removeComments": true,
+    "experimentalDecorators": true,
+    "noImplicitReturns": true,
+    "allowSyntheticDefaultImports": true,
+    "allowUnreachableCode": false,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    // "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "*": [
+        "*",
+        "shared/*"
+      ]
+    }
   },
-  "include": [
-    "src/**/*.ts"
-  ],
   "exclude": [
-    "node_modules",
-    "dist"
+    "node_modules"
   ]
 }
