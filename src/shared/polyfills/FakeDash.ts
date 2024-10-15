@@ -3,7 +3,7 @@ import {
     profile
   } from "shared/utils/profiling/profiler"
 
-import { benchmark } from "shared/utils/profiling/benchmark";
+import benchmark from "shared/utils/profiling/benchmark";
 import loggerClass from "utils/logger";
 let logger = new loggerClass("fakeDash");
 

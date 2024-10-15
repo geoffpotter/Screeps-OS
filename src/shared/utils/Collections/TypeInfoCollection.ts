@@ -1,7 +1,14 @@
-import { ResourceConstant } from "game/constants";
-import { Store } from "game/prototypes";
+import Logger from "shared/utils/logger";
+let logger = new Logger("TypeInfoCollection");
+logger.enabled = false;
+export interface TypeInfoJSON<T> {
+  type: T;
+  amount: number;
+}
 
-
+export interface TypeInfoCollectionJSON<T> {
+  types: T[];
+}
 
 export class TypeInfo<ItemType> {
   type: ItemType;
@@ -11,10 +18,17 @@ export class TypeInfo<ItemType> {
   }
 }
 
-
 export class TypeInfoCollection<Type,
                                 InfoType extends TypeInfo<Type> = TypeInfo<Type>,
                                 InfoConstructorType extends { new(type: Type): InfoType } = { new(type: Type): InfoType }> {
+  static fromJSON<T>(json: TypeInfoCollectionJSON<TypeInfoJSON<T>>, infoConstructor: { new(type: T): TypeInfo<T> }): TypeInfoCollection<T> {
+    const collection = new TypeInfoCollection<T>(infoConstructor);
+    json.types.forEach(typeInfo => {
+      collection.setAmount(typeInfo.type, typeInfo.amount);
+    });
+    return collection;
+  }
+
   types: Map<Type, InfoType>;
   infoConstructor: InfoConstructorType;
   constructor(infoConstructor: InfoConstructorType) {
@@ -89,7 +103,7 @@ export class TypeInfoCollection<Type,
       if(newVal < 0 && !allowNegitive) {
         newVal = 0;
       }
-      //console.log('processing collection. on', type, theirVal, ourVal, newVal)
+      //logger.log('processing collection. on', type, theirVal, ourVal, newVal)
       diff.setAmount(type, newVal);
     }
     return diff;
@@ -128,7 +142,7 @@ export class TypeInfoCollection<Type,
     })
     unUpdatedType.forEach(type=>{
       //delete anything that wasn't updated.
-      this.types.delete(type)
+      this.setAmount(type, 0);
     })
   }
 
@@ -148,7 +162,7 @@ export class TypeInfoCollection<Type,
     })
   }
 
-  updateFromStore(store: StoreDefinition | Store<ResourceConstant>) {
+  updateFromStore(store: StoreDefinition | Store<ResourceConstant, false>) {
     //this.types.clear();\
     let unUpdatedType = new Set<Type>(this.getTypes());
     for (let resourceName in store) {
@@ -156,13 +170,12 @@ export class TypeInfoCollection<Type,
       let typeName:ResourceConstant = resourceName;
       let typeAmt = store[typeName];
       if (typeAmt > 0) {
-        //console.log("updating type from store", typeName, typeAmt)
-        //@ts-ignore typeName may not be a string.. so don't fuckin use this if it isn't.
-        this.setAmount(typeName, typeAmt);
+        logger.log("updating type from store", typeName, typeAmt)
+        this.setAmount(typeName as Type, typeAmt);
         //@ts-ignore stop fuckin around.
         unUpdatedType.delete(typeName);
       }
-
+      logger.log("updated types", this.getInfos())
     }
     unUpdatedType.forEach(type=>{
       //delete anything that wasn't updated.

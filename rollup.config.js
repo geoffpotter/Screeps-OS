@@ -1,14 +1,22 @@
 "use strict";
 
+//@ts-ignore
 import clear from "rollup-plugin-clear";
-import resolve, { nodeResolve } from "@rollup/plugin-node-resolve";
+import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import typescript from "rollup-plugin-typescript2";
 import fg from "fast-glob";
 import screeps from 'rollup-plugin-screeps';
 import babel from '@rollup/plugin-babel';
+import replace from '@rollup/plugin-replace';
+//@ts-ignore
 import fixGlobals from 'rollup-plugin-node-globals';
-import includePaths from 'rollup-plugin-includepaths'
+
+import includePaths from 'rollup-plugin-includepaths';
+import inject from '@rollup/plugin-inject';
+import path from 'path';
+
+
 
 let targetBot = "";
 for (let i = 0; i < process.argv.length; i++) {
@@ -51,21 +59,42 @@ function getOptions(botSrc) {
       sourcemap:  true,
       // preserveModules: true,
       // preserveModulesRoot: botSrc,
-      paths: (/** @type {string} */ path) => {
-        console.log("processing path", path)
-        // https://rollupjs.org/guide/en/#outputpaths
-        // TS requires that we use non-relative paths for these "ambient" modules
-        // The game requires relative paths, so prefix all game modules with "/" in the output bundle
-        if (path.startsWith("game") || path.startsWith("arena")) {
-          return "/" + path;
-        }
-        return
-      }
     },
 
     plugins: [
-      // fixGlobals(),
+      fixGlobals(),
       clear({ targets: targetBot === "" ? ["dist"] : [outDir] }), // If targeted build, only clear target sub-directory
+      replace({
+        preventAssignment: true,
+        values: {
+          "_SOURCE_MAPS_": function() {
+            console.log("building source maps")
+            // let inputs = grunt.file.expand({ filter: 'isFile'}, "shared/**/sourceMaps.js");
+            // let output = inputs[0].replace("src","");//String(inputs[0]).replace("src","");
+
+            let mapFiles = fg.sync(botSrc + "/**/*.map");
+            let mapFileBlocks = [];
+            for(let i in mapFiles) {
+              let mapFile = mapFiles[i].replace(".js.map", ".map");
+              let file = path.basename(mapFile).replace(".map", "");
+              let mapBlock = `
+"${file}_inst":null,
+"${file}": function() {
+if(!this.${file}_inst) {
+this.${file}_inst = require("${mapFile.replace(outDir + "/", "")}");
+}
+return this.${file}_inst
+},`;
+  mapFileBlocks.push(mapBlock);
+            }
+            let sourceMapCode = `
+${mapFileBlocks.join("")}
+`
+
+            return sourceMapCode;
+          }
+        }
+      }),
       //need this to resolve relative local paths
       includePaths({
         include: {},
@@ -73,27 +102,28 @@ function getOptions(botSrc) {
         extensions: ['.js', '.json', '.ts']
       }),
       //guessing I don't need this.. but it may let me bring in node modules
-      nodeResolve({
+      resolve({
           module: true,
           jsnext: true,
           main: true,
           preferBuiltins: false,
-
-          moduleDirectories: [
-            "node_modules",
-            "src/shared"
-          ],
+          // browser: true,
           rootDir: "src"
       }),
-      resolve({ rootDir: "src"}),
+      // resolve({ rootDir: "src"}),
       commonjs({
         include: ["src/**", 'node_modules/**'],
         transformMixedEsModules: true,
         esmExternals: true,
         requireReturnsDefault: 'auto',
-
+        ignoreGlobal: true,
       }),
       typescript({ tsconfig: "./tsconfig.json" }),
+      // inject({
+      //   Promise: path.resolve('src/shared/polyfills/Promise.ts'),
+      //   // setInterval: path.resolve('src/shared/polyfills/setInterval.ts'),
+      //   // setTimeout: path.resolve('src/shared/polyfills/setTimeout.ts'),
+      // }),
       babel({ babelHelpers: 'bundled' }),
       screeps({config: cfg, dryRun: cfg == null})
     ]
@@ -103,7 +133,7 @@ function getOptions(botSrc) {
 
 console.log("Building for target:", targetBot);
 
-const bot = fg.sync(`src/*world_*${targetBot}*`, { onlyDirectories: true });
+const bot = fg.sync(`src/world_${targetBot}`, { onlyDirectories: true });
 if (bot.length === 0) {
   throw new Error("No matching bots found in src/. Exiting");
 } else {

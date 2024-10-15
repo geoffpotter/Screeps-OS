@@ -8,7 +8,7 @@
     "moduleResolution": "Node",
     "outDir": "./dist",
     "baseUrl": "src/",
-    "sourceMap": false,
+    "sourceMap": true,
     "strict": true,
     "allowJs": true,
     "checkJs": true,
@@ -20,6 +20,11 @@
     "esModuleInterop": true,
     // "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./@types",
+      "./node_modules/@types/screeps/dist"
+    ],
     "paths": {
       "*": [
         "*",
@@ -27,6 +32,9 @@
       ]
     }
   },
+  "include": [
+    "src/**/*"
+  ],
   "exclude": [
     "node_modules"
   ]

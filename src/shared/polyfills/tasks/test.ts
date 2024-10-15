@@ -283,7 +283,7 @@
 
 //   addItem(item:T) {
 //     // if(this.currentIndex > this.currentBufferSize) {
-//     //   //console.log("fifo buffer increased by:", this.bufferGrowSize, ", new size:", this.currentBufferSize + this.bufferGrowSize, "current index", this.currentIndex);
+//     //   //console.log("fifo buffer increased by:", this.bufferGrowSize, ",profile new size:", this.currentBufferSize + this.bufferGrowSize, "current index", this.currentIndex);
 //     //   this.currentBufferSize = this.currentBufferSize + this.bufferGrowSize;
 //     //   this.items.length = this.currentBufferSize;
 //     // }

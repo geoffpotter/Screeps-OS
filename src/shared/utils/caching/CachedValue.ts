@@ -1,5 +1,5 @@
 import { queueTask } from "shared/polyfills/tasks";
-import { getSettings } from "../settings";
+
 
 
 export class CachedValue<T> {
@@ -22,7 +22,7 @@ export class CachedValue<T> {
   }
 
   private checkClearCache() {
-    let currentTick = getSettings().getTick();
+    let currentTick = Game.time;
     if(this.hasCachedValue() && currentTick >= this.nextClearTick) {
       //time to clear
       this.clearValue();
@@ -30,7 +30,7 @@ export class CachedValue<T> {
   }
 
   private getNewValue() {
-    let currentTick = getSettings().getTick();
+    let currentTick = Game.time;
     this.nextClearTick = currentTick + this.cacheTTL;
     return this.currentValue = this.refreshFN();
   }

@@ -17,7 +17,7 @@ class LRUInfo<T> {
   }
 }
 
-export class IndexingCollection<T> {
+export default class IndexingCollection<T> {
   idField: string;
   groupByFields: string[];
   thingsById: { [id: string]: T };
@@ -59,7 +59,7 @@ export class IndexingCollection<T> {
   }
 
 
-  _markUsed(thingInfo: LRUInfo<T>) {
+  private markUsed(thingInfo: LRUInfo<T>) {
     //if we have a newer and older then we're
     if (this.head && thingInfo.id == this.head.id) {
       //logger.log(thingInfo.id, "already most recently used")
@@ -104,7 +104,7 @@ export class IndexingCollection<T> {
     //this._debugQueue();
   }
 
-  _enforceLimit() {
+  private enforceLimit() {
     //logger.log("enforcing limits", this.head.id, this.tail.id);
     //this._debugQueue();
     let finalLimit = this.limits[this.limits.length - 1];
@@ -120,7 +120,13 @@ export class IndexingCollection<T> {
       this.remove(nodeToRemove);
     }
   }
-
+  map(fn: Function) {
+    let arr: any[] = [];
+    this.forEach((thing: T) => {
+      arr.push(fn(thing));
+    });
+    return arr;
+  }
   forEach(fn: Function) {
     if (!this.head) {
       return; //collection must be empty
@@ -186,8 +192,8 @@ export class IndexingCollection<T> {
 
     let nodeInfo = new LRUInfo(id);
     this.nodeInfoById.set(id, nodeInfo);
-    this._markUsed(nodeInfo);
-    this._enforceLimit();
+    this.markUsed(nodeInfo);
+    this.enforceLimit();
   }
 
   remove(theThing: T) {
@@ -227,11 +233,12 @@ export class IndexingCollection<T> {
       for (let f in this.groupByFields) {
         let fieldPath = this.groupByFields[f];
         let value: any = get(theThing, fieldPath);
-        //logger.log("removing", theThing.id, "from", fieldPath, "value", value);
+        //@ts-ignore
+        // logger.log("removing", theThing.id, "from", fieldPath, "value", value);
         if (this.groups[fieldPath][value]) {
-          //logger.log("before remove", JSON.stringify(this.groups[fieldPath][value]))
-          this.groups[fieldPath][value] = this.groups[fieldPath][value].filter((thisId) => id == thisId)
-          //logger.log("after remove", JSON.stringify(this.groups[fieldPath][value]))
+          // logger.log("before remove", JSON.stringify(this.groups[fieldPath][value]))
+          this.groups[fieldPath][value] = this.groups[fieldPath][value].filter((thisId) => id !== thisId)
+          // logger.log("after remove", JSON.stringify(this.groups[fieldPath][value]))
         } else {
           logger.log("grouping error:", fieldPath, value, Object.keys(this.groups[fieldPath]))
           throw new Error("Object for removal isn't in all groupings.. I broke something, I'm sorry.");
@@ -239,6 +246,41 @@ export class IndexingCollection<T> {
       }
 
     }
+  }
+
+
+  validateCollection() {
+    // I suspect there are bugs in this class, this function is to check the validity of the collection and the groups
+
+    // go through all the groups and make sure that every id in the group is in the thingsById
+    for (let fieldPath in this.groups) {
+      let group = this.groups[fieldPath];
+      for (let value in group) {
+        let ids = group[value];
+        for (let id of ids) {
+          if (!this.thingsById[id]) {
+            logger.log("id not found in thingsById", id, fieldPath, value);
+            throw new Error("id not found in thingsById");
+          }
+        }
+      }
+    }
+
+    // go through all the thingsById and make sure that every id in the thingsById is in the groups
+    for (let id in this.thingsById) {
+      let thing = this.thingsById[id];
+      for (let fieldPath of this.groupByFields) {
+        let value = get(thing, fieldPath);
+        let group = this.groups[fieldPath];
+        // logger.log("checking", id, "fieldPath", fieldPath, "value", value, "group", group, "fields", this.groupByFields);
+        if (!group[value]) {
+          logger.log("id not found in groups", id, fieldPath, value);
+          throw new Error("id not found in groups");
+        }
+      }
+    }
+
+    logger.log("collection is valid");
   }
 
   hasId(id: string | number) {
@@ -257,16 +299,16 @@ export class IndexingCollection<T> {
   getAll():T[] {
     return Object.values(this.thingsById);
   }
-  getById(id: string) {
+  getById(id: string): T | undefined {
     if (!this.thingsById[id]) {
-      return false;
+      return undefined;
     }
     let info = this.nodeInfoById.get(id);
     if (info)
-      this._markUsed(info);
+      this.markUsed(info);
     return this.thingsById[id];
   }
-  getGroupWithValue(fieldPath: any, value: string | number) {
+  getGroupWithValue(fieldPath: any, value: string | number): string[] | false {
     let group = this.getGroup(fieldPath);
     if (!group[value]) {
       return false;

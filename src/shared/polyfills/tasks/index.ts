@@ -1,17 +1,21 @@
 import { addInPriorityOrder } from "shared/utils/ArrayHelpers";
-import {
-  profile,
-  profiler
-} from "shared/utils/profiling/profiler";
-import { runPostTickQueues, runPreTickQueues } from "./taskQueue";
-
+import { getQueueManager } from "./queueManager";
+import { profiler } from "shared/utils/profiling";
 export * from "./taskQueue"
-
-
+export * from "./queueManager"
+import Logger from "shared/utils/logger";
+let logger = new Logger("tasks");
+logger.color = COLOR_CYAN
+logger.enabled = false;
+let profilerStackFromLastTick: string[] = [];
 export function startTick() {
-  runPreTickQueues();
+  // logger.log("startTick", profilerStackFromLastTick, profiler.stack);
+  // profiler.resumeContext(profilerStackFromLastTick);
+  getQueueManager().runPreTickQueues();
 }
 
 export function endTick() {
-  runPostTickQueues();
+  getQueueManager().runPostTickQueues();
+  // profilerStackFromLastTick = profiler.pauseContext()
+  // logger.log("endTick", profilerStackFromLastTick, profiler.stack);
 }

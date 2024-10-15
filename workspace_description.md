@@ -10,7 +10,7 @@
     "main_components": {
       "Configuration Files": "Includes files like package.json, tsconfig.json, and rollup.config.js for project configuration and build setup.",
       "Documentation": "Detailed guides and in-depth documentation on various aspects of the project and development workflow.",
-      "Source Code": "Divided into different world implementations (e.g., world_old, world_inert, world_pstar) and shared components, each containing various scripts and utilities for AI development.",
+      "Source Code": "Divided into different world implementations (e.g., world_old, world_inert, world_NodeNetwork) and shared components, each containing various scripts and utilities for AI development.",
       "Testing": "Setup for unit and integration tests using Mocha and other testing frameworks."
     },
     "components_fit_together": "The project uses TypeScript for coding the AI logic, Rollup for bundling and deployment, and various testing frameworks for ensuring code quality. The documentation provides guidance on setup, development, and deployment processes, integrating with the source code and configuration files."

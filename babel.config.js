@@ -1,23 +1,25 @@
 'use strict'
 /**
-babel.config.js with useful plugins. 
+babel.config.js with useful plugins.
 */
 module.exports = function(api) {
-  api.cache(true);
+  console.log("babel config")
+  // api.cache(true);
+  api.cache.never();
 
   const presets = [
                     [
                       "@babel/preset-env", {
                         modules: false,
                         //
-                        useBuiltIns: "entry",
+                        useBuiltIns: "usage",
                         //debug:true,
                         include: [
                           //"transform-async-to-generator"
                         ],
                         "targets": {
-                          //"esmodules": true,
-                          "node":"10"
+                          // "esmodules": true,
+                          "node":"12"
                         }
                       }
                     ]
@@ -25,9 +27,10 @@ module.exports = function(api) {
   const plugins = [
     //['@babel/plugin-transform-modules-commonjs'],
     //["@babel/plugin-transform-arrow-functions", { "spec": false }],
-    // ["babel-plugin-transform-async-to-promises"],
+    // ["@babel/plugin-transform-async-generator-functions"],
+    ["babel-plugin-transform-async-to-promises"],
     // ["@babel/plugin-proposal-decorators", {
-    //   decoratorsBeforeExport: true, 
+    //   decoratorsBeforeExport: true,
     //   //legacy:true
     // }],
     // [

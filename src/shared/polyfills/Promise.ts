@@ -1,25 +1,45 @@
 import { queueMicroTask } from "./tasks";
-import { profiler, profile } from "shared/utils/profiling/profiler";
+import { profiler, profile, profileClass } from "shared/utils/profiling/profiler";
+import { setTimeout } from "shared/polyfills/setTimeout";
 
+import Logger from "shared/utils/logger";
+let logger = new Logger("Promise");
+logger.color = COLOR_GREEN
+// logger.enabled = false;
 //Describe to TS how I want my types structured, hopefully this will keep me from fucking up.
 
 //Main types
 type Resolvable<T> = thenable<T> | T;
 type Executor<T> = (
   resolve: ResolveHandler<T>,
-  reject: RejectHandler<T>
+  reject: RejectHandler
 ) => void;
 interface thenable<T> {
-  then<TResult>(onSuccess?: OnSuccess<T, TResult>, onFailure?: OnFailure<TResult>): Resolvable<TResult>;
-  catch?<CResult>(onFailure: OnFailure<CResult>): Resolvable<CResult>;
-  finally?<FResult>(onSuccess: OnSuccess<T, FResult>): Resolvable<FResult>;
+  then<TResult extends Resolvable<T>>(onSuccess: OnSuccess<T, TResult>, onFailure: OnFailure<TResult>): Resolvable<TResult>;
+  catch?<CResult extends Resolvable<T>>(onFailure: OnFailure<CResult>): Resolvable<CResult>;
+  finally?<FResult extends Resolvable<T>>(onSuccess: OnSuccess<T, FResult>): Resolvable<FResult>;
 }
 
+// ((value: void) => TResult | PromiseLike<TResult>) | null | undefined
+// Type '((value: TResult) => TResult1 | PromiseLike<TResult1>) | null | undefined' is not assignable to type 'OnSuccess<TResult, TResult2> | undefined'.
+//Type 'null' is not assignable to type 'OnSuccess<TResult, TResult2> | undefined'.
+
+//'<TResult1 = string, TResult2 = never>(onfulfilled?: ((value: string) => TResult1 | PromiseLike<TResult1>) | null | undefined, onrejected?: ((reason: any) => TResult2 | PromiseLike<...>) | null | undefined) => Promise<...>' is not assignable to type '<TResult>(onSuccess: OnSuccess<string, TResult>, onFailure: OnFailure<TResult>) => Resolvable<TResult>'.
 //callback types
-type OnSuccess<T, TResult> = (value: T) => Resolvable<TResult>;
-type OnFailure<TResult> = (reason: any) => Resolvable<TResult>;
+type OnSuccess<T, TResult extends Resolvable<T>> = ((value: T) => Resolvable<TResult> | undefined | void);
+type OnFailure<TResult> = (reason: any) => Resolvable<TResult> | undefined | void;
 type ResolveHandler<T> = (value?: Resolvable<T>) => void;
-type RejectHandler<T> = (reason: any) => void;
+type RejectHandler = (reason: any) => void;
+
+export function isThenable(obj:any) {
+  return (typeof obj === "object") && typeof obj.then === "function";
+}
+export function asThenable<T>(obj:any):thenable<T>|false {
+  if( (typeof obj === "object") && typeof obj.then === "function") {
+    return obj;
+  }
+  return false;
+}
 
 enum PromiseState {
   Pending,
@@ -27,18 +47,22 @@ enum PromiseState {
   Rejected
 }
 
+// declare global {
+//   interface Promise<T> {
+//     then<TResult extends Resolvable<T>>(onSuccess: OnSuccess<T, TResult>, onFailure: OnFailure<TResult>): Resolvable<TResult>
+//   }
+// }
 
 
-
-export class Promise<T> implements thenable<T> {
+export default class PromisePoly<T> implements thenable<T> {
   //static functions
   static resolve<T>(value: T) {
-    return new Promise<T>((resolve) => {
+    return new PromisePoly<T>((resolve) => {
       resolve(value);
     })
   }
   static reject<T>(value: T) {
-    return new Promise<T>((_, reject) => {
+    return new PromisePoly<T>((_, reject) => {
       reject(value);
     })
   }
@@ -47,149 +71,114 @@ export class Promise<T> implements thenable<T> {
   private callbacks: Function[] = [];
   private state = PromiseState.Pending;
   public reasonOrValue: any;
+
   constructor(executor: Executor<T>) {
-    //Run resolver immediatly
-    let lastProfiledName = profiler.getCurrentProfileTarget();
-    if (!lastProfiledName) {
-      lastProfiledName = "global"
+    // this.profilerContext = profiler.stack.slice();
+    let startContext = profiler.stack.slice();
+    try {
+      executor(this.resolveHandler.bind(this), this.rejectHandler.bind(this));
+    } catch (e) {
+      logger.error("error in executor", e, (e as Error).stack);
+      this.rejectHandler(e);
     }
-    profiler.startCall("Promise:construct:" + lastProfiledName)
-    executor(this.resolveHandler.bind(this), this.rejectHandler.bind(this));
-    profiler.endCall("Promise:construct:" + lastProfiledName)
+    profiler.pauseContext();
+    profiler.resumeContext(startContext);
   }
-  /**
-  * Calls onSuccess or onFailure when this promise object is resolved or rejected, respectivly.
-  * @param onSuccess handler for when promise is resolved, can return a thenable
-  * @param onFailure handler for when promise is rejected, can return a thenable
-  * @returns {Promise} New Promise object that will resolve after the promsie returned from the called handler
-  */
-  public then<TResult>(onSuccess?: OnSuccess<T, TResult>, onFailure?: OnFailure<TResult>): Promise<TResult> {
-    let lastProfiledName = profiler.getCurrentProfileTarget();
-    if (!lastProfiledName) {
-      lastProfiledName = "global"
-    }
-    profiler.startCall("Promise:then")
-    //console.log("then called", this.state, lastProfiledName)
-    let thenPromise = new Promise<TResult>((resolve, reject) => {
-      //make a callback for later.
+
+  public then<TResult extends Resolvable<T>>(onSuccess?: OnSuccess<T, TResult>, onFailure?: OnFailure<TResult>): PromisePoly<TResult> {
+    let thenProfilerContext = profiler.stack.slice();
+
+    let thenPromise = new PromisePoly<TResult>((resolve, reject) => {
       this.callbacks.push(() => {
-        profiler.startCall("Promise:callback:" + lastProfiledName);
-        //by now the promise should be resolved.
-        //console.log("handle this then function, pstate:", this.state, this.reasonOrValue, typeof onSuccess);
-        try {
-          // //no wait, need to call onSuccess first, then handle the resolve algo
-          let callbackResult: Resolvable<TResult> | undefined = undefined;
+        const runCallback = (callback: Function | undefined, value: any) => {
+          let oldContext = profiler.pauseContext();
+          profiler.resumeContext(thenProfilerContext);
+
           try {
-            if (this.state == PromiseState.Resolved) {
-              if (onSuccess)
-                callbackResult = onSuccess(this.reasonOrValue);
-              else
-                callbackResult = this.reasonOrValue;
-
-            } else if (this.state == PromiseState.Rejected) {
-              if (onFailure)
-                callbackResult = onFailure(this.reasonOrValue);
-              else
-                callbackResult = this.reasonOrValue
-            } else {
-              throw new TypeError("Processing callbacks on unresolved Promise, that seems wrong..")
-            }
-
-          } catch (e2) {
-            reject(e2);
+            const result = callback ? callback(value) : value;
+            this.handleCallbackResult(result, resolve, reject);
+          } catch (e) {
+            logger.error("error in then callback", e, (e as Error).stack);
+            reject(e);
+          } finally {
+            profiler.pauseContext();
+            // profiler.resumeContext(oldContext);
           }
+        };
 
-
-
-          // //ok, og promise has resolved, callback called.
-          // //need to do promise resolve algo with result.
-          //@ts-ignore
-          if (this === callbackResult) {
-            throw new TypeError("A promsie can't resolve to itself")
-          }
-          if (callbackResult instanceof Promise) {
-            //console.log("resolving promise for then with another promise")
-            while ((callbackResult instanceof Promise) && callbackResult.state !== PromiseState.Pending) {
-              //console.log("moving up a level to an unresolved promise, or the end, old value:", JSON.stringify(callbackResult))
-              //console.log("weird", callbackResult.reasonOrValue.reasonOrValue)
-              callbackResult = callbackResult.reasonOrValue;
-            }
-            //console.log("this",JSON.stringify(this))
-            //console.log("res", JSON.stringify(callbackResult))
-            //console.log(this == callbackResult)
-            //if they returned a promise, adopt state of it
-            //@ts-ignore
-            callbackResult.then(resolve, reject);// is that it??
-            //@ts-ignore
-          } else if ((typeof callbackResult === "object" || typeof callbackResult === "function") && typeof callbackResult.next === "function") {
-            //console.log("resolving promise for then with a thenable")
-            //console.log(callbackResult)
-            //the point here is to handle promiselike objects or functions
-            // (promise like functions? promise factory? whatever, I'm just following rules)
-            //if makes sure object/func has a then function, we'll just assume it behaves correctly and adopt it's state
-            //@ts-ignore
-            callbackResult.then(resolve, reject);
-
-          } else {
-            //console.log("resolving promise with basic value", callbackResult)
-            //not a promise or thenable, we can just resolve(in a microtask to detach from current execution)
-            queueMicroTask(() => {
-              resolve(callbackResult);
-            });
-
-          }
-        } catch (e) {
-          //reject(e);
-          throw e;
+        if (this.state === PromiseState.Resolved) {
+          runCallback(onSuccess, this.reasonOrValue);
+        } else if (this.state === PromiseState.Rejected) {
+          runCallback(onFailure, this.reasonOrValue);
         }
-
-        profiler.endCall("Promise:callback:" + lastProfiledName);
-      })
-
-
+      });
     });
-    //if promise is already resolved, this will re-run the resolvePromise method
-    if (this.state != PromiseState.Pending) {
+
+    if (this.state !== PromiseState.Pending) {
       this.resolvePromise();
     }
-    profiler.endCall("Promise:then")
-    //console.log("then done")
-    return thenPromise;
 
+    return thenPromise;
   }
 
-  @profile("Promise")
+  public catch<CResult extends Resolvable<T>>(onFailure: OnFailure<CResult>): PromisePoly<CResult> {
+    return this.then<CResult>(undefined, onFailure);
+  }
+
+  public finally<FResult extends Resolvable<T>>(onSuccess: OnSuccess<T, FResult>): PromisePoly<FResult> {
+    let finallyFunc = (value:T ): void => {
+      onSuccess(value);
+    }
+    return this.then<FResult>(finallyFunc, (reason) => {
+      finallyFunc(reason);
+      return reason;
+    });
+  }
+
+  private handleCallbackResult<TResult>(result: Resolvable<TResult>, resolve: ResolveHandler<TResult>, reject: RejectHandler) {
+    if (result instanceof PromisePoly) {
+      result.then(resolve, reject);
+    } else if (isThenable(result)) {
+      const thenable = asThenable<TResult>(result);
+      if (thenable) {
+        thenable.then(resolve, reject);
+      }
+    } else {
+      queueMicroTask(() => {
+        resolve(result as TResult);
+      });
+    }
+  }
+
   private resolveHandler<T>(value?: Resolvable<T>): void {
-    //only handle once
     if (this.state != PromiseState.Pending) return;
-    //set promise resolved
     this.state = PromiseState.Resolved;
     this.reasonOrValue = value;
     this.resolvePromise();
   }
-  @profile("Promise")
+
   private rejectHandler<T>(reason: any): void {
-    //only handle once
+    logger.error("rejectHandler", reason, (reason as Error).stack);
     if (this.state != PromiseState.Pending) return;
     this.state = PromiseState.Rejected;
     this.reasonOrValue = reason;
     this.resolvePromise();
   }
-  @profile("Promise")
+
   private resolvePromise() {
-    //console.log("resolve promise called", this.state)
-    //only run callbacks if we're resolved.
     if (this.state == PromiseState.Pending) return;
-    //console.log("queuing resolve task", queueMicroTask)
-    queueMicroTask(() => {
-      //console.log("in promise microtask", this.callbacks.length, JSON.stringify((new Error().stack)))
-      let nextCallback: Function | undefined;
-      while (nextCallback = this.callbacks.shift()) {
-        //console.log("running callback")
-        nextCallback();
-      }
-    })
 
+    let nextCallback: Function | undefined;
+    while (nextCallback = this.callbacks.shift()) {
+      let callback = nextCallback;
+      queueMicroTask(() => {
+          callback();
+      });
+    }
   }
-
 }
+
+//@ts-ignore  Override global.Promise with our PromisePoly
+global.Promise = PromisePoly
+
+

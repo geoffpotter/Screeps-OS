@@ -1,12 +1,12 @@
 import { queueTask } from "shared/polyfills/tasks";
-import { getSettings } from "../settings";
+
 
 
 let cacheHelpers: Set<CacheHelper> = new Set();
 
 //run through all the cached values and see if their value needs to be cleared out
 queueTask(()=>{
-  let currentTick = getSettings().getTick();
+  let currentTick = Game.time;
   cacheHelpers.forEach((cacheHelper)=>{
     cacheHelper.refreshCache(currentTick);
   })
@@ -19,7 +19,7 @@ export class CacheHelper {
   constructor(refreshFN: () => void, cacheTTL = 1, refreshNow = true) {
     this.refreshInterval = 1;
     this.refreshFN = refreshFN;
-    let currentTick = getSettings().getTick();
+    let currentTick = Game.time;
     if (refreshNow) {
       this.refreshCache(currentTick);
     } else {

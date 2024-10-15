@@ -1,0 +1,154 @@
+### **Core Components**
+
+#### **Wrappers**
+
+Wrappers are classes that encapsulate game objects, providing a consistent interface for interacting with them. They handle data updates, caching, and provide methods specific to each game object type.
+
+- **`GameObjectWrapper`**: A generic base class for all game object wrappers. It includes common properties like `id`, `exists`, and methods for updating and caching game object data.
+
+- **`CreepWrapper`** (`creep/CreepWrapper.ts`):
+  - Extends `HasStorageWrapper`.
+  - Manages individual creeps, their actions, movement, and interactions.
+  - Handles action assignment, targeting, and movement logic.
+  - Uses `CreepBody` for body part analysis.
+
+- **`CreepBody`** (`creep/CreepBody.ts`):
+  - Analyzes a creep's body parts to classify its role (e.g., attacker, healer, worker).
+  - Provides methods to get the count and type of body parts.
+  - Determines the creep's class based on active body parts and their ratios.
+
+- **Specific Structure Wrappers**:
+  - Each game structure has a corresponding wrapper class, such as `SpawnWrapper`, `ControllerWrapper`, `StructureLabWrapper`, `StructureTerminalWrapper`, `StructureTowerWrapper`, etc.
+  - They inherit from `KillableWrapper` or `HasStorageWrapper` depending on their functionalities.
+  - Provide structure-specific properties and methods, like `spawning` status for spawns or `cooldown` for labs.
+
+#### **Actions**
+
+Actions represent tasks that game objects (mostly creeps) can perform. They encapsulate the logic required to execute tasks and define prerequisites and completion conditions.
+
+- **`BaseAction`** (`actions/base/BaseAction.ts`):
+  - An abstract class defining the structure and common functionality for all actions.
+  - Manages assignments, validity checks, and action execution flow.
+
+- **`BasePartAction`**:
+  - Extends `BaseAction` for actions that require specific body parts.
+  - Used for actions like attacking or healing, where the creep must have the relevant parts.
+
+- **`BaseResourceAction`**:
+  - Extends `BaseAction` for actions involving resource transfers or usage.
+  - Handles actions like harvesting, transferring, or picking up resources.
+
+- **Specific Actions**:
+  - **`KillCreep`** (`actions/military/KillCreep.ts`):
+    - Targets enemy creeps for attack.
+    - Determines if the acting creep has the necessary attack or ranged parts.
+    - Executes attack actions based on proximity.
+  - **`KillBuilding`** (`actions/military/KillBuilding.ts`):
+    - Similar to `KillCreep` but targets enemy structures.
+  - **`Build`** (`actions/economy/Build.ts`):
+    - Targets construction sites for building.
+    - Requires the creep to have `WORK` parts.
+    - Executes build actions when in range.
+
+#### **Jobs**
+
+- **`BaseJob`**:
+  - Represents higher-level tasks or objectives composed of multiple actions.
+  - Manages the sequence and assignment of actions to fulfill the job.
+
+#### **Utilities**
+
+- **`CachedValue`**:
+  - A utility class for caching computed values for a specified number of ticks.
+  - Optimizes performance by reducing redundant calculations.
+
+- **Collections**:
+  - **`BodyPartInfoCollection`**:
+    - Manages information about a creep's body parts.
+    - Used in action assignments to ensure creeps meet part requirements.
+  - **`ResourceInfoCollection`**:
+    - Manages resource amounts and capacities.
+    - Helps in resource-related actions to track and plan resource usage.
+
+#### **Main Execution Flow**
+
+- **`main.ts`**:
+  - The entry point of the bot.
+  - Initializes the game loop and sets up intervals for updates and actions.
+  - Configures task queues and scheduling via the `queues` module.
+
+- **Task Queues and Intervals**:
+  - Uses `setInterval` and custom queues (e.g., `queues.MOVEMENT`) to manage the timing of actions.
+  - Separates movement and action phases to optimize performance.
+
+---
+
+### **File Structure Overview**
+
+- **`wrappers/`**:
+  - Contains all wrapper classes for game objects.
+  - Organized into subdirectories like `creep/`, `spawn/`, etc.
+
+- **`actions/`**:
+  - Contains all action classes.
+  - Organized into categories like `military/` and `economy/`.
+
+- **`main.ts`**:
+  - Sets up the game loop and initializes core systems.
+
+- **`queues.ts`**:
+  - Defines task queues and priorities for scheduling actions.
+
+---
+
+### **Key Concepts**
+
+- **Creep Classification**:
+  - Creeps are classified based on their body parts using the `CreepBody` class.
+  - Classifications include roles like attacker, healer, ranged, worker, hauler, etc.
+  - Classification influences action assignment and behavior.
+
+- **Action Assignment and Execution**:
+  - Creeps are assigned actions based on available actions and their own capabilities.
+  - The bot checks for valid actions each tick and assigns the most appropriate one.
+  - Actions are executed during the creep's `run()` method, while movement is handled separately.
+
+- **Movement Handling**:
+  - Movement is processed after actions to ensure creeps are in the correct position to perform tasks.
+  - The bot uses pathfinding and range checks to move creeps efficiently.
+
+- **Task Scheduling**:
+  - The bot uses task queues to manage CPU usage and ensure timely execution of critical tasks.
+  - Queues help prioritize actions like movement, combat, and resource management.
+
+- **Data Caching and Optimization**:
+  - Repeated calculations are minimized using caching mechanisms like `CachedValue`.
+  - Enhances performance by reducing unnecessary computations.
+
+---
+
+### **Usage Flow**
+
+1. **Initialization**:
+   - On each game tick, the bot updates all wrappers to reflect the current game state.
+   - Creeps and structures update their statuses and available actions.
+
+2. **Action Assignment**:
+   - Creeps check for valid actions they can perform based on their classification and capabilities.
+   - Actions are prioritized and assigned accordingly.
+
+3. **Action Execution**:
+   - Creeps execute their assigned actions during the action phase.
+   - Actions may involve attacking, building, harvesting, etc.
+
+4. **Movement**:
+   - After actions are performed, creeps handle movement towards their targets.
+   - Movement is optimized using range checks and efficient pathfinding.
+
+5. **Task Scheduling**:
+   - The bot schedules tasks using queues to balance CPU usage.
+   - Ensures that critical tasks are prioritized and executed efficiently.
+
+---
+
+This architecture promotes modularity, allowing for easy expansion and maintenance of the codebase. By separating concerns into wrappers, actions, and utilities, the bot can efficiently manage game objects and their interactions within Screeps.

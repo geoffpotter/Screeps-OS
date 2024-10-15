@@ -1,164 +1,195 @@
+import Logger from "shared/utils/logger";
+import { uuid } from "shared/utils/uuid";
+import type { QueueManager } from "./queueManager";
+
+const logger = new Logger("taskQueue");
+logger.color = COLOR_PURPLE;
+logger.enabled = false;
 
 
-import { addInPriorityOrder } from "shared/utils/ArrayHelpers";
-import {functionQueueArray} from "shared/utils/queues/functionQueueArray"
-import {functionQueueSet} from "shared/utils/queues/functionQueueSet"
-
-
-
-export enum tickPhases {
-  PRE_TICK,
-  POST_TICK
+interface intervalInstance {
+  id: string;
+  func: Function;
+  ticks: number;
+  startTick: any;
+  cpuUsed: number;
+  queueName: string | false;
+  profileName: string | false;
+  profileContext: string[];
+}
+interface timeoutInstance {
+  id: string;
+  func: Function;
+  ticks: number;
+  startTick: any;
+  cpuUsed: number;
+  queueName: string | false;
+  profileName: string | false;
+  profileContext: string[];
 }
 
-export class taskQueue {
 
-  private tasks:functionQueueArray = new functionQueueArray()
-  private microTasks: functionQueueSet = new functionQueueSet();
-
+export class TaskQueue {
+  private tasks: Function[] = [];
+  private microTasks: Set<Function> = new Set();
   name: string;
-  tickPhase: tickPhases;
-  /**
-   * high priority queues go first.
-   */
-  priority: number = 0;
+  priority: number;
+  private maxCpuPerRun: number | false;
+  private maxTotalCpu: number | false;
+  private intervals: Map<string, intervalInstance> = new Map();
+  private timeouts: Map<string, timeoutInstance> = new Map();
 
-  constructor(name: string, priority: number = 0, tickPhase: tickPhases = tickPhases.POST_TICK) {
+  currentlyRunningQueue: TaskQueue | false = false;
+
+
+  get numTasks() {
+    return this.tasks.length;
+  }
+  get numMicroTasks() {
+    return this.microTasks.size;
+  }
+  constructor(name: string, priority: number = 0, maxCpuPerRun: number | false = false, maxTotalCpu: number | false = false) {
     this.name = name;
-    this.tickPhase = tickPhase;
     this.priority = priority;
-    addQueue(this);
-
+    this.maxCpuPerRun = maxCpuPerRun;
+    this.maxTotalCpu = maxTotalCpu;
   }
 
-  queueTask(task:Function) {
-    this.tasks.addFunc(task);
+
+  setInterval(func: Function, ticks: number, runImmediately: boolean = false, profileName: string | false = false, profileContext: string[] | false = false) {
+    let id = uuid();
+    if (runImmediately) {
+      this.queueMicroTask(func);
+    }
+    this.intervals.set(id, {
+      id,
+      func,
+      ticks,
+      startTick: Game.time,
+      cpuUsed: 0,
+      queueName: this.name,
+      profileName,
+      profileContext: profileContext || []
+    });
+    return id;
   }
-  queueMicroTask(microTask:Function) {
-    this.microTasks.addFunc(microTask);
+
+  clearInterval(id: string) {
+    this.intervals.delete(id);
+  }
+  processIntervals() {
+    this.intervals.forEach((interval) => {
+      let ticksSinceStart = Game.time - interval.startTick;
+      if (ticksSinceStart >= interval.ticks) {
+        this.queueMicroTask(interval.func);
+        interval.startTick = Game.time;
+      }
+    });
+  }
+
+  setTimeout(func: Function, ticks: number, profileName: string | false = false, profileContext: string[] | false = false) {
+    let id = uuid();
+    this.timeouts.set(id, {
+      id,
+      func,
+      ticks,
+      startTick: Game.time,
+      cpuUsed: 0,
+      queueName: this.name,
+      profileName,
+      profileContext: profileContext || []
+    });
+
+    if (ticks === 0 && this.currentlyRunningQueue && this.name == this.currentlyRunningQueue.name) {
+      this.currentlyRunningQueue.queueMicroTask(() => {
+        if (this.timeouts.has(id)) {
+          this.queueMicroTask(func);
+          this.clearTimeout(id);
+        }
+      });
+    }
+    return id;
+  }
+
+  clearTimeout(id: string) {
+    this.timeouts.delete(id);
+  }
+  processTimeouts() {
+    this.timeouts.forEach((timeout) => {
+      let ticksSinceStart = Game.time - timeout.startTick;
+      if (ticksSinceStart >= timeout.ticks) {
+        this.queueMicroTask(timeout.func);
+        this.clearTimeout(timeout.id);
+      }
+    });
+  }
+
+
+  queueTask(task: Function) {
+    logger.log("queueTask", this.name);
+    this.tasks.push(task);
+  }
+
+  queueMicroTask(microTask: Function) {
+    logger.log("queueMicroTask", this.name);
+    this.microTasks.add(microTask);
   }
 
   run() {
-    console.log("running queue", this.name)
-    this.runTasks();
-    this.runMicroTasks();
-  }
-  private runTasks() {
-    this.tasks.processCurrentQueueWithDone();
-  }
+    logger.log("run", this.name, this.tasks.length, this.microTasks.size);
+    const startCpu = Game.cpu.getUsed();
+    let totalCpuUsed = 0;
+    this.processIntervals();
+    this.processTimeouts();
+    const checkCpuLimit = () => {
+      const currentCpu = Game.cpu.getUsed();
+      totalCpuUsed = currentCpu - startCpu;
+      return (this.maxTotalCpu !== false && currentCpu >= this.maxTotalCpu) ||
+             (this.maxCpuPerRun !== false && totalCpuUsed >= this.maxCpuPerRun);
+    };
 
+    // Run all microtasks first
+    this.runMicroTasks(checkCpuLimit);
+    if (checkCpuLimit()) return;
 
-  private runMicroTasks() {
-    this.microTasks.processFullQueue();
-  }
+    // Run tasks, with microtasks in between
+    let taskIndex = 0;
+    while (taskIndex < this.tasks.length) {
+      const task = this.tasks[taskIndex];
+      logger.log("run", this.name, taskIndex, this.tasks.length);
+      const done = task();
 
-}
+      if (done !== false) {
+        this.tasks.splice(taskIndex, 1);
+      } else {
+        taskIndex++;
+      }
 
+      // Run microtasks after each task
+      this.runMicroTasks(checkCpuLimit);
 
-let preTickQueues = new Array<taskQueue>();
-let postTickQueues = new Array<taskQueue>();
-let queueLookup = new Map<string, taskQueue>();
-
-export enum builtInQueues {
-  TICK_INIT="tickInit", // create everything
-  UPDATE="update",// find new actions/goals/jobs
-  BEFORE_MAIN="beforeMain",
-
-  AFTER_MAIN="afterMain",
-  ACTIONS="actions", // do actions
-  MOVEMENT="movement", //do movement
-  TICK_DONE="tickDone",
-}
-
-enum TaskPriorities {
-  FIRST = 10000,
-  DEFAULT = 0,
-  LAST = -10000
-}
-
-let tickInitQueue = new taskQueue(builtInQueues.TICK_INIT, TaskPriorities.FIRST, tickPhases.PRE_TICK);
-let updateQueue = new taskQueue(builtInQueues.UPDATE, TaskPriorities.LAST, tickPhases.PRE_TICK);
-let beforeMainQueue = new taskQueue(builtInQueues.BEFORE_MAIN, TaskPriorities.LAST, tickPhases.PRE_TICK);
-
-let afterMainQueue = new taskQueue(builtInQueues.AFTER_MAIN, TaskPriorities.FIRST, tickPhases.POST_TICK);
-let actionsQueue = new taskQueue(builtInQueues.ACTIONS, TaskPriorities.DEFAULT, tickPhases.POST_TICK);
-let movementQueue = new taskQueue(builtInQueues.MOVEMENT, TaskPriorities.DEFAULT - 10, tickPhases.POST_TICK);
-let tickDoneQueue = new taskQueue(builtInQueues.TICK_DONE, TaskPriorities.LAST, tickPhases.POST_TICK);
-
-
-export let currentQueue:taskQueue|false = false;
-
-
-
-/**
- * Queue a Microtask to be executed inbetween or after tasks, as cpu allows
- *
- * These run first at the end of the main loop, then again inbetween tasks.
- */
-export function queueMicroTask(microTask:Function, queue:string|taskQueue|false=false) {
-  if(queue===false) {
-    if(currentQueue) {
-      queue = currentQueue;
-    } else {
-      queue = tickDoneQueue;
+      if (checkCpuLimit()) {
+        // If we've hit the CPU limit, keep remaining tasks for next tick
+        logger.log("run", this.name, "CPU limit hit", this.tasks.length, this.tasks);
+        // this.tasks = this.tasks.slice(taskIndex);
+        return;
+      }
     }
-  } else if(!(queue instanceof taskQueue)) {
-    queue = getQueue(queue);
-  }
-  queue.queueMicroTask(microTask);
-}
 
-/**
- * Queue a Task to be executed at the end of the tick, as cpu allows
- *
- * These run at the end of the tick, after the microtasks are run.
- */
-export function queueTask(task:Function, queue:string|taskQueue|false=false) {
-  if(queue===false) {
-    if(currentQueue) {
-      queue = currentQueue;
-    } else {
-      queue = tickDoneQueue;
+
+    logger.log(`${this.name} queue finished. CPU used: ${totalCpuUsed}`);
+  }
+
+  private runMicroTasks(checkCpuLimit: () => boolean) {
+    for (const microTask of this.microTasks) {
+      const done = microTask();
+      if (done !== false) {
+        this.microTasks.delete(microTask);
+      }
+
+      if (checkCpuLimit()) {
+        return;
+      }
     }
-  } else if(!(queue instanceof taskQueue)) {
-      queue = getQueue(queue);
-  }
-  queue.queueTask(task);
-}
-
-export function addQueue(queue:taskQueue) {
-  if(queueLookup.has(queue.name)) {
-    throw new Error("Queue names must be unique!"+queue.name)
-  }
-  queueLookup.set(queue.name, queue);
-  if(queue.tickPhase == tickPhases.PRE_TICK) {
-    addInPriorityOrder(preTickQueues, queue);
-  } else {
-    addInPriorityOrder(postTickQueues, queue);
   }
 }
-
-export function getQueue(queueName:string):taskQueue {
-  if(!queueLookup.has(queueName)) {
-    throw new Error("Trying to add func to non-existant queue")
-  }
-  //@ts-ignore complaining about returning undefined, but we throw an error in that case
-  return queueLookup.get(queueName);
-}
-
-export function runPreTickQueues() {
-  for(let queue of preTickQueues) {
-    currentQueue = queue;
-    queue.run();
-    currentQueue = false;
-  }
-}
-export function runPostTickQueues() {
-  for(let queue of postTickQueues) {
-    currentQueue = queue;
-    queue.run();
-    currentQueue = false;
-  }
-}
-
-

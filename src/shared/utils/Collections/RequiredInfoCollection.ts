@@ -1,7 +1,15 @@
+import { TypeInfo, TypeInfoCollection, TypeInfoCollectionJSON, TypeInfoJSON } from "./TypeInfoCollection";
+import Logger from "shared/utils/logger";
 
-import { ResourceConstant } from "game/constants";
-import { Store } from "game/prototypes";
-import { TypeInfo, TypeInfoCollection } from "./TypeInfoCollection";
+const logger = new Logger("RequiredInfoCollection");
+
+export interface RequiredInfoJSON<T> extends TypeInfoJSON<T> {
+  min: number;
+  max: number;
+}
+export interface RequiredInfoCollectionJSON<T> extends TypeInfoCollectionJSON<T> {
+  maxTotalAmount: number | false;
+}
 
 export class RequiredInfo<ItemType> extends TypeInfo<ItemType> {
   min:number = 0;
@@ -43,6 +51,17 @@ export class RequiredInfoCollection<Type,
                                     InfoConstructorType extends { new(type: Type): InfoType } = { new(type: Type): InfoType }
                                     > extends TypeInfoCollection<Type, InfoType, InfoConstructorType> {
 
+  static fromJSON<T>(json: RequiredInfoCollectionJSON<RequiredInfoJSON<T>>, infoConstructor: { new(type: T): RequiredInfo<T> }): RequiredInfoCollection<T> {
+    const collection = new RequiredInfoCollection<T>(infoConstructor);
+    json.types.forEach(typeInfo => {
+      const info = collection.get(typeInfo.type);
+      info.amount = typeInfo.amount;
+      info.min = typeInfo.min;
+      info.max = typeInfo.max;
+    });
+    collection.maxTotalAmount = json.maxTotalAmount;
+    return collection;
+  }
   getTypesByAmountRequired() {
     let typesRequired = new RequiredInfoCollection<Type, InfoType, InfoConstructorType>(this.infoConstructor);
     let validTypes = Array.from(this.types.values()).filter(r=>r.amountRequired>0).sort((a,b)=>a.amountRequired-b.amountRequired);
@@ -61,10 +80,13 @@ export class RequiredInfoCollection<Type,
   }
   getTypesByAmountAllowed() {
     let typesAllowed = new RequiredInfoCollection<Type, InfoType, InfoConstructorType>(this.infoConstructor);
-    let validTypes = Array.from(this.types.values()).filter(r=>r.amountAllowed>0).sort((a,b)=>a.amountAllowed-b.amountAllowed);
+    // logger.log("getTypesByAmountAllowed", this.types.get(RESOURCE_ENERGY as Type), Array.from(this.types.values()).map(r=>r.amountAllowed))
+    let validTypes = Array.from(this.getInfos()).filter(r=>r.amountAllowed>0).sort((a,b)=>a.amountAllowed-b.amountAllowed);
     validTypes.forEach(type=>{
       typesAllowed.setAmount(type.type, type.amountAllowed);
     })
+    //@ts-ignore
+    // logger.log("getTypesByAmountAllowed", typesAllowed.get(RESOURCE_ENERGY as Type))
     return typesAllowed;
   }
   getTypesByAmountAvailable() {
@@ -91,7 +113,7 @@ export class RequiredInfoCollection<Type,
   }
 
 
-  constructor(infoConstructor: InfoConstructorType, store:StoreDefinition|Store<ResourceConstant>|RequiredInfoCollection<Type>|false=false, maxTotalAmount:number|false=false) {
+  constructor(infoConstructor: InfoConstructorType, store:StoreDefinition|RequiredInfoCollection<Type>|false=false, maxTotalAmount:number|false=false) {
     super(infoConstructor)
     this.maxTotalAmount = maxTotalAmount;
     if(store instanceof RequiredInfoCollection) {
@@ -123,6 +145,11 @@ export class RequiredInfoCollection<Type,
   }
 
 
+  getAmountAllowed(type: Type) {
+    if(!this.has(type)) return 0;
+    let tInfo = this.get(type)
+    return tInfo.amountAllowed;
+  }
 
   getMin(type: Type) {
     if(!this.has(type)) return 0;

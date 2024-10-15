@@ -7,31 +7,31 @@
  * mod.thing == 'a thing'; // true
  */
 
-const COLOR_RED = 1;
-const COLOR_PURPLE = 2;
-const COLOR_BLUE = 3;
-const COLOR_CYAN = 4;
-const COLOR_GREEN = 5;
-const COLOR_YELLOW = 6;
-const COLOR_ORANGE = 7;
-const COLOR_BROWN = 8;
-const COLOR_GREY = 9;
-const COLOR_WHITE = 10;
+const LOG_COLOR_RED = 1;
+const LOG_COLOR_PURPLE = 2;
+const LOG_COLOR_BLUE = 3;
+const LOG_COLOR_CYAN = 4;
+const LOG_COLOR_GREEN = 5;
+const LOG_COLOR_YELLOW = 6;
+const LOG_COLOR_ORANGE = 7;
+const LOG_COLOR_BROWN = 8;
+const LOG_COLOR_GREY = 9;
+const LOG_COLOR_WHITE = 10;
 
 
 var colorMap:string[] = [];
-colorMap[COLOR_RED] = "red";
-colorMap[COLOR_PURPLE] = "purple";
-colorMap[COLOR_BLUE] = "blue";
-colorMap[COLOR_CYAN] = "cyan";
-colorMap[COLOR_GREEN] = "green";
-colorMap[COLOR_YELLOW] = "yellow";
-colorMap[COLOR_ORANGE] = "orange";
-colorMap[COLOR_BROWN] = "brown";
-colorMap[COLOR_GREY] = "grey";
-colorMap[COLOR_WHITE] = "white";
+colorMap[LOG_COLOR_RED] = "red";
+colorMap[LOG_COLOR_PURPLE] = "purple";
+colorMap[LOG_COLOR_BLUE] = "blue";
+colorMap[LOG_COLOR_CYAN] = "cyan";
+colorMap[LOG_COLOR_GREEN] = "green";
+colorMap[LOG_COLOR_YELLOW] = "yellow";
+colorMap[LOG_COLOR_ORANGE] = "orange";
+colorMap[LOG_COLOR_BROWN] = "brown";
+colorMap[LOG_COLOR_GREY] = "grey";
+colorMap[LOG_COLOR_WHITE] = "white";
 
-export default class logger {
+export default class Logger {
   module: string;
   enabled: boolean;
   color: any;
@@ -39,33 +39,38 @@ export default class logger {
   constructor(module: string, color: any = "white") {
     this.module = module;
     this.enabled = true;
-    this.color = color ? color : COLOR_WHITE;
+    this.color = color ? color : LOG_COLOR_WHITE;
   }
 
-  log(item:any, item2:any, item3:any, item4:any, item5:any, item6:any):void;
-  log(item:any, item2:any, item3:any, item4:any, item5:any):void;
-  log(item:any, item2:any, item3:any, item4:any):void;
-  log(item:any, item2:any, item3:any):void;
-  log(item:any, item2:any):void;
-  log(item:any):void;
-  log():void {
+  error(...args: any[]):void {
+    var line = this.module + "> ";
+    for (var i in args) {
+      if(typeof args[i] == "object")
+        line += JSON.stringify(args[i]) + " ";
+      else
+        line += args[i] + " ";
+    }
+
+    console.log(this.colorize(line, LOG_COLOR_RED), "\n", new Error().stack);
+  }
+  log(...args: any[]):void {
     if (!this.enabled)
       return;
-    var line = this.module + " ";
-    for (var i in arguments) {
-      if(typeof arguments[i] == "object")
-        line += JSON.stringify(arguments[i]) + " ";
+    var line = this.module + "> ";
+    for (var i in args) {
+      if(typeof args[i] == "object")
+        line += JSON.stringify(args[i]) + " ";
       else
-        line += arguments[i] + " ";
+        line += args[i] + " ";
     }
     console.log(this.colorize(line, this.color));
   }
   colorize(line: string, color: any): any {
-    return line;
-    // if(typeof color == "number") {
-    //   return "<font color='" + colorMap[color] + "'>" + line + "</font>"
-    // } else {
-    //   return "<font color='" + color + "'>" + line + "</font>"
-    // }
+    // return line;
+    if(typeof color == "number") {
+      return "<font color='" + colorMap[color] + "'>" + line + "</font>"
+    } else {
+      return "<font color='" + color + "'>" + line + "</font>"
+    }
   }
 }

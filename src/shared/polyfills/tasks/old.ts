@@ -1,27 +1,15 @@
 import {
-    profile,
-    profiler
-  } from "shared/utils/profiler";
+    profiler, profile
+  } from "shared/utils/profiling/profiler";
   import { taskQueue, tickPhases } from "./taskQueue";
-
+  import { PriorityQueue } from "shared/utils/queues/priorityQueue";
 
   let preTickQueues = new PriorityQueue<taskQueue>((a,b) => a.priority >= b.priority);
   let postTickQueues = new PriorityQueue<taskQueue>((a,b) => a.priority >= b.priority);
   let defaultQueue = new taskQueue("default", -100, tickPhases.POST_TICK);
 
-
-
-
-  /**
-   * Queue of tasks that need to be run
-   * @type {Function[]}
-   */
-  let tasks = [];
-  /**
-   * Queue of microTasks that need to be run
-   * @type {Function[]}
-   */
-  let microTasks = [];
+  let tasks: Function[] = [];
+  let microTasks: Function[] = [];
 
   /**
    * Queue a Microtask to be executed inbetween or after tasks, as cpu allows
@@ -29,7 +17,7 @@ import {
    * These run first at the end of the main loop, then again inbetween tasks.
    * @param {Function} microTask
    */
-  export function queueMicroTask(microTask) {
+  export function queueMicroTask(microTask: Function) {
     microTasks.push(microTask);
   }
 
@@ -39,7 +27,7 @@ import {
    * These run at the end of the tick, after the microtasks are run.
    * @param {Function} task
    */
-  export function queueTask(task) {
+  export function queueTask(task: Function) {
     tasks.push(task);
   }
   @profile("tasks")

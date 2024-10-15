@@ -11,9 +11,8 @@ import {
   setTimeout as setTm,
   clearTimeout as clearTm
 } from "./setTimeout";
-import {
-  Promise as pf
-} from "./Promise";
+import {default as pf} from "./Promise";
+import {default as slp} from "./sleep";
 
 export type idType = string;
 
@@ -23,4 +22,5 @@ export let setInterval = setInt;
 export let clearInterval = clearInt;
 export let startTick = start;
 export let endTick = end;
-export let Promise = pf
+export let PromisePoly = pf
+export let sleep = slp
