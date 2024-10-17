@@ -139,7 +139,54 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
     let haulerDropoffs: Dropoff[] = [];
     let minerPickups: Pickup[] = [];
 
-
+    // Create jobs if they don't exist
+    if (!this.workerJob) {
+      this.workerJob = new Job(this.id + "_worker", this, {
+        name: "worker",
+        fatness: 1,
+        priority: priority.TOP,
+        primaryPart: WORK,
+        secondaryPart: CARRY,
+        secondaryPerPrimary: 1,
+        maxLevel: 1,
+      });
+      this.workerJob.maxAssignedObjects = 1;
+      this.workerJob.priority = priority.NORMAL;
+    }
+    if (!this.minerJob) {
+      this.minerJob = new Job(this.id + "_miner", this, {
+        name: "miner",
+        fatness: 100,
+        priority: priority.NORMAL,
+        primaryPart: WORK,
+        secondaryPart: CARRY,
+        secondaryPerPrimary: 0.01,
+      });
+      // this.minerJob.maxAssignedObjects = 2;
+      this.minerJob.priority = priority.TOP;
+    }
+    if (!this.haulerJob) {
+      this.haulerJob = new Job(this.id + "_hauler", this, {
+        name: "hauler",
+        fatness: 1,
+        priority: priority.NORMAL,
+        maxLevel: 1
+      });
+      this.haulerJob.maxAssignedObjects = 8;
+      this.haulerJob.priority = priority.LOW;
+    }
+    if (!this.upgraderJob) {
+      this.upgraderJob = new Job(this.id + "_upgrader", this, {
+        name: "upgrader",
+        fatness: 100,
+        priority: priority.NORMAL,
+        primaryPart: WORK,
+        secondaryPart: CARRY,
+        secondaryPerPrimary: 0.01,
+      });
+      // this.upgraderJob.maxAssignedObjects = 5;
+      this.upgraderJob.priority = priority.NORMAL;
+    }
 
 
 
@@ -168,45 +215,16 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
 
     }
 
-    // Create jobs if they don't exist
-    if (!this.minerJob) {
-      this.minerJob = new Job(this.id + "_miner", this, {
-        name: "miner",
-        fatness: 100,
-        priority: priority.TOP,
-        primaryPart: WORK,
-        secondaryPart: CARRY,
-        secondaryPerPrimary: 0.01,
-      });
-      // this.minerJob.maxAssignedObjects = 2;
-    }
-    if (!this.haulerJob) {
-      this.haulerJob = new Job(this.id + "_hauler", this, {
-        name: "hauler",
-        fatness: 1,
-        priority: priority.HIGH,
-        maxLevel: 1
-      });
-      this.haulerJob.maxAssignedObjects = 8;
-    }
-    if (!this.upgraderJob) {
-      this.upgraderJob = new Job(this.id + "_upgrader", this, {
-        name: "upgrader",
-        fatness: 100,
-        priority: priority.NORMAL,
-        primaryPart: WORK,
-        secondaryPart: CARRY,
-        secondaryPerPrimary: 0.01,
-      });
-      // this.upgraderJob.maxAssignedObjects = 5;
-    }
+
 
     // Sync actions for each job
     this.minerJob.syncActions(sourceActions);
-    this.haulerJob.syncActions(pickupActions, [...spawnsActions, ...controllerDropOff, ...upgraderDropoffs, ...minerPickups]);
+    this.workerJob.syncActions(sourceActions, [...spawnsActions, ...upgradeActions]);
+    this.haulerJob.syncActions(pickupActions, [...spawnsActions, ...controllerDropOff]);
     this.upgraderJob.syncActions(controllerPickup, [...upgradeActions]);
 
     this.jobs = [
+      this.workerJob,
       this.minerJob,
       this.haulerJob,
       this.upgraderJob,

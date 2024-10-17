@@ -32,9 +32,9 @@ export class Pickup extends BaseResourceAction<HasStorageWrapper<HasStorage>>
     this.maxRange = 1;
   }
 
-  shouldDo(object: HasStorageWrapper<Creep>): boolean {
-    if (!super.shouldDo(object)) return false;
-    let assignments = this.getAssignmentAmount(object);
+  shouldDo(object: HasStorageWrapper<Creep>, priority:number): boolean {
+    if (!super.shouldDo(object, priority)) return false;
+    let assignments = this.getAssignmentAmount(object, priority);
     if (Object.values(assignments).some(amount => amount > 0)) {
       logger.log("should do", this.id, object.id, object.store.totalFree * 0.7, object.store.totalFree, this.resourceAmounts.total, object.store.totalFree * 0.7 < this.resourceAmounts.total);
       logger.log("assignments", assignments)

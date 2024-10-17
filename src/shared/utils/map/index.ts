@@ -70,9 +70,9 @@ export function findPathPositions(creepPos: WorldPosition, path: WorldPosition[]
     lookaheadPos: WorldPosition,
     currentIndex: number
 } {
+    startIndex = Math.min(startIndex, path.length - 1);
     let closestIndex = startIndex;
     let closestDist = creepPos.getRangeTo(path[startIndex]);
-
     for (let i = startIndex + 1; i < path.length; i++) {
         let posDist = creepPos.getRangeTo(path[i]);
         if (posDist < closestDist) {

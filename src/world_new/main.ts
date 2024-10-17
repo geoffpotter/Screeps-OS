@@ -8,6 +8,7 @@ import "shared/polyfills"
 import console from "shared/prototypes/console";
 import "shared/prototypes/roomPosition";
 import "shared/utils/map/WorldPosition";
+// import "shared/prototypes/CreepMovement";
 import {
     ErrorMapper
   } from "shared/utils/errors/ErrorMapper";
@@ -70,9 +71,14 @@ import { Edge, makeEdgeId } from "shared/subsystems/NodeNetwork";
 
 
 
-
-let mainRoom = getOrMakeRoomWrapper("W7N3");
+let mainRoomName = "W7N3";
 let remoteNames = ["W7N4", "W8N3", "W6N3"];
+if (Game.rooms.sim) {
+    mainRoomName = "sim";
+    remoteNames = [];
+}
+
+let mainRoom = getOrMakeRoomWrapper(mainRoomName);
 // let remoteNames = ["W7N4"];
 // let remoteNames: string[] = [];
 let remoteRooms = remoteNames.map(name=>getOrMakeRoomWrapper(name));

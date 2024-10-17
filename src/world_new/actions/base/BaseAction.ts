@@ -187,7 +187,7 @@ export abstract class BaseAction<
     obj.currentAction = this as AnyAction<AssignedWrapperType>;
     // logger.log("assigning", obj.id, "to", this.id);
     this.clearLosers(obj, priority);
-    let assignAmount = this.getAssignmentAmount(obj);
+    let assignAmount = this.getAssignmentAmount(obj, priority);
     // logger.log("assignAmount?", this.id, obj.id, assignAmount);
     const assignment = new this.assignmentConstructor(this, obj, priority, assignAmount) as AssignmentType;
     this.assignments.set(obj.id, assignment as AssignmentType);
@@ -214,10 +214,10 @@ export abstract class BaseAction<
   abstract doAction(object: AssignedWrapperType): boolean;
 
   canDo(object: AssignedWrapperType): boolean {
-    return object.id !== this.target.id && (this.maxAssignments == 0 || this.assignments.size < this.maxAssignments);
+    return object.id !== this.target.id;
   }
-  shouldDo(object: AssignedWrapperType): boolean {
-    let assignmentAmount = this.getAssignmentAmount(object);
+  shouldDo(object: AssignedWrapperType, priority:number): boolean {
+    let assignmentAmount = this.getAssignmentAmount(object, priority);
     logger.log("should do", this.id, object.id, assignmentAmount);
     return Object.values(assignmentAmount).some(value => value > 0);
   }
@@ -282,11 +282,13 @@ export abstract class BaseAction<
       if (a.priority !== b.priority) {
         return a.priority - b.priority;
       }
-      return a.distanceToTarget - b.distanceToTarget;
+      return b.distanceToTarget - a.distanceToTarget;
     });
     while (this.overAllowedAssignments()) {
       const loser = loserAssignments.shift();
       if (!loser) break;
+      //@ts-ignore
+      loser.assigned.currentAction = false;
       this.unassign(loser.assigned as AssignedWrapperType & CanHazAction);
     }
   }
@@ -308,43 +310,36 @@ export abstract class BaseAction<
   abstract calculateDemand(): ActionDemand;
 
   getAmountRemainingByPriorityAndLocation(priority: number, pos: WorldPosition): ActionDemand {
-    const totalDemand = this.calculateDemand();
-    const remainingDemand: ActionDemand = { ...totalDemand };
+    const remainingDemand: ActionDemand = this.calculateDemand();
     const targetRange = this.wpos.getRangeTo(pos);
 
     for (const assignment of this.assignments.values()) {
       if (assignment.priority <= priority && assignment.distanceToTarget <= targetRange) {
         for (const part in assignment.partAmounts) {
           if (remainingDemand[part as BodyPartConstant]) {
-            remainingDemand[part as BodyPartConstant]! -= assignment.partAmounts[part as BodyPartConstant] || 0;
+            let remainingDemandForPart = remainingDemand[part as BodyPartConstant];
+            if (!remainingDemandForPart) {
+              delete remainingDemand[part as BodyPartConstant];
+              continue;
+            }
+            let assignmentAmount = assignment.partAmounts[part as BodyPartConstant] || 0;
+            remainingDemandForPart -= assignmentAmount;
+            if (remainingDemandForPart <= 0) {
+              delete remainingDemand[part as BodyPartConstant];
+            } else {
+              remainingDemand[part as BodyPartConstant] = Math.max(0, remainingDemandForPart);
+            }
           }
         }
       }
     }
 
-    // Ensure no negative values
-    for (const part in remainingDemand) {
-      remainingDemand[part as BodyPartConstant] = Math.max(0, remainingDemand[part as BodyPartConstant] || 0);
-    }
-
     return remainingDemand;
   }
-  getAssignmentAmount(object:AssignedWrapperType): ActionDemand {
-    let demand = this.calculateDemand();
-    let assigned = this.getCurrentAssignedParts();
-    // logger.log("getAssignmentAmount1", this.id, object.id, demand, assigned);
-    for(let part in demand) {
-      //@ts-ignore
-      demand[part as BodyPartConstant] -= assigned[part as BodyPartConstant] || 0;
-    }
-    // logger.log("getAssignmentAmount2", this.id, object.id, demand);
-    // now limit remaining demand to the amount of parts available
-    for(let part in demand) {
-      //@ts-ignore
-      demand[part as BodyPartConstant] = Math.min(demand[part as BodyPartConstant], object.getNumBodyParts(part as BodyPartConstant));
-    }
-    logger.log("getAssignmentAmount3", this.id, object.id, demand);
-    return demand;
+  getAssignmentAmount(object:AssignedWrapperType, priority:number): ActionDemand {
+    let remaining = this.getAmountRemainingByPriorityAndLocation(priority, object.wpos);
+    logger.log("getAssignmentAmount3", this.id, object.id, remaining);
+    return remaining;
   }
   getRemainingDemandByPriority(): { [priority: number]: ActionDemand } {
     const demandByPriority: { [priority: number]: ActionDemand } = {};

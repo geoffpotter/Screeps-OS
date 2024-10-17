@@ -12,7 +12,7 @@ import { sleepUntilCreepExists } from "shared/polyfills/sleep";
 
 const logger = new Logger("Job");
 logger.color = COLOR_CYAN;
-logger.enabled = false;
+// logger.enabled = false;
 
 export interface canHazJob extends GameObjectWrapper<any> {
   assignedJob: Job | false;
@@ -29,6 +29,7 @@ export interface JobMemory {
   creepRequestOptions: CreepRequestOptionsWithName;
   isSpawning: boolean;
   maxAssignedObjects: number; // Add this line
+  priority: number;
 }
 
 type CreepRequestOptionsWithName = Partial<CreepRequestOptions> & Pick<CreepRequestOptions, "name">;
@@ -53,7 +54,8 @@ export class Job extends baseStorable implements StorableClass<Job, typeof Job, 
       spawnerId: (this.spawner as any).id,
       creepRequestOptions: this.creepRequestOptions,
       isSpawning: this.isSpawning,
-      maxAssignedObjects: this.maxAssignedObjects
+      maxAssignedObjects: this.maxAssignedObjects,
+      priority: this.priority
     };
   }
 
@@ -65,6 +67,7 @@ export class Job extends baseStorable implements StorableClass<Job, typeof Job, 
   maxAssignedObjects: number;
   protected primaryActions: MemoryGroupedCollection<BaseAction<any, any>>;
   protected secondaryActions: MemoryGroupedCollection<BaseAction<any, any>>;
+  priority: number;
 
   constructor(
     id: string,
@@ -78,6 +81,7 @@ export class Job extends baseStorable implements StorableClass<Job, typeof Job, 
     this.spawner = spawner;
     this.creepRequestOptions = creepRequestOptions;
     this.maxAssignedObjects = 0;
+    this.priority = 0;
 
     // Set default values if not provided
     this.creepRequestOptions.memory = creepRequestOptions.memory || {};
@@ -267,7 +271,7 @@ export class Job extends baseStorable implements StorableClass<Job, typeof Job, 
 
   needsObject(object: canHazJob, useName: boolean = true) {
     if (useName) {
-      if (object.wrapperType === "CreepWrapper" && (this.maxAssignedObjects === 0 || this.assignedObjects.size < this.maxAssignedObjects)) {
+      if (object.wrapperType === "CreepWrapper") {
         let creepWrapper = object as CreepWrapper;
         if (creepWrapper.name && creepWrapper.name.includes(this.creepRequestOptions.name)) {
           logger.log("creep name includes job name", creepWrapper.name, this.creepRequestOptions.name);
@@ -338,7 +342,7 @@ export class Job extends baseStorable implements StorableClass<Job, typeof Job, 
     let allActions = [...this.primaryActions.getAll(), ...this.secondaryActions.getAll()];
     logger.log("allActions", allActions.map(action=>action.id));
     let validActions = allActions.filter(action => (
-      action.canDo(object) && action.hasDemand() && action.shouldDo(object)
+      action.canDo(object)
     ));
     logger.log("validActions", validActions.map(action=>action.id));
     let sortedActions = validActions.sort((a, b) => {
@@ -348,7 +352,11 @@ export class Job extends baseStorable implements StorableClass<Job, typeof Job, 
       return a.wpos.getRangeTo(object.wpos) - b.wpos.getRangeTo(object.wpos);
     });
 
-    return sortedActions[0] || false;
+    for (let action of sortedActions) {
+      if (action.shouldDo(object, this.priority)) {
+        return action;
+      }
+    }
+    return false;
   }
-
 }

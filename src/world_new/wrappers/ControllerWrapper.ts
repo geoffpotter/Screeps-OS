@@ -17,6 +17,8 @@ import { TypeInfoCollection } from "shared/utils/Collections/TypeInfoCollection"
 import Logger from "shared/utils/logger";
 import { SpawnWrapper } from "./spawn";
 import { RoomPositionWrapper } from "./room/RoomPositionWrapper";
+import costMatrixUtils from "shared/utils/map/CostMatrix";
+import { priority } from "shared/utils/priority";
 
 const logger = new Logger("ControllerWrapper");
 logger.enabled = false;
@@ -88,6 +90,7 @@ export class ControllerWrapper extends GameObjectWrapper<StructureController> im
     this.signControllerAction = new SignController(this, "Default sign");
     //@ts-ignore
     this.dumpEnergyAction = new Dropoff(this);
+    this.dumpEnergyAction.priority = priority.BOTTOM;
     //@ts-ignore
     this.useEnergyAction = new Pickup(this);
   }
@@ -132,6 +135,7 @@ export class ControllerWrapper extends GameObjectWrapper<StructureController> im
           [WORK]: this.level == 8 ? 15 : 100,
           [CARRY]: (currentlyAssigned[CARRY] || 0) + 1
         } as ActionDemand;
+        this.upgradeAction.display();
         this.signControllerAction.currentDemand = controller.sign ? {} : { [MOVE]: 1 } as ActionDemand;
         let intel = getRoomIntel(this.roomWrapper.id);
         if (!this.energyDumpPosition) {
@@ -142,7 +146,18 @@ export class ControllerWrapper extends GameObjectWrapper<StructureController> im
             let pathToSpawn = PathFinder.search(this.wpos.toRoomPosition(), closestSpawn.wpos.toRoomPosition(), {
               maxRooms: 1,
               roomCallback: (roomName) => {
-                return roomName == this.roomWrapper.id;
+                let thisRoomIntel = getRoomIntel(roomName);
+                let allStructs = [
+                  ...thisRoomIntel.buildings[PlayerStatus.MINE].getAll(),
+                  ...thisRoomIntel.buildings[PlayerStatus.ENEMY].getAll(),
+                  ...thisRoomIntel.buildings[PlayerStatus.NEUTRAL].getAll(),
+                  ...thisRoomIntel.buildings[PlayerStatus.FRIENDLY].getAll(),
+                ]
+                let costMatrix = costMatrixUtils.getCM(roomName);
+                for (const struct of allStructs) {
+                  costMatrix.set(struct.wpos.toRoomPosition().x, struct.wpos.toRoomPosition().y, 255);
+                }
+                return costMatrix;
               }
             });
             if (pathToSpawn.path.length > 0) {

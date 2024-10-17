@@ -34,8 +34,8 @@ export class Dropoff extends BaseResourceAction<HasStorageWrapper<HasStorage>>
     super(Dropoff.actionType, target);
   }
 
-  shouldDo(object: HasStorageWrapper<Creep>): boolean {
-    if (!super.shouldDo(object)) return false;
+  shouldDo(object: HasStorageWrapper<Creep>, priority:number): boolean {
+    if (!super.shouldDo(object, priority)) return false;
     logger.log("shouldDo", object.id, object.store.total, object.store.total > 0);
     return object.store.total > 0;
   }

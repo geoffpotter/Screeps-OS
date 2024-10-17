@@ -22,15 +22,16 @@ logger.enabled = false;
 
 let creepWrappers: Map<string, CreepWrapper> = new Map();
 //run creep movement
-setInterval(()=>{
-  creepWrappers.forEach(wrapper=>{
-    if(!wrapper.exists) {
-      creepWrappers.delete(wrapper.id);
-      return;
-    }
-    wrapper.move();
-  })
-}, 1, queues.MOVEMENT)
+// movement is now handled by the movement manager
+// setInterval(()=>{
+//   creepWrappers.forEach(wrapper=>{
+//     if(!wrapper.exists) {
+//       creepWrappers.delete(wrapper.id);
+//       return;
+//     }
+//     wrapper.move();
+//   })
+// }, 1, queues.MOVEMENT)
 //run creep actions
 setInterval(()=>{
   creepWrappers.forEach(wrapper=>{
@@ -183,15 +184,21 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
     super.update();
     //if(this.body.getBodyClassification())
     if(!this.my) return;
+    this.ensureAction();
+    // logger.log(this.name, "update", this.currentAction ? this.currentAction.id : "no action", this.assignedJob ? this.assignedJob.id : "no job");
+  }
+
+  private ensureAction() {
     let action = this.currentAction;
-    if(action && action.valid()) {
+    if (action && action.valid()) {
       logger.log(this.name, "has action", action.id, action.assignments.size, action.maxAssignments);
     } else {
       // if (this.colony && !this.assignedJob)
       if (this.colony && !this.assignedJob) {
-        logger.log(this.name, "has no job, finding a new one")
+        this.getObject()?.say("no job")
+        logger.log(this.name, "has no job, finding a new one", this.getObject);
         let newJob = this.colony.findSuitableJobForCreep(this);
-        if(newJob) {
+        if (newJob) {
           newJob.assignObject(this);
           logger.log(this.name, "assigned job", newJob.id);
         }
@@ -199,7 +206,7 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
       if (!this.assignedJob) {
         logger.log(this.name, "has no colony job, finding a new one from Empire");
         let newJob = Empire.findSuitableJobForObject(this);
-        if(newJob) {
+        if (newJob) {
           newJob.assignObject(this);
           logger.log(this.name, "assigned Empire job", newJob.id);
         }
@@ -207,49 +214,54 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
       if (this.assignedJob) {
         logger.log(this.name, "finding new action from existing job", this.assignedJob.id);
         let newAction = this.assignedJob.findActionForObject(this);
-        if(newAction) {
+        if (newAction) {
           newAction.assign(this);
           logger.log(this.name, "assigned action", newAction.id);
         }
       }
-      if(!this.currentAction) {
-        logger.log(this.name, "has no action, dropping all")
+      if (!this.currentAction) {
+        logger.log(this.name, "has no action, dropping all");
         this.dropAll();
       }
     }
-    // logger.log(this.id, "update", this.currentAction ? this.currentAction.id : "no action", this.assignedJob ? this.assignedJob.id : "no job");
   }
 
   /**
    * preform any actions
    */
   act() {
+    if (!this.my) return;
+    this.ensureAction();
     let action = this.currentAction;
     if(!action){
-      console.log(this.id, "has no action, doing nothing")
+      console.log(this.name, "has no action, doing nothing")
       return;
     }
 
     let rangeToAction = this.wpos.getRangeTo(action.target.wpos);
-    logger.log(this.id, "range to action", rangeToAction, "max range", action.maxRange)
+    logger.log(this.name, "range to action", rangeToAction, "max range", action.maxRange)
     if(rangeToAction <= action.maxRange) {
       let actionDone = action.doAction(this);
-      logger.log(this.id, "did action", actionDone, action.id, action.assignments.size, action.maxAssignments);
+      logger.log(this.name, "did action", actionDone, action.id, action.assignments.size, action.maxAssignments);
       if(actionDone==true) {
-        logger.log(this.id, "finished action", action.id)
+        logger.log(this.name, "finished action", action.id)
         this.currentAction && this.currentAction.unassign(this);
         this.currentAction = false;
+        this.ensureAction(); //find a new action
       }
     }
+    this.move();
   }
 
   /**
    * do movement
    */
   move() {
+    if (!this.my) return;
+    // this.ensureAction();
     let action = this.currentAction;//researches for new action if it was completed during the do phase.
     if(!action){
-      // console.log(this.id, "has no action, not moving")
+      console.log(this.name, "has no action, not moving")
       return;
     }
 
@@ -259,13 +271,21 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
       throw new Error("no creep for " + this.id + " something has gone horribly wrong")
     }
 
-    let rangeToAction = this.wpos.getRangeTo(action.target.wpos);
-    // logger.log(this.id, " doing move. range to action", rangeToAction, "max range", action.maxRange, this.wpos.roomName,  action.target.wpos.roomName)
-    if(rangeToAction > action.maxRange || this.wpos.roomName !== action.target.wpos.roomName) {
-      // logger.log(this.id, " moving to action", action.target.id)
-      //creep.moveTo(action.target.wpos.toRoomPosition());
-      nodeNetwork.moveTo(creep, {pos: action.target.wpos, range: action.maxRange});
+    logger.log(this.name, " moving to action", action.target.id)
+    if (creep.fatigue > 0) {
+      creep.say("🛌")
+      return;
     }
+    creep.moveTo(action.target.wpos.toRoomPosition(), {
+      range: action.maxRange,
+      reusePath: 1,
+      // priority: 0,
+      // ignoreCreeps: true,
+      visualizePathStyle: {
+        stroke: '#ff0000'
+      }
+    });
+    // nodeNetwork.moveTo(creep, {pos: action.target.wpos, range: action.maxRange});
   }
 
 

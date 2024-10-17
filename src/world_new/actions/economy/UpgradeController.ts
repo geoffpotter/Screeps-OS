@@ -31,7 +31,8 @@ export class UpgradeController extends BaseAction<ControllerWrapper, CreepWrappe
     return super.canDo(object) && object.hasBodyPart(WORK) && object.hasBodyPart(CARRY);
   }
 
-  shouldDo(object: CreepWrapper): boolean {
+  shouldDo(object: CreepWrapper, priority:number): boolean {
+    if (!super.shouldDo(object, priority)) return false;
     return object.store.getAmount(RESOURCE_ENERGY) > 0;
   }
   calculateDemand(): ActionDemand {

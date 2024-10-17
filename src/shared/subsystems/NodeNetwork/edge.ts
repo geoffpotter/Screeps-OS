@@ -532,7 +532,9 @@ class Edge {
             let style = {
                 opacity: opacity
             }
-            visual.drawPath(this.path.path.map(pos => pos.toRoomPosition()), color, style)
+            // visual.drawPath(this.path.path.map(pos => pos.toRoomPosition()), color, style)
+            let visual = new RoomVisual(this.node1Pos.roomName);
+            visual.poly(this.path.path.map(pos => pos.toRoomPosition()), {stroke: color, opacity: opacity})
         }
     }
 

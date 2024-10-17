@@ -827,7 +827,9 @@ export class NodeNetwork {
 
     moveTo(creep: MovableObject, goal: { pos: WorldPosition; range: number }): ScreepsReturnCode {
         logger.log(`${creep.name} moveTo ${goal.pos.serialize()}`);
-
+        if (creep.getWeight() < 0) {
+            return creep.moveTo(goal.pos, {range: goal.range, visualizePathStyle: {stroke: '#ff0000'}});
+        }
         const creepPos = creep.pos.toWorldPosition();
 
         // Check if we've reached the goal
@@ -945,7 +947,7 @@ export class NodeNetwork {
                         // Move along the edge
                         let result = creep.moveTo(nextNode.pos, {
                             range: 1,
-                            visualizePathStyle: { stroke: '#00ff00' },
+                            visualizePathStyle: { lineStyle: 'dashed' },
                             maxPathDistance: 3,
                             goalPos: nextNode.pos,
                             noPathFinding: true
@@ -1019,6 +1021,7 @@ export class NodeNetwork {
 
         let cheapestNode: Node | false = false;
         let cheapestCost = 1000000;
+        let maxCost = 3;
 
         while (roomsToCheck.length > 0) {
             let roomName = roomsToCheck.shift();
@@ -1040,26 +1043,26 @@ export class NodeNetwork {
                     //logger.log(node.id, node, node.pos, NodeNetworkRoom.roomName)
                     //global.utils.visual.circle(node.pos, "#f00", 1, 0.5)
                     let nodeCost = pos.getRangeTo(node.pos);
-                    if (nodeCost < cheapestCost) {
+                    if (nodeCost < cheapestCost && nodeCost < maxCost) {
                         cheapestNode = node;
                         cheapestCost = nodeCost;
                     }
                 }
             }
             //log("checked room: " + roomName + " " + (roomName == pos.roomName))
-            if (roomName == pos.roomName && cheapestNode === false) {
-                //logger.log("not found yet, adding neighbors", cheapestNode);
+            // if (roomName == pos.roomName && cheapestNode === false) {
+            //     //logger.log("not found yet, adding neighbors", cheapestNode);
 
-                let exits = Game.map.describeExits(pos.roomName);
-                for (let dir in exits) {
-                    if (exits.hasOwnProperty(dir)) {
-                        const exitRoomName = exits[dir as ExitKey];
-                        if (exitRoomName) {
-                            roomsToCheck.push(exitRoomName);
-                        }
-                    }
-                }
-            }
+            //     let exits = Game.map.describeExits(pos.roomName);
+            //     for (let dir in exits) {
+            //         if (exits.hasOwnProperty(dir)) {
+            //             const exitRoomName = exits[dir as ExitKey];
+            //             if (exitRoomName) {
+            //                 roomsToCheck.push(exitRoomName);
+            //             }
+            //         }
+            //     }
+            // }
         }
         // if (cheapestNode) {
         //     visual.circle(cheapestNode.pos.toRoomPosition(), "#0f0", 1, 1)

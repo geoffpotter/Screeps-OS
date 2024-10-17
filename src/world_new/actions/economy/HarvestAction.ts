@@ -58,7 +58,8 @@ export class HarvestAction extends BasePartAction<harvestable, CreepWrapper>
     return false;
   }
 
-  shouldDo(object: CreepWrapper): boolean {
+  shouldDo(object: CreepWrapper, priority:number): boolean {
+    if (!super.shouldDo(object, priority)) return false;
     return object.store.total == 0 || object.store.totalFree > 0;
   }
 

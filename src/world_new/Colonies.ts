@@ -5,6 +5,7 @@ import Logger from "shared/utils/logger";
 import queues from "./queues";
 let logger = new Logger("Colonies");
 import { setInterval } from "shared/polyfills";
+import { builtInQueues } from "shared/polyfills/tasks";
 let colonies = MemoryManager.loadOrCreateObject(MemoryMap, "empire_colonies", false) as MemoryMap<Colony>;
 
 
@@ -30,7 +31,7 @@ export function getAllColonies() {
     return colonies.values();
 }
 
-setInterval(() => colonies.forEach((colony) => colony.init()), 1, queues.TICK_INIT, true);
+setInterval(() => colonies.forEach((colony) => colony.init()), 1, builtInQueues.START_TICK, true);
 setInterval(() => colonies.forEach((colony) => colony.postInit()), 1, queues.POST_INIT, true);
 setInterval(() => colonies.forEach((colony) => colony.update()), 1, queues.UPDATE, true);
 setInterval(() => colonies.forEach((colony) => colony.act()), 1, queues.ACTIONS, true);

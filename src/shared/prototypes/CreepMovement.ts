@@ -1,10 +1,12 @@
 import visual from "shared/utils/visual";
-import { movementManager } from "../subsystems/NodeNetwork/MovementManager";
-import { NodeNetwork } from "../subsystems/NodeNetwork/nodeNetwork";
-import WorldPosition, { deserializeWPath, serializeWPath, toWorldPosition } from "../utils/map/WorldPosition";
+import { movementManager } from "shared/subsystems/NodeNetwork/MovementManager";
+import { NodeNetwork } from "shared/subsystems/NodeNetwork/nodeNetwork";
+import WorldPosition, { deserializeWPath, serializeWPath, toWorldPosition } from "shared/utils/map/WorldPosition";
 import { deserializePath, serializePath } from "./roomPosition";
 import { findPathPositions } from "../utils/map/index";
 import Logger from "../utils/logger";
+import { getRoomIntel, PlayerStatus } from "shared/subsystems/intel/intel";
+import costMatrixUtils from "shared/utils/map/CostMatrix";
 let logger = new Logger("CreepMovement");
 
 interface CustomMoveToOpts {
@@ -21,9 +23,10 @@ interface CustomMoveToOpts {
     plainCost?: number;
     swampCost?: number;
     flee?: boolean;
-    costCallback?: (roomName: string) => CostMatrix | boolean;
+    roomCallback?: (roomName: string) => CostMatrix | boolean;
     maxPathDistance?: number;
     goalPos?: WorldPosition;
+    priority?: number;
 }
 
 interface MoveMemory {
@@ -125,6 +128,7 @@ Creep.prototype.getCost = function (terrainType: keyof typeof terrainCosts): num
     // Adjust the weight to fit the terrain multiplier scale
     // This will result in a value that, when multiplied by the terrain factor,
     // gives the number of ticks the creep will spend on that tile
+    logger.log(this.name, "getCost", terrainType, effectiveWeight, totalWeight, cost, moveParts.length, normalizedWeight);
     return normalizedWeight;
 }
 
@@ -142,7 +146,9 @@ Creep.prototype.setPath = function(dest: WorldPosition, path: WorldPosition[]): 
 Creep.prototype.moveTo = function(target: WorldPosition | RoomPosition | { pos: RoomPosition }, opts: CustomMoveToOpts = {}): CreepMoveReturnCode | ERR_NO_PATH | ERR_INVALID_TARGET | ERR_NOT_FOUND {
     logger.log(this.name, "moveTo", target);
     const dest = toWorldPosition(target);
-
+    if (!opts.plainCost) opts.plainCost = this.getCost("plain");
+    if (!opts.swampCost) opts.swampCost = this.getCost("swamp");
+    if (opts.range == undefined) opts.range = 0;
     logger.log(this.name, "checking for path", this.memory._move?.dest, dest);
     // Check if we already have a path and it's still valid
     if (this.memory._move && this.memory._move.dest && dest.isEqualTo(this.memory._move.dest)) {
@@ -152,17 +158,47 @@ Creep.prototype.moveTo = function(target: WorldPosition | RoomPosition | { pos: 
     }
     logger.log(this.name, "finding new path");
     // Find a new path
-    const result = PathFinder.search(this.pos, { pos: dest.toRoomPosition(), range: opts.range || 1 }, {
-        plainCost: opts.plainCost || 2,
-        swampCost: opts.swampCost || 10,
-        roomCallback: opts.costCallback,
-        maxOps: opts.maxOps || 2000,
-        maxRooms: opts.maxRooms || 16,
-        flee: opts.flee,
-    });
+    opts.roomCallback = (roomName: string) => {
+        let intel = getRoomIntel(roomName);
+        let costMatrix = new PathFinder.CostMatrix;
+        let allStructs = [
+            ...intel.buildings[PlayerStatus.MINE].getAll(),
+            ...intel.buildings[PlayerStatus.ENEMY].getAll(),
+            ...intel.buildings[PlayerStatus.FRIENDLY].getAll(),
+            ...intel.buildings[PlayerStatus.NEUTRAL].getAll(),
+
+        ];
+
+        let allCreeps = [
+            ...intel.creeps[PlayerStatus.MINE].getAll(),
+            ...intel.creeps[PlayerStatus.ENEMY].getAll(),
+            ...intel.creeps[PlayerStatus.FRIENDLY].getAll(),
+            ...intel.creeps[PlayerStatus.NEUTRAL].getAll(),
+        ];
+
+        for (const struct of allStructs) {
+            let structPos = struct.wpos.toRoomPosition();
+            costMatrix.set(structPos.x, structPos.y, 255);
+        }
+        // if (!opts.ignoreCreeps) {
+            for (const creep of allCreeps) {
+                let creepPos = creep.wpos.toRoomPosition();
+                costMatrix.set(creepPos.x, creepPos.y, 255);
+            }
+        // }
+
+
+        return costMatrix;
+    };
+    const result = PathFinder.search(this.pos, { pos: dest.toRoomPosition(), range: opts.range }, opts);
 
     if (result.incomplete) {
         return ERR_NO_PATH;
+    }
+
+    // Visualize the path if requested
+    if (opts.visualizePathStyle) {
+        visual.drawPath(result.path, this.getColor(), opts.visualizePathStyle);
     }
 
     // Convert RoomPositions to WorldPositions
@@ -209,13 +245,19 @@ Creep.prototype.moveByPath = function(path: WorldPosition[] | string, opts: Cust
         return OK;
     }
 
-    // Visualize the path if requested
-    if (opts.visualizePathStyle) {
-        //visual.drawPath(deserializedPath.map(p => p.toRoomPosition()), this.getColor(), opts.visualizePathStyle);
-    }
+
 
     // Move to the next position
-    return this.move(creepPos.getDirectionTo(nextPos), { ...opts, goalPos: lookaheadPos });
+    movementManager.registerMovement({
+        creep: this,
+        currentPathPos: currentPos,
+        nextPathPos: nextPos,
+        goalPos: lookaheadPos,
+        goalRange: opts.range || 0,
+        priority: opts.priority || 1, // Use the provided priority or default to 1
+        pathRange: Math.min(opts.maxPathDistance || 1, deserializedPath.length - startIndex),
+    });
+    return OK;
 };
 
 //@ts-ignore just screwin up the api all over the place
@@ -229,13 +271,12 @@ Creep.prototype.move = function(direction: DirectionConstant | Creep, opts: Cust
 
     movementManager.registerMovement({
         creep: this,
-        currentPos: currentPos,
-        desiredDirection: direction,
+        currentPathPos: currentPos,
+        nextPathPos: targetPos,
         goalPos: opts.goalPos || targetPos,
         goalRange: opts.range || 0,
-        priority: 1,
-        maxPathDistance: opts.maxPathDistance || 3,
-        maxEndDistance: 1
+        priority: opts.priority || 1, // Use the provided priority or default to 1
+        pathRange: opts.maxPathDistance || 1,
     });
 
     return OK;
