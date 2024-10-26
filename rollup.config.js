@@ -16,6 +16,7 @@ import includePaths from 'rollup-plugin-includepaths';
 import inject from '@rollup/plugin-inject';
 import path from 'path';
 
+import sourcemaps from 'rollup-plugin-sourcemaps';
 
 
 let targetBot = "";
@@ -56,7 +57,8 @@ function getOptions(botSrc) {
       format: "cjs",
       entryFileNames: "[name].js",
 
-      sourcemap:  true,
+      sourcemap: true,
+
       // preserveModules: true,
       // preserveModulesRoot: botSrc,
     },
@@ -64,37 +66,8 @@ function getOptions(botSrc) {
     plugins: [
       fixGlobals(),
       clear({ targets: targetBot === "" ? ["dist"] : [outDir] }), // If targeted build, only clear target sub-directory
-      replace({
-        preventAssignment: true,
-        values: {
-          "_SOURCE_MAPS_": function() {
-            console.log("building source maps")
-            // let inputs = grunt.file.expand({ filter: 'isFile'}, "shared/**/sourceMaps.js");
-            // let output = inputs[0].replace("src","");//String(inputs[0]).replace("src","");
 
-            let mapFiles = fg.sync(botSrc + "/**/*.map");
-            let mapFileBlocks = [];
-            for(let i in mapFiles) {
-              let mapFile = mapFiles[i].replace(".js.map", ".map");
-              let file = path.basename(mapFile).replace(".map", "");
-              let mapBlock = `
-"${file}_inst":null,
-"${file}": function() {
-if(!this.${file}_inst) {
-this.${file}_inst = require("${mapFile.replace(outDir + "/", "")}");
-}
-return this.${file}_inst
-},`;
-  mapFileBlocks.push(mapBlock);
-            }
-            let sourceMapCode = `
-${mapFileBlocks.join("")}
-`
 
-            return sourceMapCode;
-          }
-        }
-      }),
       //need this to resolve relative local paths
       includePaths({
         include: {},
@@ -124,7 +97,41 @@ ${mapFileBlocks.join("")}
       //   // setInterval: path.resolve('src/shared/polyfills/setInterval.ts'),
       //   // setTimeout: path.resolve('src/shared/polyfills/setTimeout.ts'),
       // }),
-      babel({ babelHelpers: 'bundled' }),
+      // babel({ babelHelpers: 'bundled'}),
+      sourcemaps(),
+
+//       replace({
+//         preventAssignment: true,
+//         values: {
+//           "_SOURCE_MAPS_": function() {
+//             console.log("building source maps", outDir, botSrc)
+//             // let inputs = grunt.file.expand({ filter: 'isFile'}, "shared/**/sourceMaps.js");
+//             // let output = inputs[0].replace("src","");//String(inputs[0]).replace("src","");
+
+//             let mapFiles = fg.sync("./" + outDir + "/**/*.map*");
+//             let mapFileBlocks = [];
+//             for(let i in mapFiles) {
+//               console.log("map file:", mapFiles[i])
+//               let mapFile = mapFiles[i].replace(".js.map", ".map");
+//               let file = path.basename(mapFile).replace(".map", "");
+//               let mapBlock = `
+// "${file}_inst":null,
+// "${file}": function() {
+// if(!this.${file}_inst) {
+// this.${file}_inst = require("${mapFile.replace(outDir + "/", "")}");
+// }
+// return this.${file}_inst
+// },`;
+//   mapFileBlocks.push(mapBlock);
+//             }
+//             let sourceMapCode = `
+// ${mapFileBlocks.join("")}
+// `
+
+//             return sourceMapCode;
+//           }
+//         }
+//       }),
       screeps({config: cfg, dryRun: cfg == null})
     ]
   };

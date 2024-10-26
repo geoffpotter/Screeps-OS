@@ -50,7 +50,6 @@ export class PowerCreepWrapper extends HasStorageWrapper<PowerCreep> implements 
       this.className = powerCreep.className;
       this.shard = powerCreep.shard || null;
       this.spawnCooldownTime = powerCreep.spawnCooldownTime || null;
-      this.store.updateFromStore(powerCreep.store);
     }
   }
 }

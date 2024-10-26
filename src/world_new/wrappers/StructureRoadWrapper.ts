@@ -1,36 +1,39 @@
 import { KillableWrapper, KillableWrapperData } from "./base/KillableWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
 
 interface StructureRoadWrapperData extends KillableWrapperData {
-  // Add any road-specific properties here
+  ticksToDecay: number;
 }
 
 export class StructureRoadWrapper extends KillableWrapper<StructureRoad> implements StorableCreatableClass<StructureRoadWrapper, typeof StructureRoadWrapper, StructureRoadWrapperData> {
+  ticksToDecay: number;
+
   static fromJSON(json: StructureRoadWrapperData): StructureRoadWrapper {
-    return new StructureRoadWrapper(json.id as Id<StructureRoad>);
+    const wrapper = new StructureRoadWrapper(json.id as Id<StructureRoad>);
+    wrapper.ticksToDecay = json.ticksToDecay;
+    return wrapper;
   }
+
   toJSON(): StructureRoadWrapperData {
     return {
       ...super.toJSON(),
-      // Add any road-specific properties here
+      ticksToDecay: this.ticksToDecay,
     };
   }
 
   constructor(id: string) {
     super(id as Id<StructureRoad>);
+    this.ticksToDecay = 0;
   }
 
   update() {
     super.update();
     const road = this.getObject();
     if (road) {
-      // Update road-specific properties here
+      this.ticksToDecay = road.ticksToDecay;
     }
   }
-
 }
 
 registerObjectWrapper(StructureRoad, StructureRoadWrapper);

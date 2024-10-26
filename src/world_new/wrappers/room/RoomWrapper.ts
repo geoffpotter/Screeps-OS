@@ -1,4 +1,3 @@
-import { AnyAction } from "../../actions/base/BaseAction";
 
 import MemoryManager, { baseStorable, StorableCreatableClass } from "shared/utils/memory/MemoryManager";
 import MemoryGroupedCollection, { MemoryGroupedCollectionJSON } from "shared/utils/memory/MemoryGroupedCollection";
@@ -8,8 +7,7 @@ import WorldPosition, { WorldPositionData } from "shared/utils/map/WorldPosition
 import { setTimeout } from "shared/polyfills/setTimeout";
 import { builtInQueues, queueMicroTask } from "shared/polyfills/tasks";
 import Logger from "shared/utils/logger";
-import { JobMemory } from "world_new/jobs/Job";
-import { ScoutAction, ScoutActionMemory } from "world_new/actions/economy/ScoutAction";
+import { ScoutAction } from "world_new/actions/economy/ScoutAction";
 import Empire from "world_new/Empire";
 import { Colony } from "world_new/Colony";
 import { RoomMode } from "./RoomMode";
@@ -29,7 +27,6 @@ interface RoomWrapperData {
     wpos: WorldPositionData;
     lastSeen: number;
     refreshEvery: number;
-    scoutAction: ScoutActionMemory;
     roomMode: RoomMode;
     addedSurroundingRooms: boolean;
 }
@@ -49,7 +46,6 @@ export class RoomWrapper /* extends GameObjectWrapper<GameRoom>*/ implements Sto
 
         wrapper.lastSeen = data.lastSeen;
         wrapper.refreshEvery = data.refreshEvery;
-        wrapper.scoutAction = ScoutAction.fromJSON(data.scoutAction);
         wrapper.roomMode = data.roomMode;
         wrapper.addedSurroundingRooms = data.addedSurroundingRooms;
         return wrapper;
@@ -60,7 +56,6 @@ export class RoomWrapper /* extends GameObjectWrapper<GameRoom>*/ implements Sto
             wpos: this.wpos,
             lastSeen: this.lastSeen,
             refreshEvery: this.refreshEvery,
-            scoutAction: this.scoutAction as unknown as ScoutActionMemory,
             roomMode: this.roomMode,
             addedSurroundingRooms: this.addedSurroundingRooms,
         };
@@ -78,7 +73,7 @@ export class RoomWrapper /* extends GameObjectWrapper<GameRoom>*/ implements Sto
     wrapperType = "RoomWrapper";
     refreshEvery = 100;
     addedSurroundingRooms = false;
-    scoutAction: ScoutAction;
+    private _scoutAction?: ScoutAction;
     roomMode: RoomMode = RoomMode.UNUSED;
     colony: Colony | false = false;
     readonly exists: boolean = true;
@@ -88,8 +83,6 @@ export class RoomWrapper /* extends GameObjectWrapper<GameRoom>*/ implements Sto
     constructor(roomName: string) {
         this.id = roomName;
         this.wpos = (new RoomPosition(25, 25, roomName)).toWorldPosition();
-        this.scoutAction = new ScoutAction(this);
-        this.scoutAction.maxAssignments = 1;
         if (!Memory.rooms) {
             Memory.rooms = {};
         }
@@ -100,17 +93,12 @@ export class RoomWrapper /* extends GameObjectWrapper<GameRoom>*/ implements Sto
         Memory.rooms[this.id].wrapper = this as unknown as RoomWrapperData;
 
     }
-    registerActions(): void {
-        if (this.actionsRegistered) {
-            return;
+    getScoutAction(): ScoutAction {
+        if (!this._scoutAction) {
+            this._scoutAction = new ScoutAction(this);
+            this._scoutAction.maxAssignments = 1;
         }
-        if (this.colony) {
-            // logger.log("Registering actions for room", this.id, this.scoutAction);
-            Empire.registerAction(this.scoutAction);
-            this.actionsRegistered = true;
-        }
-        //@ts-ignore
-        // logger.log("Registered actions", Empire.registeredActions.size, Empire.registeredActions.getAll());
+        return this._scoutAction;
     }
     public get room(): Room | false {
         if (Game.rooms[this.id]) {
@@ -121,7 +109,6 @@ export class RoomWrapper /* extends GameObjectWrapper<GameRoom>*/ implements Sto
     }
 
     init() {
-        this.registerActions();
         if (!this.room) {
             return;
         }
@@ -179,10 +166,8 @@ export class RoomWrapper /* extends GameObjectWrapper<GameRoom>*/ implements Sto
     }
     update() {
         // logger.log("Updating room wrapper", this.id, this.roomMode, this.needsScouting(), this.lastSeen, this.refreshEvery);
-        this.scoutAction.currentDemand = this.needsScouting() ? {move:1} : {};
-        if (this.colony) {
-            this.scoutAction.display();
-        }
+
+        this.getScoutAction().display();
     }
     needsScouting(): boolean {
         return Game.time > this.lastSeen + this.refreshEvery;

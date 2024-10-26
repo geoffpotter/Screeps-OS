@@ -7,15 +7,14 @@ import visual from "shared/utils/visual";
 import Logger from "shared/utils/logger";
 import { addRoomWrapper, getRoomWrapper } from "../room/RoomWrappers";
 import type { RoomWrapper } from "../room/RoomWrapper";
-import { Job } from "world_new/jobs/Job";
 import { Colony } from "world_new/Colony";
 import { removeGameObjectWrapperById, addGameObjectWrapper, hasGameObjectWrapper, getGameObjectWrapperById, getObjectWrapperClass, GameObjectClass } from "./AllGameObjects";
 import Node from "shared/subsystems/NodeNetwork/node";
-import nodeNetwork, { NodeNetwork } from "shared/subsystems/NodeNetwork/nodeNetwork";
+import nodeNetwork from "shared/subsystems/NodeNetwork/nodeNetwork";
 import nodeTypes from "shared/subsystems/NodeNetwork/nodeTypes";
 
 const logger = new Logger("GameObjectWrapper");
-logger.enabled = false;
+// logger.enabled = false;
 
 export type GameObject = RoomObject & _HasId;
 
@@ -40,6 +39,41 @@ export interface GameObjectWrapperData {
     lastSeen: number;
     timeout: number;
 }
+
+const wrapperToObjectLookup: Record<string, string> = {
+    "SpawnWrapper": STRUCTURE_SPAWN,
+    "StructureExtensionWrapper": STRUCTURE_EXTENSION,
+    "StructureTowerWrapper": STRUCTURE_TOWER,
+    "StructureStorageWrapper": STRUCTURE_STORAGE,
+    "StructureTerminalWrapper": STRUCTURE_TERMINAL,
+    "StructureLabWrapper": STRUCTURE_LAB,
+    "StructureFactoryWrapper": STRUCTURE_FACTORY,
+    "StructureObserverWrapper": STRUCTURE_OBSERVER,
+    "StructurePowerSpawnWrapper": STRUCTURE_POWER_SPAWN,
+    "StructureExtractorWrapper": STRUCTURE_EXTRACTOR,
+    "StructureRoadWrapper": STRUCTURE_ROAD,
+    "StructureWallWrapper": STRUCTURE_WALL,
+    "StructureRampartWrapper": STRUCTURE_RAMPART,
+    "StructureKeeperLairWrapper": STRUCTURE_KEEPER_LAIR,
+    "StructurePortalWrapper": STRUCTURE_PORTAL,
+    "StructureLinkWrapper": STRUCTURE_LINK,
+    "StructureContainerWrapper": STRUCTURE_CONTAINER,
+    "ControllerWrapper": STRUCTURE_CONTROLLER,
+    "PowerBankWrapper": STRUCTURE_POWER_BANK,
+    "InvaderCoreWrapper": STRUCTURE_INVADER_CORE,
+    "CreepWrapper": "creep",
+    "PowerCreepWrapper": "powerCreep",
+    "SourceWrapper": "source",
+    "MineralWrapper": "mineral",
+    "DepositWrapper": "deposit",
+    "RuinWrapper": "ruin",
+    "TombstoneWrapper": "tombstone",
+    "ResourceWrapper": "resource",
+    "ConstructionSiteWrapper": "constructionSite",
+    "FlagWrapper": "flag",
+    "PortalWrapper": "portal"
+};
+
 export class GameObjectWrapper<T extends GameObject> extends baseStorable implements StorableClass<GameObjectWrapper<T>, typeof GameObjectWrapper, GameObjectWrapperData> {
     static fromJSON(json: GameObjectWrapperData, wrapper?: GameObjectWrapper<any>): GameObjectWrapper<any> {
         if(!wrapper) {
@@ -67,11 +101,13 @@ export class GameObjectWrapper<T extends GameObject> extends baseStorable implem
     protected _exists: boolean = true;
     wpos: WorldPosition;
     owner: string = "Screeps";
-    private _actionsRegistered: boolean = false;
     private _nodes: Node[] | null = null;
 
     get wrapperType(): string {
         return this.constructor.name;
+    }
+    get objectType(): string {
+        return wrapperToObjectLookup[this.wrapperType];
     }
     get roomWrapper(): RoomWrapper {
 
@@ -127,20 +163,13 @@ export class GameObjectWrapper<T extends GameObject> extends baseStorable implem
         MemoryManager.unregisterObject(this);
         this.removeNodesFromNetwork();
     }
-    registerActions() {
-        if(this._actionsRegistered) {
-            return;
-        }
-        this._actionsRegistered = true;
-    }
 
     display() {
+        logger.log("display", this.id, this.wpos.roomName);
         visual.drawText(this.id, this.wpos.toRoomPosition(), "white");
     }
     init() {
-        if (!this._actionsRegistered) {
-            this.registerActions();
-        }
+
         // logger.log("init", this.id, this.exists, this.owner, this.wpos)
         // this.display();
         if ((this.lastSeen + this.timeout) < Game.time) {
@@ -165,6 +194,7 @@ export class GameObjectWrapper<T extends GameObject> extends baseStorable implem
         if (obj) {
             this.onSeen(obj);
         }
+        // this.display();
     }
 
     onSeen(gameObject: GameObject) {

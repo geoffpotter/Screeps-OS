@@ -1,4 +1,4 @@
-export const priority = {
+export const Priority = {
     TOP: 10000,
     HIGH: 1000,
     NORMAL: 0,

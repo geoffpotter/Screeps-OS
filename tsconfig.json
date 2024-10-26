@@ -6,9 +6,12 @@
     ],
     "target": "es2015",
     "moduleResolution": "Node",
-    "outDir": "./dist",
     "baseUrl": "src/",
     "sourceMap": true,
+    "outDir": "dist/",
+    "rootDir": "./src",
+    "inlineSources": true,
+    // "inlineSourceMap": true,
     "strict": true,
     "allowJs": true,
     "checkJs": true,
@@ -36,6 +39,7 @@
     "src/**/*"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist"
   ]
 }

@@ -1,8 +1,9 @@
 import { HasStorageWrapper, HasStorageWrapperData } from "./base/HasStorageWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
+import Logger from "shared/utils/logger";
+
+const logger = new Logger("StructureFactoryWrapper");
 
 interface StructureFactoryWrapperData extends HasStorageWrapperData {
   level: number;
@@ -15,17 +16,10 @@ export class StructureFactoryWrapper extends HasStorageWrapper<StructureFactory>
 
   static fromJSON(json: StructureFactoryWrapperData): StructureFactoryWrapper {
     const wrapper = new StructureFactoryWrapper(json.id as Id<StructureFactory>);
+    HasStorageWrapper.fromJSON(json, wrapper);
     wrapper.level = json.level;
     wrapper.cooldown = json.cooldown;
     return wrapper;
-  }
-
-  toJSON(): StructureFactoryWrapperData {
-    return {
-      ...super.toJSON(),
-      level: this.level,
-      cooldown: this.cooldown,
-    };
   }
 
   constructor(id: string) {
@@ -39,8 +33,16 @@ export class StructureFactoryWrapper extends HasStorageWrapper<StructureFactory>
     const factory = this.getObject();
     if (factory) {
       this.level = factory.level || 0;
-      this.cooldown = factory.cooldown || 0;
+      this.cooldown = factory.cooldown;
     }
+  }
+
+  toJSON(): StructureFactoryWrapperData {
+    return {
+      ...super.toJSON(),
+      level: this.level,
+      cooldown: this.cooldown,
+    };
   }
 }
 

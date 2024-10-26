@@ -1,18 +1,7 @@
-import { AnyAction } from "../../actions/base/BaseAction";
-
 import MemoryManager, { baseStorable, StorableCreatableClass } from "shared/utils/memory/MemoryManager";
-import MemoryGroupedCollection, { MemoryGroupedCollectionJSON } from "shared/utils/memory/MemoryGroupedCollection";
-import { setInterval } from "shared/polyfills/setInterval";
-import { PlayerStatus, RoomStatus, updateRoomIntel } from "shared/subsystems/intel/intel";
 import WorldPosition, { WorldPositionData } from "shared/utils/map/WorldPosition";
-import { setTimeout } from "shared/polyfills/setTimeout";
-import { builtInQueues, queueMicroTask } from "shared/polyfills/tasks";
 import Logger from "shared/utils/logger";
-import { JobMemory } from "world_new/jobs/Job";
-import { ScoutAction, ScoutActionMemory } from "world_new/actions/economy/ScoutAction";
-import Empire from "world_new/Empire";
-import { Colony } from "world_new/Colony";
-import { RoomMode } from "./RoomMode";
+
 import { HasStorageWrapper } from "../base/HasStorageWrapper";
 import { ResourceInfoCollection } from "shared/utils/Collections/ResourceInfoCollection";
 

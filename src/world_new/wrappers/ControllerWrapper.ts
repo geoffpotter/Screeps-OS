@@ -7,16 +7,20 @@ import { AttackController } from "../actions/economy/AttackController";
 import { ReserveController } from "../actions/economy/ReserveController";
 import { SignController } from "../actions/economy/SignController";
 import { RoomMode } from "./room";
-import { ActionDemand } from "../actions/base/ActionHelpers";
+import { ActionDemand } from "../actions/base/ActionDemand";
 import WorldPosition from "shared/utils/map/WorldPosition";
 import { getRoomIntel, PlayerStatus } from "shared/subsystems/intel";
-import { Dropoff } from "world_new/actions/economy/Dropoff";
-import { Pickup } from "world_new/actions/economy/Pickup";
 import { ResourceInfoCollection } from "shared/utils/Collections/ResourceInfoCollection";
 import { TypeInfoCollection } from "shared/utils/Collections/TypeInfoCollection";
 import Logger from "shared/utils/logger";
 import { SpawnWrapper } from "./spawn";
 import { RoomPositionWrapper } from "./room/RoomPositionWrapper";
+import costMatrixUtils from "shared/utils/map/CostMatrix";
+import { Priority } from "shared/utils/priority";
+import { DropoffAny } from "world_new/actions/economy/resources/DropoffAny";
+import { PickupAny } from "world_new/actions/economy/resources/PickupAny";
+import { ResourceWrapper } from "./ResourceWrapper";
+import { wrap } from "lodash";
 
 const logger = new Logger("ControllerWrapper");
 logger.enabled = false;
@@ -37,16 +41,116 @@ export class ControllerWrapper extends GameObjectWrapper<StructureController> im
   ticksToDowngrade: number;
   upgradeBlocked: number;
   energyDumpPosition: WorldPosition | undefined;
-
-  upgradeAction: UpgradeController;
-  claimAction: Claim;
-  attackControllerAction: AttackController;
-  reserveControllerAction: ReserveController;
-  signControllerAction: SignController;
-  dumpEnergyAction: Dropoff;
-  useEnergyAction: Pickup;
-
   store: ResourceInfoCollection;
+
+  private _upgradeAction?: UpgradeController;
+  private _claimAction?: Claim;
+  private _attackControllerAction?: AttackController;
+  private _reserveControllerAction?: ReserveController;
+  private _signControllerAction?: SignController;
+  private _dumpEnergyAction?: DropoffAny;
+  private _useEnergyAction?: PickupAny;
+
+  getActionUpgrade(): UpgradeController {
+    if (!this._upgradeAction) {
+      this._upgradeAction = new UpgradeController(this);
+    }
+    return this._upgradeAction;
+  }
+
+  getActionClaim(): Claim {
+    if (!this._claimAction) {
+      this._claimAction = new Claim(this);
+    }
+    return this._claimAction;
+  }
+
+  getActionAttackController(): AttackController {
+    if (!this._attackControllerAction) {
+      this._attackControllerAction = new AttackController(this);
+    }
+    return this._attackControllerAction;
+  }
+
+  getActionReserveController(): ReserveController {
+    if (!this._reserveControllerAction) {
+      this._reserveControllerAction = new ReserveController(this);
+    }
+    return this._reserveControllerAction;
+  }
+
+  getActionSignController(): SignController {
+    if (!this._signControllerAction) {
+      this._signControllerAction = new SignController(this, "Default sign");
+    }
+    return this._signControllerAction;
+  }
+
+  getActionDumpEnergy(): DropoffAny {
+    if (!this._dumpEnergyAction) {
+      this.getEnergyDumpPosition();
+      if (this.energyDumpPosition) {
+        let dumpPositionWrapper = new RoomPositionWrapper(this.roomWrapper.id, this.energyDumpPosition);
+        this._dumpEnergyAction = new DropoffAny(dumpPositionWrapper, this.store);
+        this._dumpEnergyAction.maxRange = 0;
+      } else {
+        this._dumpEnergyAction = new DropoffAny(this as any, this.store);
+      }
+    }
+    this._dumpEnergyAction.priority = Priority.BOTTOM;
+    return this._dumpEnergyAction;
+  }
+
+  getActionUseEnergy(): PickupAny {
+    if (!this._useEnergyAction) {
+      this.getEnergyDumpPosition();
+      if (this.energyDumpPosition) {
+        this._useEnergyAction = new PickupAny(this.energyDumpPosition, this.store);
+        this._useEnergyAction.maxRange = 0;
+      } else {
+        this._useEnergyAction = new PickupAny(this as any, this.store);
+      }
+    }
+    this._useEnergyAction.priority = Priority.BOTTOM;
+    return this._useEnergyAction;
+  }
+
+  getEnergyDumpPosition(): WorldPosition | undefined {
+    if (!this.energyDumpPosition) {
+      let intel = getRoomIntel(this.wpos.roomName);
+      logger.log("finding energy dump position");
+      let allSpawns = intel.buildings[PlayerStatus.MINE].getGroupWithValueGetObjects("wrapperType", "SpawnWrapper");
+      let closestSpawn = allSpawns.sort((a, b) => a.wpos.getRangeTo(this.wpos) - b.wpos.getRangeTo(this.wpos))[0];
+      if (closestSpawn) {
+        let pathToSpawn = PathFinder.search(this.wpos.toRoomPosition(), closestSpawn.wpos.toRoomPosition(), {
+          maxRooms: 1,
+          roomCallback: (roomName) => {
+            let thisRoomIntel = getRoomIntel(roomName);
+            let allStructs = [
+              ...thisRoomIntel.buildings[PlayerStatus.MINE].getAll(),
+              ...thisRoomIntel.buildings[PlayerStatus.ENEMY].getAll(),
+              ...thisRoomIntel.buildings[PlayerStatus.NEUTRAL].getAll(),
+              ...thisRoomIntel.buildings[PlayerStatus.FRIENDLY].getAll(),
+            ]
+            let costMatrix = costMatrixUtils.getCM(roomName);
+            for (const struct of allStructs) {
+              costMatrix.set(struct.wpos.toRoomPosition().x, struct.wpos.toRoomPosition().y, 255);
+            }
+            return costMatrix;
+          }
+        });
+        if (pathToSpawn.path.length > 0) {
+          this.energyDumpPosition = pathToSpawn.path[3].toWorldPosition();
+        }
+      }
+
+
+      logger.log("energy dump position", this.energyDumpPosition?.toRoomPosition(), closestSpawn, allSpawns.length, intel.buildings[PlayerStatus.MINE].getGroup("wrapperType"), SpawnWrapper.constructor);
+    }
+    return this.energyDumpPosition;
+
+  }
+
 
   static fromJSON(json: ControllerWrapperData): ControllerWrapper {
     const wrapper = new ControllerWrapper(json.id as Id<StructureController>);
@@ -81,30 +185,9 @@ export class ControllerWrapper extends GameObjectWrapper<StructureController> im
     this.ticksToDowngrade = 0;
     this.upgradeBlocked = 0;
     this.store = new ResourceInfoCollection();
-    this.upgradeAction = new UpgradeController(this);
-    this.claimAction = new Claim(this);
-    this.attackControllerAction = new AttackController(this);
-    this.reserveControllerAction = new ReserveController(this);
-    this.signControllerAction = new SignController(this, "Default sign");
-    //@ts-ignore
-    this.dumpEnergyAction = new Dropoff(this);
-    //@ts-ignore
-    this.useEnergyAction = new Pickup(this);
-  }
-
-  registerActions() {
-    super.registerActions();
-    if (this.colony) {
-      logger.log(this.id, "registering actions");
-      this.colony.registerAction(this.upgradeAction);
-      this.colony.registerAction(this.claimAction);
-      this.colony.registerAction(this.attackControllerAction);
-      this.colony.registerAction(this.reserveControllerAction);
-      this.colony.registerAction(this.signControllerAction);
-      this.colony.registerAction(this.dumpEnergyAction);
-      this.colony.registerAction(this.useEnergyAction);
-    }
-    this.update();
+    this.store.setMaxTotal(1000000);
+    this.store.setMax(RESOURCE_ENERGY, 1000000);
+    // this.store.setMin(RESOURCE_ENERGY, );
   }
 
   update() {
@@ -117,100 +200,15 @@ export class ControllerWrapper extends GameObjectWrapper<StructureController> im
       this.reservation = controller.reservation;
       this.ticksToDowngrade = controller.ticksToDowngrade;
       this.upgradeBlocked = controller.upgradeBlocked;
-
-      // Update actions
-      if (!this.my) {
-        let roomMode = this.roomWrapper.roomMode;
-        if (roomMode == RoomMode.OWNED && (this.getObject() == null || !this.getObject()!.my)) {
-          this.claimAction.currentDemand = { [CLAIM]: 1 } as ActionDemand;
+      if (this.my) {
+        this.store.clear();
+        //update store from dropped resources in area
+        const resources = controller.pos.findInRange(FIND_DROPPED_RESOURCES, 4);
+        for (const resource of resources) {
+          const wrapper: ResourceWrapper = resource.getWrapper()
+          wrapper.nearController = true;
+          this.store.addAmount(resource.resourceType, resource.amount);
         }
-        this.attackControllerAction.currentDemand = {} as ActionDemand;
-        this.reserveControllerAction.currentDemand = {} as ActionDemand;
-      } else {
-        let currentlyAssigned = this.upgradeAction.getCurrentAssignedParts();
-        this.upgradeAction.currentDemand = {
-          [WORK]: this.level == 8 ? 15 : 100,
-          [CARRY]: (currentlyAssigned[CARRY] || 0) + 1
-        } as ActionDemand;
-        this.signControllerAction.currentDemand = controller.sign ? {} : { [MOVE]: 1 } as ActionDemand;
-        let intel = getRoomIntel(this.roomWrapper.id);
-        if (!this.energyDumpPosition) {
-          logger.log("finding energy dump position");
-          let allSpawns = intel.buildings[PlayerStatus.MINE].getGroupWithValueGetObjects("wrapperType", "SpawnWrapper");
-          let closestSpawn = allSpawns.sort((a, b) => a.wpos.getRangeTo(this.wpos) - b.wpos.getRangeTo(this.wpos))[0];
-          if (closestSpawn) {
-            let pathToSpawn = PathFinder.search(this.wpos.toRoomPosition(), closestSpawn.wpos.toRoomPosition(), {
-              maxRooms: 1,
-              roomCallback: (roomName) => {
-                return roomName == this.roomWrapper.id;
-              }
-            });
-            if (pathToSpawn.path.length > 0) {
-              this.energyDumpPosition = pathToSpawn.path[3].toWorldPosition();
-            }
-          }
-          if (this.energyDumpPosition) {
-            if (this.dumpEnergyAction) {
-              this.dumpEnergyAction.unassignAll();
-            }
-            if (this.colony) {
-              this.colony.unregisterAction(this.dumpEnergyAction);
-            }
-            let dumpPositionWrapper = new RoomPositionWrapper(this.roomWrapper.id, this.energyDumpPosition);
-            this.dumpEnergyAction = new Dropoff(dumpPositionWrapper);
-            this.dumpEnergyAction.maxRange = 0;
-            if (this.useEnergyAction) {
-              this.useEnergyAction.unassignAll();
-            }
-            if (this.colony) {
-              this.colony.unregisterAction(this.useEnergyAction);
-            }
-            this.useEnergyAction = new Pickup(dumpPositionWrapper);
-            // this.useEnergyAction.maxRange = 1;
-            if (this.colony) {
-              this.colony.registerAction(this.useEnergyAction);
-              this.colony.registerAction(this.dumpEnergyAction);
-            }
-          }
-
-          logger.log("energy dump position", this.energyDumpPosition?.toRoomPosition(), closestSpawn, allSpawns.length, intel.buildings[PlayerStatus.MINE].getGroup("wrapperType"), SpawnWrapper.constructor);
-        }
-        if (this.energyDumpPosition !== undefined) {
-          let dumpPosition = this.energyDumpPosition;
-          //update store
-          this.store.setMaxTotal(10000);
-          this.store.setMax(RESOURCE_ENERGY, 10000);
-          this.store.setMin(RESOURCE_ENERGY, 1000);
-          //get resources on ground near dump position
-          let resources = intel.droppedResources.getGroupWithValueGetObjects("resourceType", RESOURCE_ENERGY).filter((resource) => resource.wpos.getRangeTo(dumpPosition) < 5);
-          let resourcesInArea = new ResourceInfoCollection();
-          this.store.setAmount(RESOURCE_ENERGY, 0);
-          for (const i in resources) {
-            let resource = resources[i];
-            resource.supressActions = true;
-            let existingResource = resourcesInArea.get(resource.resourceType);
-            this.store.setAmount(resource.resourceType, this.store.getAmount(resource.resourceType) + resource.amount);
-            if (existingResource) {
-              resourcesInArea.setAmount(resource.resourceType, existingResource.amount + resource.amount);
-            } else {
-              resourcesInArea.setAmount(resource.resourceType, resource.amount);
-            }
-          }
-          logger.log("resources in area", resourcesInArea.getTypes(), this.store.getTypesByAmountAvailable(), this.store.getTypesByAmountAllowed(), this.store, this.store.get(RESOURCE_ENERGY));
-
-          this.useEnergyAction.wpos = dumpPosition;
-          this.useEnergyAction.resourceAmounts.updateFromCollection(resourcesInArea.getTypesByAmountAvailable());
-          this.useEnergyAction.currentDemand = this.useEnergyAction.calculateDemand();
-          this.useEnergyAction.display();
-          logger.log("use energy action demand", this.useEnergyAction.currentDemand, this.useEnergyAction.wpos.toRoomPosition());
-
-          this.dumpEnergyAction.wpos = dumpPosition;
-          this.dumpEnergyAction.resourceAmounts.updateFromCollection(this.store.getTypesByAmountAllowed());
-          this.dumpEnergyAction.currentDemand = this.dumpEnergyAction.calculateDemand();
-          // this.dumpEnergyAction.display();
-          logger.log("dump energy action demand", this.dumpEnergyAction.currentDemand, this.dumpEnergyAction.wpos.toRoomPosition());
-        }
-
       }
     }
   }

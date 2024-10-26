@@ -1,24 +1,8 @@
-import { BaseAction, BaseActionMemory } from "../base/BaseAction";
+import { BaseCreepAction } from "../base/BaseCreepAction";
 import CreepWrapper from "../../wrappers/creep/CreepWrapper";
-import { StorableClass, baseStorable } from "shared/utils/memory/MemoryManager";
-import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
-import { ActionDemand } from "../base/ActionHelpers";
+import { ActionDemand } from "../base/ActionDemand";
 
-export interface PullMemory extends BaseActionMemory {
-}
-
-export class Pull extends BaseAction<CreepWrapper, CreepWrapper>
-  implements StorableClass<Pull, typeof Pull, PullMemory> {
-
-  static fromJSON(json: PullMemory, action?: Pull): Pull {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as CreepWrapper;
-      action = new Pull(target);
-    }
-    BaseAction.fromJSON(json, action);
-    return action;
-  }
-
+export class Pull extends BaseCreepAction<CreepWrapper> {
   static actionType = "🚶‍♂️⬅️";
 
   constructor(target: CreepWrapper) {
@@ -42,9 +26,9 @@ export class Pull extends BaseAction<CreepWrapper, CreepWrapper>
     return false;
   }
 
-  calculateDemand(): ActionDemand {
-    return {
-      [MOVE]: 1,
-    };
+  calculateDemand(): ActionDemand<BodyPartConstant> {
+    let demand = new ActionDemand<BodyPartConstant>();
+    demand.set(MOVE, 1);
+    return demand;
   }
 }

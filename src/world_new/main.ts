@@ -8,6 +8,7 @@ import "shared/polyfills"
 import console from "shared/prototypes/console";
 import "shared/prototypes/roomPosition";
 import "shared/utils/map/WorldPosition";
+// import "shared/prototypes/CreepMovement";
 import {
     ErrorMapper
   } from "shared/utils/errors/ErrorMapper";
@@ -63,16 +64,21 @@ import { getRoomWrapper } from "./wrappers/room/RoomWrappers";
 import { getColony } from "./Colonies";
 import { getOrMakeRoomWrapper, RoomMode } from "./wrappers/room";
 import { getOrMakeColony } from "./Colony";
-import { priority } from "shared/utils/priority";
+import { Priority } from "shared/utils/priority";
 import nodeNetwork from "shared/subsystems/NodeNetwork/nodeNetwork";
 import nodeTypes from "shared/subsystems/NodeNetwork/nodeTypes";
 import { Edge, makeEdgeId } from "shared/subsystems/NodeNetwork";
 
 
 
-
-let mainRoom = getOrMakeRoomWrapper("W7N3");
+let mainRoomName = "W7N3";
 let remoteNames = ["W7N4", "W8N3", "W6N3"];
+if (Game.rooms.sim) {
+    mainRoomName = "sim";
+    remoteNames = [];
+}
+
+let mainRoom = getOrMakeRoomWrapper(mainRoomName);
 // let remoteNames = ["W7N4"];
 // let remoteNames: string[] = [];
 let remoteRooms = remoteNames.map(name=>getOrMakeRoomWrapper(name));
@@ -122,7 +128,6 @@ async function asyncMain() {
     console.log("-------------- start main loop --------------");
 
     speedrun.run({ position: { x: 1, y: 25 }, avgDuration: 250 })
-
 
 
 
@@ -181,6 +186,6 @@ async function asyncMain() {
     console.log("-------------- end main loop --------------");
 }
 
-export const loop = asyncMainLoop(asyncMain);
+export const loop = ErrorMapper.wrapLoop(asyncMainLoop(asyncMain));
 
 console.log("-------------- end main --------------");

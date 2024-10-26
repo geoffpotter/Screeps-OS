@@ -1,4 +1,3 @@
-
 import { FlagsCollection } from "shared/utils/flags";
 import { setInterval } from "shared/polyfills/setInterval";
 import { builtInQueues } from "shared/polyfills/tasks";
@@ -117,7 +116,9 @@ export class RoomIntel extends baseStorable implements StorableCreatableClass<Ro
     powerBanks:MemoryGroupedCollection<PowerBankWrapper>;
     deposits:MemoryGroupedCollection<DepositWrapper>;
 
-
+    roads: MemoryGroupedCollection<StructureWrapper>;
+    walls: MemoryGroupedCollection<StructureWrapper>;
+    ramparts: Record<PlayerStatus, MemoryGroupedCollection<StructureWrapper>>;
 
     constructor(roomName:string) {
         super(roomName);
@@ -171,6 +172,16 @@ export class RoomIntel extends baseStorable implements StorableCreatableClass<Ro
         } else {
             Memory.rooms[roomName].roomIntel = this;
         }
+
+        // Initialize new collections
+        this.roads = new MemoryGroupedCollection<StructureWrapper>(roomName, "id");
+        this.walls = new MemoryGroupedCollection<StructureWrapper>(roomName, "id");
+        this.ramparts = {
+            [PlayerStatus.MINE]: new MemoryGroupedCollection<StructureWrapper>(roomName, "id"),
+            [PlayerStatus.FRIENDLY]: new MemoryGroupedCollection<StructureWrapper>(roomName, "id"),
+            [PlayerStatus.NEUTRAL]: new MemoryGroupedCollection<StructureWrapper>(roomName, "id"),
+            [PlayerStatus.ENEMY]: new MemoryGroupedCollection<StructureWrapper>(roomName, "id"),
+        };
     }
     clear():void {
         this.flags = new FlagsCollection();
@@ -197,6 +208,14 @@ export class RoomIntel extends baseStorable implements StorableCreatableClass<Ro
         this.invaderCores.clear();
         this.powerBanks.clear();
         this.deposits.clear();
+
+        // Clear the new collections
+        this.roads.clear();
+        this.walls.clear();
+        this.ramparts[PlayerStatus.MINE].clear();
+        this.ramparts[PlayerStatus.FRIENDLY].clear();
+        this.ramparts[PlayerStatus.NEUTRAL].clear();
+        this.ramparts[PlayerStatus.ENEMY].clear();
     }
     toJSON():RoomIntelJSON {
         return {
@@ -307,6 +326,29 @@ export function updateRoomIntel(room:Room, roomWrapper:RoomWrapper):RoomIntel {
 
     room.find(FIND_STRUCTURES).forEach((structure) => {
         let wrapper = structure.getWrapper<StructureWrapper>();
+
+        // Handle special structure types first
+        if (structure instanceof StructureRoad) {
+            roomIntel.roads.add(wrapper);
+            return;
+        }
+        if (structure instanceof StructureWall) {
+            roomIntel.walls.add(wrapper);
+            return;
+        }
+        if (structure instanceof StructureRampart) {
+            if (structure.my) {
+                roomIntel.ramparts[PlayerStatus.MINE].add(wrapper);
+            } else {
+                let ownerName = structure.owner?.username || "Invader";
+                let playerIntel = getPlayerIntel(ownerName);
+                playerIntel.lastSeen = Game.time;
+                roomIntel.ramparts[playerIntel.status].add(wrapper);
+            }
+            return;
+        }
+
+        // Existing structure handling code...
         if (structure instanceof OwnedStructure) {
             if (structure instanceof StructurePortal) {
                 roomIntel.portals.add(wrapper as StructurePortalWrapper);
@@ -406,3 +448,4 @@ export function updateRoomIntel(room:Room, roomWrapper:RoomWrapper):RoomIntel {
 
     return roomIntel;
 }
+

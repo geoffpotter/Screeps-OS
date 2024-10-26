@@ -40,6 +40,7 @@ export class TombstoneWrapper extends HasStorageWrapper<Tombstone> implements St
     this.deathTime = 0;
     this.ticksToDecay = 0;
     this.timeout = 1;
+    this.store.setMaxTotal(0);
   }
 
   update() {

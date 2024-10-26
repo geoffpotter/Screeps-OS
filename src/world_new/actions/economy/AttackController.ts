@@ -1,25 +1,12 @@
-import { BaseAction, BaseActionMemory } from "../base/BaseAction";
+import { BaseCreepAction } from "../base/BaseCreepAction";
 import { ControllerWrapper } from "../../wrappers/ControllerWrapper";
 import CreepWrapper from "../../wrappers/creep/CreepWrapper";
-import { StorableClass, baseStorable } from "shared/utils/memory/MemoryManager";
+import { StorableClass } from "shared/utils/memory/MemoryManager";
 import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
-import { ActionDemand } from "../base/ActionHelpers";
+import { ActionDemand } from "../base/ActionDemand";
 
-export interface AttackControllerMemory extends BaseActionMemory {
+export class AttackController extends BaseCreepAction<ControllerWrapper> {
 
-}
-
-export class AttackController extends BaseAction<ControllerWrapper, CreepWrapper>
-  implements StorableClass<AttackController, typeof AttackController, AttackControllerMemory> {
-
-  static fromJSON(json: AttackControllerMemory, action?: AttackController): AttackController {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as ControllerWrapper;
-      action = new AttackController(target);
-    }
-    BaseAction.fromJSON(json, action);
-    return action;
-  }
 
   static actionType = "⚔️🏛️";
 
@@ -44,9 +31,9 @@ export class AttackController extends BaseAction<ControllerWrapper, CreepWrapper
     return false;
   }
 
-  calculateDemand(): ActionDemand {
-    return {
-      [CLAIM]: 1,
-    };
+  calculateDemand(): ActionDemand<BodyPartConstant> {
+    let demand = new ActionDemand<BodyPartConstant>();
+    demand.set(CLAIM, 1);
+    return demand;
   }
 }

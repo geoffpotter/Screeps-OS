@@ -1,5 +1,6 @@
 
 import Logger from "../../utils/logger";
+import { CachedValue } from "../caching/CachedValue";
 
 const logger = new Logger("WorldPosition");
 
@@ -98,7 +99,7 @@ export default class WorldPosition {
      * @param {RoomPosition | { pos: RoomPosition }} point
      */
     getRangeTo(point: WorldPosition): number {
-        let pos:WorldPosition = toWorldPosition(point);
+        let pos: WorldPosition = toWorldPosition(point);
         return this.getRangeToXY(pos.x, pos.y);
     }
 
@@ -118,7 +119,7 @@ export default class WorldPosition {
     /**
      * @param {number} dir
      */
-    moveInDir(dir: number|string): WorldPosition {
+    moveInDir(dir: number | string): WorldPosition {
         dir = Number(dir);
         let dx: number, dy: number = 0;
         switch (dir) {
@@ -156,13 +157,19 @@ export default class WorldPosition {
     }
 
 
-
+    private cachedDistances: Map<string, CachedValue<number>> = new Map();
     /**
      * @param {number} x
      * @param {number} y
      */
     getRangeToXY(x: number, y: number): number {
-        return this.getChebyshevDist(x, y);
+        let key = `${x}_${y}`;
+        let cached = this.cachedDistances.get(key);
+        if(!cached) {
+            cached = new CachedValue(() => this.getChebyshevDist(x, y), 100_000);
+            this.cachedDistances.set(key, cached);
+        }
+        return cached.get();
     }
 
     /**
@@ -271,6 +278,97 @@ export default class WorldPosition {
         return _.get(Game.rooms, roomName + ".controller.my", false);
     }
 
+
+    getAdjacentNonBlockedPositions(): WorldPosition[] {
+        let positions: WorldPosition[] = [];
+        for (let dir of [TOP, TOP_RIGHT, RIGHT, BOTTOM_RIGHT, BOTTOM, BOTTOM_LEFT, LEFT, TOP_LEFT]) {
+            if (!this.moveInDir(dir).isBlocked()) {
+                positions.push(this.moveInDir(dir));
+            }
+        }
+        return positions;
+    }
+
+    getAdjacentClearPositions(): WorldPosition[] {
+        let positions: WorldPosition[] = [];
+        for (let dir of [TOP, TOP_RIGHT, RIGHT, BOTTOM_RIGHT, BOTTOM, BOTTOM_LEFT, LEFT, TOP_LEFT]) {
+            if (this.moveInDir(dir).isClearSpace()) {
+                positions.push(this.moveInDir(dir));
+            }
+        }
+        return positions;
+    }
+
+    getAdjacentPositions(): WorldPosition[] {
+        let positions: WorldPosition[] = [];
+        for (let dir of [TOP, TOP_RIGHT, RIGHT, BOTTOM_RIGHT, BOTTOM, BOTTOM_LEFT, LEFT, TOP_LEFT]) {
+            positions.push(this.moveInDir(dir));
+        }
+        return positions;
+    }
+
+    getPositionsInRange(range: number): WorldPosition[] {
+        let positions: WorldPosition[] = [];
+        for (let x = this.x - range; x <= this.x + range; x++) {
+            for (let y = this.y - range; y <= this.y + range; y++) {
+                positions.push(new WorldPosition(x, y));
+            }
+        }
+        return positions;
+    }
+
+    isClearSpace(): boolean {
+        let pos = this.toRoomPosition();
+        return pos.isClearSpace();
+    }
+
+    isBlocked(): boolean {
+        const roomPos = this.toRoomPosition();
+        const terrain = Game.map.getRoomTerrain(roomPos.roomName);
+
+        // Check for walls
+        if (terrain.get(roomPos.x, roomPos.y) === TERRAIN_MASK_WALL) {
+            // visual.circle(pos.toRoomPosition(), '#ff0000', 0.5);
+            return true;
+        }
+        if (Game.rooms[roomPos.roomName]) {
+
+            // Check for structures
+            const structures = roomPos.lookFor(LOOK_STRUCTURES);
+            for (const structure of structures) {
+                // List of structure types that block movement
+                const blockingStructures: StructureConstant[] = [
+                    STRUCTURE_WALL,
+                    STRUCTURE_RAMPART,
+                    STRUCTURE_SPAWN,
+                    STRUCTURE_EXTENSION,
+                    STRUCTURE_LINK,
+                    STRUCTURE_STORAGE,
+                    STRUCTURE_TOWER,
+                    STRUCTURE_OBSERVER,
+                    STRUCTURE_POWER_SPAWN,
+                    STRUCTURE_LAB,
+                    STRUCTURE_TERMINAL,
+                    STRUCTURE_NUKER,
+                    STRUCTURE_FACTORY
+                ];
+
+                if (blockingStructures.includes(structure.structureType)) {
+                    // If it's a rampart, check if it's not our own or if it's not public
+                    if (structure.structureType === STRUCTURE_RAMPART) {
+                        const rampart = structure as StructureRampart;
+                        if (!rampart.my) {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     /** Distance functions */
 
     /**
@@ -359,7 +457,7 @@ export default class WorldPosition {
         return "[world pos " + this.x + "," + this.y + "]";
     }
 
-    isEqualTo(pos: WorldPosition|RoomPosition|object): boolean {
+    isEqualTo(pos: WorldPosition | RoomPosition | object): boolean {
         if (pos instanceof WorldPosition) {
             return this.x === pos.x && this.y === pos.y;
         } else if (pos instanceof RoomPosition) {
@@ -375,7 +473,7 @@ export default class WorldPosition {
     }
 }
 
-export function toWorldPosition(pos: WorldPosition|RoomPosition|HasPos): WorldPosition {
+export function toWorldPosition(pos: WorldPosition | RoomPosition | HasPos): WorldPosition {
     if (pos instanceof WorldPosition) {
         return pos;
     } else if (pos instanceof RoomPosition) {
@@ -398,7 +496,7 @@ export function toWorldPosition(pos: WorldPosition|RoomPosition|HasPos): WorldPo
     }
 }
 
-export function toRoomPosition(pos: WorldPosition|RoomPosition|HasPos): RoomPosition {
+export function toRoomPosition(pos: WorldPosition | RoomPosition | HasPos): RoomPosition {
     if (pos instanceof RoomPosition) {
         return pos;
     } else if (pos instanceof WorldPosition) {

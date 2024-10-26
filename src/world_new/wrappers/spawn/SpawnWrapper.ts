@@ -7,6 +7,7 @@ import { PriorityQueue } from "shared/utils/queues/priorityQueue";
 import sleep from "shared/polyfills/sleep";
 import { setInterval, clearInterval } from "shared/polyfills/setInterval";
 import queues from "../../queues"
+import { Priority } from "shared/utils/priority";
 const logger = new Logger("SpawnWrapper");
 logger.color = COLOR_RED
 // logger.enabled = false;
@@ -94,6 +95,9 @@ export default class SpawnWrapper extends HasStorageWrapper<StructureSpawn> impl
       this.spawning = !!spawn.spawning;
       this.remainingTime = spawn.spawning ? spawn.spawning.remainingTime : null;
 
+      // Update store limits
+      this.store.setMin(RESOURCE_ENERGY, spawn.store.getCapacity(RESOURCE_ENERGY));
+      this.store.setMax(RESOURCE_ENERGY, spawn.store.getCapacity(RESOURCE_ENERGY));
     }
   }
 

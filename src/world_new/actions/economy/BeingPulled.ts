@@ -1,24 +1,10 @@
-import { BaseAction, BaseActionMemory } from "../base/BaseAction";
+import { BaseCreepAction } from "../base/BaseCreepAction";
 import CreepWrapper from "../../wrappers/creep/CreepWrapper";
-import { StorableClass, baseStorable } from "shared/utils/memory/MemoryManager";
+import { StorableClass } from "shared/utils/memory/MemoryManager";
 import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
-import { ActionDemand } from "../base/ActionHelpers";
+import { ActionDemand } from "../base/ActionDemand";
 
-export interface BeingPulledMemory extends BaseActionMemory {
-}
-
-export class BeingPulled extends BaseAction<CreepWrapper, CreepWrapper>
-  implements StorableClass<BeingPulled, typeof BeingPulled, BeingPulledMemory> {
-
-  static fromJSON(json: BeingPulledMemory, action?: BeingPulled): BeingPulled {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as CreepWrapper;
-      action = new BeingPulled(target);
-    }
-    BaseAction.fromJSON(json, action);
-    return action;
-  }
-
+export class BeingPulled extends BaseCreepAction<CreepWrapper> {
   static actionType = "🚶‍♂️➡️";
 
   constructor(target: CreepWrapper) {
@@ -35,7 +21,9 @@ export class BeingPulled extends BaseAction<CreepWrapper, CreepWrapper>
     return true;
   }
 
-  calculateDemand(): ActionDemand {
-    return {}; // No specific demand for being pulled
+  calculateDemand(): ActionDemand<BodyPartConstant> {
+    let demand = new ActionDemand<BodyPartConstant>();
+    demand.set(MOVE, 1);
+    return demand;
   }
 }

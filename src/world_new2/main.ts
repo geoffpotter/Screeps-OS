@@ -219,13 +219,9 @@ function manageWalker(creep: Creep, flags: Flag[]) {
             creep.say("🚬");
             movementManager.registerMovement({
                 creep: creep,
-                currentPos: creep.pos.toWorldPosition(),
-                desiredDirection: false,
                 goalPos: creep.pos.toWorldPosition(),
                 goalRange: 1,
                 priority: 0,
-                maxPathDistance: 1,
-                maxEndDistance: 1
             });
             return;
         }
@@ -240,13 +236,9 @@ function manageWalker(creep: Creep, flags: Flag[]) {
             creep.memory._cachedPath = null;
             movementManager.registerMovement({
                 creep: creep,
-                currentPos: creep.pos.toWorldPosition(),
-                desiredDirection: false,
                 goalPos: creep.pos.toWorldPosition(),
                 goalRange: 1,
                 priority: 0,
-                maxPathDistance: 1,
-                maxEndDistance: 1
             });
             return;
         }
@@ -268,13 +260,9 @@ function manageWalker(creep: Creep, flags: Flag[]) {
         //we didn't move, register that non movement to the manager
         movementManager.registerMovement({
             creep: creep,
-            currentPos: creep.pos.toWorldPosition(),
-            desiredDirection: false,
             goalPos: flag.pos.toWorldPosition(),
             goalRange: 1,
             priority: 0,
-            maxPathDistance: 1,
-            maxEndDistance: 1
         });
     }
 }
@@ -299,13 +287,9 @@ function manageMiner(creep: Creep) {
         } else {
             movementManager.registerMovement({
                 creep: creep,
-                currentPos: creep.pos.toWorldPosition(),
-                desiredDirection: false,
                 goalPos: creep.pos.toWorldPosition(),
                 goalRange: 1,
                 priority: 0,
-                maxPathDistance: 1,
-                maxEndDistance: 1
             });
         }
     }
@@ -403,13 +387,9 @@ function manageHauler(creep: Creep) {
     if (!moved) {
         movementManager.registerMovement({
             creep: creep,
-            currentPos: creep.pos.toWorldPosition(),
-            desiredDirection: false,
             goalPos: creep.pos.toWorldPosition(),
             goalRange: 1,
             priority: 0,
-            maxPathDistance: 1,
-            maxEndDistance: 1
         });
     }
 }

@@ -1,9 +1,6 @@
-import { GameObjectWrapper, GameObjectWrapperData } from "./base/GameObjectWrapper";
-import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
-import { registerObjectWrapper } from "./base/AllGameObjects";
 import { KillableWrapper, KillableWrapperData } from "./base/KillableWrapper";
+import { StorableCreatableClass } from "shared/utils/memory";
+import { registerObjectWrapper } from "./base/AllGameObjects";
 
 interface StructurePortalWrapperData extends KillableWrapperData {
   destination: {

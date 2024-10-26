@@ -15,14 +15,13 @@ export class DepositWrapper extends GameObjectWrapper<Deposit> implements Storab
   depositType: DepositConstant;
   cooldown: number;
   ticksToDecay: number;
-  harvestAction: HarvestAction;
+  private _harvestAction?: HarvestAction;
 
   static fromJSON(json: DepositWrapperData): DepositWrapper {
     const wrapper = new DepositWrapper(json.id as Id<Deposit>);
     wrapper.depositType = json.depositType;
     wrapper.cooldown = json.cooldown;
     wrapper.ticksToDecay = json.ticksToDecay;
-    wrapper.harvestAction = new HarvestAction(wrapper);
     return wrapper;
   }
 
@@ -31,7 +30,13 @@ export class DepositWrapper extends GameObjectWrapper<Deposit> implements Storab
     this.depositType = RESOURCE_MIST;
     this.cooldown = 0;
     this.ticksToDecay = 0;
-    this.harvestAction = new HarvestAction(this);
+  }
+
+  getActionHarvest(): HarvestAction {
+    if (!this._harvestAction) {
+      this._harvestAction = new HarvestAction(this);
+    }
+    return this._harvestAction;
   }
 
   update() {
@@ -41,20 +46,6 @@ export class DepositWrapper extends GameObjectWrapper<Deposit> implements Storab
       this.depositType = deposit.depositType;
       this.cooldown = deposit.cooldown;
       this.ticksToDecay = deposit.ticksToDecay;
-      //update action part requirements
-      if (this.cooldown < 100) {
-        this.harvestAction.requiredParts.setMin(WORK, 25);
-      } else {
-        this.harvestAction.requiredParts.setMin(WORK, 0);
-      }
-    }
-  }
-
-  registerActions() {
-    super.registerActions();
-    if (this.colony) {
-      logger.log(this.id, "registering actions");
-      this.colony.registerAction(this.harvestAction);
     }
   }
 

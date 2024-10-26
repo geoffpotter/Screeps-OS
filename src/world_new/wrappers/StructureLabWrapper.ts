@@ -1,8 +1,9 @@
 import { HasStorageWrapper, HasStorageWrapperData } from "./base/HasStorageWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
+import Logger from "shared/utils/logger";
+
+const logger = new Logger("StructureLabWrapper");
 
 interface StructureLabWrapperData extends HasStorageWrapperData {
   cooldown: number;
@@ -15,10 +16,12 @@ export class StructureLabWrapper extends HasStorageWrapper<StructureLab> impleme
 
   static fromJSON(json: StructureLabWrapperData): StructureLabWrapper {
     const wrapper = new StructureLabWrapper(json.id as Id<StructureLab>);
+    HasStorageWrapper.fromJSON(json, wrapper);
     wrapper.cooldown = json.cooldown;
     wrapper.mineralType = json.mineralType;
     return wrapper;
   }
+
   toJSON(): StructureLabWrapperData {
     return {
       ...super.toJSON(),

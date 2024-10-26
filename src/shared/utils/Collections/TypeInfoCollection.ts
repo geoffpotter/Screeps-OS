@@ -129,6 +129,11 @@ export class TypeInfoCollection<Type,
       this.addAmount(type, otherAmt);
     }
   }
+  clear() {
+    this.getTypes().forEach(type=>{
+      this.setAmount(type, 0);
+    })
+  }
   updateFromCollection(types:TypeInfoCollection<Type>) {
     //this.types.clear();
     let unUpdatedType = new Set<Type>(this.getTypes());
@@ -163,6 +168,7 @@ export class TypeInfoCollection<Type,
   }
 
   updateFromStore(store: StoreDefinition | Store<ResourceConstant, false>) {
+
     //this.types.clear();\
     let unUpdatedType = new Set<Type>(this.getTypes());
     for (let resourceName in store) {

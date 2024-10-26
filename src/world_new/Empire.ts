@@ -3,9 +3,8 @@ import queues from "./queues";
 import { baseStorable, MemoryGroupedCollection, MemoryGroupedCollectionJSON } from "shared/utils/memory";
 import MemoryMap, { MemoryMapJSON } from "shared/utils/memory/MemoryMap";
 import MemoryManager, { StorableClass } from "shared/utils/memory/MemoryManager";
-import { canHazJob, Job, JobMemory } from "./jobs/Job";
 import type { BaseAction } from "./actions/base/BaseAction";
-import { priority } from "shared/utils/priority";
+import { Priority } from "shared/utils/priority";
 import Logger from "shared/utils/logger";
 import { AnyGameObjectWrapper } from "./wrappers/base/GameObjectWrapper";
 import { CanSpawnCreeps, CreepRequest } from "./wrappers/creep/CreepRequest";
@@ -14,7 +13,8 @@ import { CreepWrapper } from "./wrappers";
 import { getAllColonies } from "./Colonies";
 import nodeNetwork from "shared/subsystems/NodeNetwork/nodeNetwork";
 
-
+import { CreepJob } from "./jobs/CreepJob";
+import { canHazJob } from "./jobs/BaseJob";
 let logger = new Logger("Empire");
 
 interface empireMemory {
@@ -29,13 +29,13 @@ class Empire extends baseStorable implements StorableClass<Empire, typeof Empire
         };
     }
     protected registeredActions: MemoryGroupedCollection<BaseAction<any, any>> = new MemoryGroupedCollection("Empire_actions", "id", ["actionType"], undefined, false);
-    scoutJob: Job;
+    scoutJob: CreepJob;
     constructor() {
         super("Empire");
-        this.scoutJob = new Job("empire_scoutJob", this, {
+        this.scoutJob = new CreepJob("empire_scoutJob", this, {
             name: "scout",
             fatness: 0,
-            priority: priority.BOTTOM,
+            priority: Priority.BOTTOM,
             primaryPart: MOVE,
             secondaryPart: false,
             secondaryPerPrimary: 0,
@@ -44,7 +44,7 @@ class Empire extends baseStorable implements StorableClass<Empire, typeof Empire
         this.scoutJob.maxAssignedObjects = 1;
     }
 
-    findSuitableJobForObject(object: canHazJob): Job | undefined {
+    findSuitableJobForObject(object: CreepWrapper): CreepJob | undefined {
         if (this.scoutJob.needsObject(object, true)) {
             return this.scoutJob;
         }
@@ -56,15 +56,19 @@ class Empire extends baseStorable implements StorableClass<Empire, typeof Empire
         this.registeredActions.add(action);
         logger.log("Registered action", action.id, action.actionType, this.registeredActions.size, this.registeredActions.toJSON());
     }
+
     unregisterAction(action: BaseAction<any, any>) {
         this.registeredActions.removeById(action.id);
     }
+
     hasAction(actionId: string) {
         return this.registeredActions.hasId(actionId);
     }
+
     getAction(actionId: string) {
         return this.registeredActions.getById(actionId);
     }
+
     getActionsByType(actionType: string) {
         let actionIds = this.registeredActions.getGroupWithValue("actionType", actionType);
         if (!actionIds) {
@@ -120,12 +124,13 @@ class Empire extends baseStorable implements StorableClass<Empire, typeof Empire
     // Periodic update function
     init() {
         // Additional empire-level logic
-        nodeNetwork.addRoomsToNetwork(10);
-        nodeNetwork.refineRooms();
-        nodeNetwork.refineEdges();
-        nodeNetwork.displayNodes();
-        nodeNetwork.displayRooms();
-    };
+        // nodeNetwork.addRoomsToNetwork(10);
+        // nodeNetwork.refineRooms();
+        // nodeNetwork.refineEdges();
+        // nodeNetwork.displayNodes();
+        // nodeNetwork.displayRooms();
+    }
+
     postInit() {
         logger.log("Registered actions", this.registeredActions.size, this.registeredActions.getAll());
         // Add all actions to the scout job
@@ -142,14 +147,15 @@ class Empire extends baseStorable implements StorableClass<Empire, typeof Empire
         })
         this.scoutJob.update();
     }
-    update() {
 
+    update() {
         logger.log("Scout job actions", this.scoutJob.numActions());
-    };
+    }
+
     act() {
         this.scoutJob.act();
         logger.log("Scout job actions", this.scoutJob.numActions());
-    };
+    }
 }
 const empire = MemoryManager.loadOrCreateObject(Empire, "empire");
 export default empire;
