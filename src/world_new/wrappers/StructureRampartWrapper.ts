@@ -1,7 +1,5 @@
 import { KillableWrapper, KillableWrapperData } from "./base/KillableWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
 
 interface StructureRampartWrapperData extends KillableWrapperData {
@@ -19,6 +17,7 @@ export class StructureRampartWrapper extends KillableWrapper<StructureRampart> i
     wrapper.ticksToDecay = json.ticksToDecay;
     return wrapper;
   }
+
   toJSON(): StructureRampartWrapperData {
     return {
       ...super.toJSON(),
@@ -41,7 +40,6 @@ export class StructureRampartWrapper extends KillableWrapper<StructureRampart> i
       this.ticksToDecay = rampart.ticksToDecay;
     }
   }
-
 }
 
 registerObjectWrapper(StructureRampart, StructureRampartWrapper);

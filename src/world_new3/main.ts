@@ -20,7 +20,8 @@ import {
 
 import "shared/prototypes/roomPosition";
 import "shared/utils/map/WorldPosition";
-import "shared/prototypes/CreepMovement";
+// import "shared/prototypes/CreepMovement";
+import "shared/prototypes/prototypeCreep";
 
 import { profiler, profile } from "shared/utils/profiling/profiler";
 import wasteCpu from "shared/utils/profiling/wasteCPU";
@@ -28,8 +29,14 @@ import nodeNetwork from "shared/subsystems/NodeNetwork/nodeNetwork";
 import nodeTypes from "shared/subsystems/NodeNetwork/nodeTypes";
 import { Edge, Node } from "shared/subsystems/NodeNetwork";
 import Logger from "shared/utils/logger";
-import { movementManager } from "shared/subsystems/NodeNetwork/MovementManager";
+import movementManager, { moveTo } from "shared/subsystems/MoveManager/MoveManager";
 import visual from "shared/utils/visual";
+import { getAllGameObjectWrappers } from "world_new/wrappers/base/AllGameObjects";
+import { updateRoomIntel } from "shared/subsystems/intel";
+import { getRoomWrapper } from "world_new/wrappers/room/RoomWrappers";
+import { getOrMakeRoomWrapper } from "world_new/wrappers/room";
+
+import "../world_new/wrappers";
 let logger = new Logger("world_new2");
 profiler.clear();
 profiler.start();
@@ -102,11 +109,18 @@ function handleFlags() {
 
 
 function moveCreep(creep: Creep, pos: RoomPosition, range: number) {
+    movementManager.moveTo(creep, pos.toWorldPosition(), {
+        range: range,
+        visualize: true,
+        ignoreCreeps: true,
+
+    });
     // nodeNetwork.moveTo(creep, {
     //     pos: pos.toWorldPosition(),
     //     range: range
     // });
-    creep.moveTo(pos, {range: range, visualizePathStyle: {stroke: '#00ff00'}, ignoreCreeps: true, heuristicWeight: 1, reusePath: 100});
+    // creep.moveTo(pos, {range: range, visualizePathStyle: {stroke: '#00ff00'}, ignoreCreeps: true, heuristicWeight: 1, reusePath: 100});
+
 }
 
 handleFlags()
@@ -120,6 +134,13 @@ export const loop = () => {
         visual.circle(Game.spawns["Spawn1"].pos, '#ffffff', 1, 1);
     } else {
         firstTick = false;
+    }
+
+    //do intel
+    let roomWrapper = getOrMakeRoomWrapper(Game.spawns["Spawn1"].room.name);
+    if (roomWrapper) {
+        roomWrapper.init();
+        roomWrapper.update();
     }
     startTick();
     let flags: Flag[] = Object.values(Game.flags);
@@ -220,8 +241,8 @@ export const loop = () => {
 
     // edgesNeedingRefinement.forEach(edge=>edge.refineEdge());
     // edges.forEach(edge=>edge.refineEdge());
-    movementManager.resolveMovements();
     endTick();
+    movementManager.processMoveRequests();
     nodeNetwork.displayRooms();
     nodeNetwork.displayNodes();
 
@@ -229,7 +250,11 @@ export const loop = () => {
     nodeNetwork.edges.getAll().forEach(edge=>logger.log(edge.id, edge.path.path && edge.path.path.map(pos=>pos.serialize())));
     nodeNetwork.logNetwork();
 
-
+    let gameObjectWrappers = getAllGameObjectWrappers();
+    console.log("Number of game object wrappers:", gameObjectWrappers.length);
+    gameObjectWrappers.forEach(wrapper => {
+        console.log("Wrapper:", wrapper.id, wrapper.wrapperType);
+    });
 };
 
 function manageWalker(creep: Creep, flags: Flag[]) {
@@ -240,10 +265,8 @@ function manageWalker(creep: Creep, flags: Flag[]) {
         flag = flags[Math.floor(Math.random() * flags.length)];
         if (flag.name === creep.memory.lastFlag) {
             creep.say("🚬");
-            movementManager.registerMovement({
-                creep: creep,
-                goalPos: creep.pos.toWorldPosition(),
-                goalRange: 1,
+            movementManager.moveTo(creep, creep.pos.toWorldPosition(), {
+                range: 1,
                 priority: 0,
             });
             return;
@@ -257,11 +280,9 @@ function manageWalker(creep: Creep, flags: Flag[]) {
             creep.memory.targetFlag = null;
             //@ts-ignore
             creep.memory._cachedPath = null;
-            movementManager.registerMovement({
-                creep: creep,
-                goalPos: creep.pos.toWorldPosition(),
-                goalRange: 1,
-                priority: 0
+            movementManager.moveTo(creep, creep.pos.toWorldPosition(), {
+                range: 1,
+                priority: 0,
             });
             return;
         }
@@ -277,10 +298,8 @@ function manageWalker(creep: Creep, flags: Flag[]) {
     }
     if (!moved) {
         //we didn't move, register that non movement to the manager
-        movementManager.registerMovement({
-            creep: creep,
-            goalPos: flag.pos.toWorldPosition(),
-            goalRange: 1,
+        movementManager.moveTo(creep, flag.pos.toWorldPosition(), {
+            range: 1,
             priority: 0,
         });
     }
@@ -304,10 +323,8 @@ function manageMiner(creep: Creep) {
         if (creep.harvest(source) == ERR_NOT_IN_RANGE) {
             moveCreep(creep, source.pos, 1);
         } else {
-            movementManager.registerMovement({
-                creep: creep,
-                goalPos: source.pos.toWorldPosition(),
-                goalRange: 1,
+            movementManager.moveTo(creep, source.pos.toWorldPosition(), {
+                range: 1,
                 priority: 0,
             });
         }
@@ -404,11 +421,9 @@ function manageHauler(creep: Creep) {
     }
 
     if (!moved) {
-        movementManager.registerMovement({
-            creep: creep,
-            goalPos: creep.pos.toWorldPosition(),
-            goalRange: 1,
-            priority: 0,
+        movementManager.moveTo(creep, creep.pos.toWorldPosition(), {
+            range: 1,
+            priority: -1,
         });
     }
 }

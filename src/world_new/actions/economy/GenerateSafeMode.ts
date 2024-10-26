@@ -1,25 +1,9 @@
-import { BaseAction, BaseActionMemory } from "../base/BaseAction";
+import { BaseCreepAction } from "../base/BaseCreepAction";
 import { ControllerWrapper } from "../../wrappers/ControllerWrapper";
 import CreepWrapper from "../../wrappers/creep/CreepWrapper";
-import { StorableClass, baseStorable } from "shared/utils/memory/MemoryManager";
-import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
-import { ActionDemand } from "../base/ActionHelpers";
+import { ActionDemand } from "../base/ActionDemand";
 
-export interface GenerateSafeModeMemory extends BaseActionMemory {
-}
-
-export class GenerateSafeMode extends BaseAction<ControllerWrapper, CreepWrapper>
-  implements StorableClass<GenerateSafeMode, typeof GenerateSafeMode, GenerateSafeModeMemory> {
-
-  static fromJSON(json: GenerateSafeModeMemory, action?: GenerateSafeMode): GenerateSafeMode {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as ControllerWrapper;
-      action = new GenerateSafeMode(target);
-    }
-    BaseAction.fromJSON(json, action);
-    return action;
-  }
-
+export class GenerateSafeMode extends BaseCreepAction<ControllerWrapper> {
   static actionType = "🛡️🏛️";
 
   constructor(target: ControllerWrapper) {
@@ -43,9 +27,9 @@ export class GenerateSafeMode extends BaseAction<ControllerWrapper, CreepWrapper
     return false;
   }
 
-  calculateDemand(): ActionDemand {
-    return {
-      [CARRY]: 1,
-    };
+  calculateDemand(): ActionDemand<BodyPartConstant> {
+    let demand = new ActionDemand<BodyPartConstant>();
+    demand.set(CARRY, 1);
+    return demand;
   }
 }

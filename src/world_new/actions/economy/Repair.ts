@@ -1,25 +1,9 @@
-import { BaseAction, BaseActionMemory } from "../base/BaseAction";
+import { BaseCreepAction } from "../base/BaseCreepAction";
 import { KillableWrapper } from "../../wrappers/base/KillableWrapper";
 import CreepWrapper from "../../wrappers/creep/CreepWrapper";
-import { StorableClass, baseStorable } from "shared/utils/memory/MemoryManager";
-import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
-import { ActionDemand } from "../base/ActionHelpers";
+import { ActionDemand } from "../base/ActionDemand";
 
-export interface RepairMemory extends BaseActionMemory {
-}
-
-export class Repair extends BaseAction<KillableWrapper<Structure>, CreepWrapper>
-  implements StorableClass<Repair, typeof Repair, RepairMemory> {
-
-  static fromJSON(json: RepairMemory, action?: Repair): Repair {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as KillableWrapper<Structure>;
-      action = new Repair(target);
-    }
-    BaseAction.fromJSON(json, action);
-    return action;
-  }
-
+export class Repair extends BaseCreepAction<KillableWrapper<Structure>> {
   static actionType = "🔧";
 
   constructor(target: KillableWrapper<Structure>) {
@@ -43,12 +27,12 @@ export class Repair extends BaseAction<KillableWrapper<Structure>, CreepWrapper>
     return false;
   }
 
-  calculateDemand(): ActionDemand {
+  calculateDemand(): ActionDemand<BodyPartConstant> {
     const structure = this.target.getObject();
-    if (!structure) return {};
+    if (!structure) return new ActionDemand<BodyPartConstant>();
     const repairNeeded = structure.hitsMax - structure.hits;
-    return {
-      [WORK]: Math.ceil(repairNeeded / REPAIR_POWER)
-    };
+    let demand = new ActionDemand<BodyPartConstant>();
+    demand.set(WORK, Math.ceil(repairNeeded / REPAIR_POWER));
+    return demand;
   }
 }

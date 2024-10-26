@@ -15,14 +15,13 @@ export class MineralWrapper extends GameObjectWrapper<Mineral> implements Storab
   mineralType: MineralConstant;
   density: number;
   mineralAmount: number;
-  harvestAction: HarvestAction;
+  private _harvestAction?: HarvestAction;
 
   static fromJSON(json: MineralWrapperData): MineralWrapper {
     const wrapper = new MineralWrapper(json.id as Id<Mineral>);
     wrapper.mineralType = json.mineralType;
     wrapper.density = json.density;
     wrapper.mineralAmount = json.mineralAmount;
-    wrapper.harvestAction = new HarvestAction(wrapper);
     return wrapper;
   }
 
@@ -31,7 +30,13 @@ export class MineralWrapper extends GameObjectWrapper<Mineral> implements Storab
     this.mineralType = RESOURCE_HYDROGEN;
     this.density = 1;
     this.mineralAmount = 0;
-    this.harvestAction = new HarvestAction(this);
+  }
+
+  getActionHarvest(): HarvestAction {
+    if (!this._harvestAction) {
+      this._harvestAction = new HarvestAction(this);
+    }
+    return this._harvestAction;
   }
 
   update() {
@@ -41,20 +46,6 @@ export class MineralWrapper extends GameObjectWrapper<Mineral> implements Storab
       this.mineralType = mineral.mineralType;
       this.density = mineral.density;
       this.mineralAmount = mineral.mineralAmount;
-      //update action part requirements
-      if (!mineral.ticksToRegeneration || mineral.ticksToRegeneration < 10) {
-        this.harvestAction.requiredParts.setMin(WORK, 25);
-      } else {
-        this.harvestAction.requiredParts.setMin(WORK, 0);
-      }
-    }
-  }
-
-  registerActions() {
-    super.registerActions();
-    if (this.colony) {
-      logger.log(this.id, "registering actions");
-      this.colony.registerAction(this.harvestAction);
     }
   }
 

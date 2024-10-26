@@ -1,101 +1,77 @@
-import { ATTACK, CARRY, HEAL, RANGED_ATTACK, WORK } from 'game/constants';
-import {
-  Creep,
-} from 'game/prototypes';
-import { CreepWrapper } from "shared/subsystems/wrappers";
 
-/*
-if (creep.body.some((part) => part.type == ATTACK)) {
-  myAttackers.push(creep);
-} else if (creep.body.some((part) => part.type == HEAL)) {
-  myHealers.push(creep);
-} else if (creep.body.some((part) => part.type == RANGED_ATTACK)) {
-  myRanged.push(creep);
-} else if (creep.body.some((part) => part.type == WORK)) {
-  myWorkers.push(creep);
-} else if (creep.body.some((part) => part.type == CARRY)) {
-  myHaulers.push(creep);
-}
-*/
 
-declare module "game/prototypes" {
+import visual from "shared/utils/visual";
+import Logger from "shared/utils/logger";
+let logger = new Logger("prototypeCreep");
+
+declare global {
   interface Creep {
 
-    isAttacker(onlyActive?:boolean):boolean;
-    isRangedAttacker(onlyActive?:boolean):boolean;
-    isHealer(onlyActive?:boolean):boolean;
-    isWorker():boolean;
-    isHauler():boolean;
-    smartMove(direction: DirectionConstant): CreepMoveReturnCode | undefined;
+
+    _weight: number;
+    getWeight(): number;
+    getCost(terrainType: string): number;
+    getColor(): string;
   }
 }
 
 
-Creep.prototype.smartMove = function(direction: DirectionConstant): CreepMoveReturnCode | undefined {
-  console.log(this.id, "moving", direction, this.move);
-  return this.move(direction);
+
+let colors = new Map<string, string>();
+Creep.prototype.getColor = function () {
+    if (!colors.has(this.name)) {
+        colors.set(this.name, "#" + visual.rgbColor(Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256)).toString());
+    }
+    return colors.get(this.name)!;
 }
 
+//add new methods
+/**
+* Calculate the weight (fatness factor) of the creep
+* @returns {number} The weight of the creep
+*/
+Creep.prototype.getWeight = function (): number {
+    if (!this._weight) {
+        const body = this.body;
+        const carryParts = body.filter(part => part.type === CARRY);
+        const otherParts = body.filter(part => part.type !== CARRY && part.type !== MOVE);
 
+        // Calculate the weight of parts that generate fatigue
+        const baseWeight = otherParts.length * 2; // Non-CARRY, non-MOVE parts cost 2 fatigue
 
+        // Calculate the weight of CARRY parts based on their contents
+        const carryWeight = (this.store.getUsedCapacity() / (carryParts.length || 1)) * 2; // Each unit of resource costs 1 fatigue, so multiply by 2 for the new scale
 
-Creep.prototype.isAttacker = function(onlyActive = false) {
-  if(!onlyActive) {
-    return this.body.some((part) => part.type == ATTACK)
-  } else {
-    return this.body.some((part) => part.type == ATTACK && part.hits!=0)
-  }
-}
-Creep.prototype.isRangedAttacker = function(onlyActive = false) {
-  if(!onlyActive) {
-    return this.body.some((part) => part.type == RANGED_ATTACK)
-  } else {
-    return this.body.some((part) => part.type == RANGED_ATTACK && part.hits!=0)
-  }
-}
-Creep.prototype.isHealer = function(onlyActive = false) {
-  if(!onlyActive) {
-    return this.body.some((part) => part.type == HEAL)
-  } else {
-    return this.body.some((part) => part.type == HEAL && part.hits!=0)
-  }
-}
-Creep.prototype.isWorker = function() {
-  return this.body.some((part) => part.type == WORK)
-}
-Creep.prototype.isHauler = function() {
-  return this.body.some((part) => part.type == CARRY)
+        // Calculate total weight
+        const totalWeight = baseWeight + carryWeight;
+
+        this._weight = totalWeight;
+    }
+    // this.say((this._weight).toFixed(2));
+    return this._weight;
 }
 
+const terrainCosts = {
+    "wall": Infinity,
+    "swamp": 10,
+    "plain": 2,
+    "road": 1,
+};
 
+Creep.prototype.getCost = function (terrainType: keyof typeof terrainCosts): number {
+    let cost = terrainCosts[terrainType] || 1;
+    let totalWeight = this.getWeight();
+    // Calculate the effective weight considering MOVE parts
+    // Each MOVE part reduces the effect of weight by 2
+    const moveParts = this.body.filter(part => part.type === MOVE);
+    const effectiveWeight = Math.max(0, totalWeight * cost - (moveParts.length * 2));
 
-Object.defineProperty(Creep.prototype, "squad", {
-  get(){
-    return this._squad ?? false;
-  },
-  set(value){
-    this._squad = value;
-  }
-})
+    // Normalize the weight
+    const normalizedWeight = effectiveWeight / this.body.length;
 
-
-
-
-// Object.defineProperty(Creep.prototype, "targets", {
-//   get(){
-//     return this._targets ?? [];
-//   },
-//   set(value){
-//     this._targets = value;
-//   }
-// })
-// Object.defineProperty(Creep.prototype, "moveTarget", {
-//   get(){
-//     return this._targets ?? [];
-//   },
-//   set(value){
-//     this._targets = value;
-//   }
-// })
-
-
+    // Adjust the weight to fit the terrain multiplier scale
+    // This will result in a value that, when multiplied by the terrain factor,
+    // gives the number of ticks the creep will spend on that tile
+    logger.log(this.name, "getCost", terrainType, effectiveWeight, totalWeight, cost, moveParts.length, normalizedWeight);
+    return normalizedWeight;
+}

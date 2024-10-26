@@ -2,7 +2,9 @@ import { GameObjectWrapper, GameObjectWrapperData } from "./base/GameObjectWrapp
 import { registerObjectWrapper } from "./base/AllGameObjects";
 import { StorableCreatableClass } from "shared/utils/memory";
 import { HasStorageWrapper, HasStorageWrapperData } from "./base/HasStorageWrapper";
+import Logger from "shared/utils/logger";
 
+const logger = new Logger("RuinWrapper");
 
 // lie to ts that Ruin has hits and hitsMax
 declare global {
@@ -25,19 +27,11 @@ export class RuinWrapper extends HasStorageWrapper<Ruin> implements StorableCrea
 
   static fromJSON(json: RuinWrapperData): RuinWrapper {
     const wrapper = new RuinWrapper(json.id as Id<Ruin>);
+    HasStorageWrapper.fromJSON(json, wrapper);
     wrapper.destroyTime = json.destroyTime;
     wrapper.ticksToDecay = json.ticksToDecay;
     wrapper.structure = json.structure;
     return wrapper;
-  }
-
-  toJSON(): RuinWrapperData {
-    return {
-      ...super.toJSON(),
-      destroyTime: this.destroyTime,
-      ticksToDecay: this.ticksToDecay,
-      structure: this.structure,
-    };
   }
 
   constructor(id: string) {
@@ -54,8 +48,16 @@ export class RuinWrapper extends HasStorageWrapper<Ruin> implements StorableCrea
       this.destroyTime = ruin.destroyTime;
       this.ticksToDecay = ruin.ticksToDecay;
       this.structure = ruin.structure.structureType;
-      this.store.updateFromStore(ruin.store);
     }
+  }
+
+  toJSON(): RuinWrapperData {
+    return {
+      ...super.toJSON(),
+      destroyTime: this.destroyTime,
+      ticksToDecay: this.ticksToDecay,
+      structure: this.structure,
+    };
   }
 }
 

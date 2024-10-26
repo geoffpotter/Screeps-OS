@@ -1,5 +1,6 @@
 
 import Logger from "../../utils/logger";
+import { CachedValue } from "../caching/CachedValue";
 
 const logger = new Logger("WorldPosition");
 
@@ -156,13 +157,19 @@ export default class WorldPosition {
     }
 
 
-
+    private cachedDistances: Map<string, CachedValue<number>> = new Map();
     /**
      * @param {number} x
      * @param {number} y
      */
     getRangeToXY(x: number, y: number): number {
-        return this.getChebyshevDist(x, y);
+        let key = `${x}_${y}`;
+        let cached = this.cachedDistances.get(key);
+        if(!cached) {
+            cached = new CachedValue(() => this.getChebyshevDist(x, y), 100_000);
+            this.cachedDistances.set(key, cached);
+        }
+        return cached.get();
     }
 
     /**
@@ -296,6 +303,16 @@ export default class WorldPosition {
         let positions: WorldPosition[] = [];
         for (let dir of [TOP, TOP_RIGHT, RIGHT, BOTTOM_RIGHT, BOTTOM, BOTTOM_LEFT, LEFT, TOP_LEFT]) {
             positions.push(this.moveInDir(dir));
+        }
+        return positions;
+    }
+
+    getPositionsInRange(range: number): WorldPosition[] {
+        let positions: WorldPosition[] = [];
+        for (let x = this.x - range; x <= this.x + range; x++) {
+            for (let y = this.y - range; y <= this.y + range; y++) {
+                positions.push(new WorldPosition(x, y));
+            }
         }
         return positions;
     }

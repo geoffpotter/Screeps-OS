@@ -1,4 +1,4 @@
-import { ActionDemand } from "world_new/actions/base/ActionHelpers";
+import { ActionDemand } from "world_new/actions/base/ActionDemand";
 import { CreepRequest, CreepRequestOptions } from "./CreepRequest";
 import CreepWrapper from "./CreepWrapper";
 import { CachedValue } from "shared/utils/caching/CachedValue";
@@ -42,7 +42,7 @@ export interface bodyClassification {
     fatness: number;
     toughness: number;
 
-    demand: ActionDemand;
+    asDemand: ActionDemand<BodyPartConstant>;
 }
 
 export enum CreepClass {
@@ -74,16 +74,7 @@ function newBodyClassification(): bodyClassification {
         numWorkActive: 0, numCarryActive: 0,
 
         fatness: 0, toughness: 0,
-        demand: {
-            attack: 0,
-            ranged_attack: 0,
-            heal: 0,
-            work: 0,
-            carry: 0,
-            move: 0,
-            tough: 0,
-            claim: 0
-        }
+        asDemand: new ActionDemand<BodyPartConstant>()
     }
 }
 
@@ -276,8 +267,7 @@ export class CreepBody {
 
             //handle body counts
             for (let part of creep.body) {
-                //@ts-ignore no clue why it's complaining "object my not exists", what object mofo?
-                ret.demand[part.type]++;
+                ret.asDemand.set(part.type, (ret.asDemand.get(part.type) || 0) + 1);
                 if (part.type == ATTACK) {
                     ret.hasAttack = true;
                     ret.numAttack++;

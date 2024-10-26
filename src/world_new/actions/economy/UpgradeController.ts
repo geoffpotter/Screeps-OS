@@ -1,24 +1,11 @@
-import { BaseAction, BaseActionMemory } from "../base/BaseAction";
+import { BaseAction } from "../base/BaseAction";
 import { ControllerWrapper } from "../../wrappers/ControllerWrapper";
 import CreepWrapper from "../../wrappers/creep/CreepWrapper";
-import { StorableClass, baseStorable } from "shared/utils/memory/MemoryManager";
-import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
-import { ActionDemand } from "../base/ActionHelpers";
+import { ActionDemand } from "../base/ActionDemand";
+import { BaseCreepAction } from "../base/BaseCreepAction";
 
-export interface UpgradeControllerMemory extends BaseActionMemory {
-}
 
-export class UpgradeController extends BaseAction<ControllerWrapper, CreepWrapper>
-  implements StorableClass<UpgradeController, typeof UpgradeController, UpgradeControllerMemory> {
-
-  static fromJSON(json: UpgradeControllerMemory, action?: UpgradeController): UpgradeController {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as ControllerWrapper;
-      action = new UpgradeController(target);
-    }
-    BaseAction.fromJSON(json, action);
-    return action;
-  }
+export class UpgradeController extends BaseCreepAction<ControllerWrapper> {
 
   static actionType = "⬆️🏛️";
 
@@ -35,14 +22,14 @@ export class UpgradeController extends BaseAction<ControllerWrapper, CreepWrappe
     if (!super.shouldDo(object, priority)) return false;
     return object.store.getAmount(RESOURCE_ENERGY) > 0;
   }
-  calculateDemand(): ActionDemand {
+  calculateDemand(): ActionDemand<BodyPartConstant> {
     const controller = this.target.getObject();
-    if (!controller) return {};
+    let demand = new ActionDemand<BodyPartConstant>();
+    if (!controller) return demand;
     const energyNeeded = 38;
-    return {
-      [WORK]: Math.ceil(energyNeeded / UPGRADE_CONTROLLER_POWER),
-      [CARRY]: 1,
-    };
+    demand.set(WORK, Math.ceil(energyNeeded / UPGRADE_CONTROLLER_POWER));
+    demand.set(CARRY, 1);
+    return demand;
   }
   doAction(actor: CreepWrapper): boolean {
     if (actor.wpos.getRangeTo(this.target.wpos) <= this.maxRange) {

@@ -1,23 +1,18 @@
 import { HasStorageWrapper, HasStorageWrapperData } from "./base/HasStorageWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
+import Logger from "shared/utils/logger";
+
+const logger = new Logger("StructureExtensionWrapper");
 
 interface StructureExtensionWrapperData extends HasStorageWrapperData {
-  // Add any extension-specific properties here
 }
 
 export class StructureExtensionWrapper extends HasStorageWrapper<StructureExtension> implements StorableCreatableClass<StructureExtensionWrapper, typeof StructureExtensionWrapper, StructureExtensionWrapperData> {
   static fromJSON(json: StructureExtensionWrapperData): StructureExtensionWrapper {
-    return new StructureExtensionWrapper(json.id as Id<StructureExtension>);
-  }
-
-  toJSON(): StructureExtensionWrapperData {
-    return {
-      ...super.toJSON(),
-      // Add any extension-specific properties here
-    };
+    const wrapper = new StructureExtensionWrapper(json.id as Id<StructureExtension>);
+    HasStorageWrapper.fromJSON(json, wrapper);
+    return wrapper;
   }
 
   constructor(id: string) {
@@ -27,10 +22,11 @@ export class StructureExtensionWrapper extends HasStorageWrapper<StructureExtens
   update() {
     super.update();
     const extension = this.getObject();
-    if (extension) {
-      // Update extension-specific properties here
+    if (extension && this.my) {
+
     }
   }
+
 }
 
 registerObjectWrapper(StructureExtension, StructureExtensionWrapper);

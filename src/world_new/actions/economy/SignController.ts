@@ -1,26 +1,10 @@
-import { BaseAction, BaseActionMemory } from "../base/BaseAction";
+import { BaseCreepAction } from "../base/BaseCreepAction";
 import { ControllerWrapper } from "../../wrappers/ControllerWrapper";
 import CreepWrapper from "../../wrappers/creep/CreepWrapper";
-import { StorableClass, baseStorable } from "shared/utils/memory/MemoryManager";
-import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
-import { ActionDemand } from "../base/ActionHelpers";
+import { ActionDemand } from "../base/ActionDemand";
 
-export interface SignControllerMemory extends BaseActionMemory {
-  text: string;
-}
 
-export class SignController extends BaseAction<ControllerWrapper, CreepWrapper>
-  implements StorableClass<SignController, typeof SignController, SignControllerMemory> {
-
-  static fromJSON(json: SignControllerMemory, action?: SignController): SignController {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as ControllerWrapper;
-      action = new SignController(target, json.text);
-    }
-    BaseAction.fromJSON(json, action);
-    return action;
-  }
-
+export class SignController extends BaseCreepAction<ControllerWrapper> {
   static actionType = "✍️🏛️";
   private text: string;
 
@@ -30,10 +14,10 @@ export class SignController extends BaseAction<ControllerWrapper, CreepWrapper>
     this.text = text;
   }
 
-  calculateDemand(): ActionDemand {
-    return {
-      [MOVE]: 1,
-    };
+  calculateDemand(): ActionDemand<BodyPartConstant> {
+    let demand = new ActionDemand<BodyPartConstant>();
+    demand.set(MOVE, 1);
+    return demand;
   }
 
   canDo(object: CreepWrapper): boolean {

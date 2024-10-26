@@ -10,10 +10,9 @@ import visual from "shared/utils/visual";
 import WorldPosition, { toWorldPosition } from "shared/utils/map/WorldPosition";
 let closestNodeLookup: Map<WorldPosition, Node> = new Map();
 import nodeTypes from "./nodeTypes";
-import { movementManager } from "./MovementManager";
 
 let logger = new Logger("NodeNetwork");
-// logger.enabled = false;
+logger.enabled = false;
 
 declare global {
     interface CreepMemory {

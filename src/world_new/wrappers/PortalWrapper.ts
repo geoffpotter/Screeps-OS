@@ -1,7 +1,6 @@
 import { GameObjectWrapper, GameObjectWrapperData } from "./base/GameObjectWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
 import CreepWrapper from "./creep/CreepWrapper";
 
 interface PortalWrapperData extends GameObjectWrapperData {

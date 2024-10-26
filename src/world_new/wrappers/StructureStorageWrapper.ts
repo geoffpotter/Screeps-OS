@@ -1,10 +1,12 @@
 import { HasStorageWrapper, HasStorageWrapperData } from "./base/HasStorageWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { Colony } from "../Colony";
 import { registerObjectWrapper } from "./base/AllGameObjects";
+import Logger from "shared/utils/logger";
+
+const logger = new Logger("StructureStorageWrapper");
+
 
 interface StructureStorageWrapperData extends HasStorageWrapperData {
-  // Add any storage-specific properties here
 }
 
 export class StructureStorageWrapper extends HasStorageWrapper<StructureStorage> implements StorableCreatableClass<StructureStorageWrapper, typeof StructureStorageWrapper, StructureStorageWrapperData> {
@@ -16,21 +18,19 @@ export class StructureStorageWrapper extends HasStorageWrapper<StructureStorage>
 
   constructor(id: string) {
     super(id as Id<StructureStorage>);
-    // No additional actions needed for StructureStorage
   }
 
   update() {
     super.update();
     const storage = this.getObject();
     if (storage) {
-      // Update storage-specific properties here if needed
+      // Initialize appropriate actions based on storage state
     }
   }
 
   toJSON(): StructureStorageWrapperData {
     return {
-      ...super.toJSON(),
-      // Add any storage-specific properties here
+      ...super.toJSON()
     };
   }
 }

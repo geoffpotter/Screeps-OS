@@ -64,7 +64,7 @@ import { getRoomWrapper } from "./wrappers/room/RoomWrappers";
 import { getColony } from "./Colonies";
 import { getOrMakeRoomWrapper, RoomMode } from "./wrappers/room";
 import { getOrMakeColony } from "./Colony";
-import { priority } from "shared/utils/priority";
+import { Priority } from "shared/utils/priority";
 import nodeNetwork from "shared/subsystems/NodeNetwork/nodeNetwork";
 import nodeTypes from "shared/subsystems/NodeNetwork/nodeTypes";
 import { Edge, makeEdgeId } from "shared/subsystems/NodeNetwork";
@@ -131,7 +131,6 @@ async function asyncMain() {
 
 
 
-
     // nodeNetwork.refineEdges();
     // let edgesNeedingRefinement = nodeNetwork.getEdgeRefineQueue();
     // let edge = edgesNeedingRefinement.shift();
@@ -187,6 +186,6 @@ async function asyncMain() {
     console.log("-------------- end main loop --------------");
 }
 
-export const loop = asyncMainLoop(asyncMain);
+export const loop = ErrorMapper.wrapLoop(asyncMainLoop(asyncMain));
 
 console.log("-------------- end main --------------");

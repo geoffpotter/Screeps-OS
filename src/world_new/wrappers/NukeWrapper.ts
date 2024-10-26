@@ -1,7 +1,6 @@
 import { GameObjectWrapper, GameObjectWrapperData } from "./base/GameObjectWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
 import { StorableCreatableClass } from "shared/utils/memory";
-import WorldPosition from "shared/utils/map/WorldPosition";
 
 interface NukeWrapperData extends GameObjectWrapperData {
   timeToLand: number;

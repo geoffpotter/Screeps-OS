@@ -1,6 +1,5 @@
 import { RoomMode } from "./wrappers/room/RoomMode";
 import type { RoomWrapper } from "./wrappers/room/RoomWrapper";
-import { Job, JobMemory } from "./jobs/Job";
 import { setInterval } from "shared/polyfills";
 import { baseStorable, MemoryGroupedCollection, MemoryGroupedCollectionJSON, StorableClass, StorableCreatableClass } from "shared/utils/memory";
 import queues from "./queues";
@@ -8,7 +7,7 @@ import CreepWrapper from "./wrappers/creep/CreepWrapper";
 import MemoryMap, { MemoryMapJSON } from "shared/utils/memory/MemoryMap";
 import MemoryManager from "shared/utils/memory/MemoryManager";
 import { BaseAction } from "./actions/base/BaseAction";
-import { priority } from "shared/utils/priority";
+import { Priority } from "shared/utils/priority";
 import { builtInQueues } from "shared/polyfills/tasks";
 import { CanSpawnCreeps, CreepRequest } from "./wrappers/creep/CreepRequest";
 import { SpawnWrapper } from "./wrappers/spawn";
@@ -17,12 +16,14 @@ import { getGameObjectWrapperById } from "./wrappers/base/AllGameObjects";
 import Logger from "shared/utils/logger";
 import { ControllerWrapper, ResourceWrapper } from "./wrappers";
 import { addColony, getAllColonies, getColony } from "./Colonies";
-import { Dropoff } from "./actions/economy/Dropoff";
-import { Pickup } from "./actions/economy/Pickup";
+import { BaseDropoff } from "./actions/economy/resources/BaseDropoff";
+import { BasePickup } from "./actions/economy/resources/BasePickup";
 import { getRoomWrapper } from "./wrappers/room/RoomWrappers";
 import nodeNetwork from "shared/subsystems/NodeNetwork/nodeNetwork";
 import { Node } from "shared/subsystems/NodeNetwork";
 import nodeTypes from "shared/subsystems/NodeNetwork/nodeTypes";
+import { CreepJob } from "./jobs/CreepJob";
+import { StructureJob } from "./jobs/StructureJob";
 let logger = new Logger("Colony");
 logger.color = COLOR_GREEN;
 
@@ -32,8 +33,6 @@ logger.color = COLOR_GREEN;
 export interface colonyMemory {
   id: string;
   rooms: MemoryGroupedCollectionJSON<RoomWrapper>;
-  spawnQueue: any[];
-  jobs: JobMemory[];
 }
 
 // OWNED,
@@ -58,19 +57,24 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
       colony = new Colony(json.id);
     }
     colony.rooms = MemoryGroupedCollection.fromJSON(json.rooms);
-    colony.spawnQueue = json.spawnQueue;
-    colony.jobs = json.jobs.map(job=>Job.fromJSON(job, colony));
     return colony;
   }
+  toJSON(): colonyMemory {
+    return {
+      id: this.id,
+      rooms: this.rooms.toJSON(),
+    };
+  }
+
   rooms: MemoryGroupedCollection<RoomWrapper>;
   spawnQueue: any[] = [];
-  jobs: Job[] = [];
+  jobs: (CreepJob | StructureJob)[] = [];
   registeredActions: MemoryGroupedCollection<BaseAction<any, any>>;
 
-  private workerJob: Job | undefined;
-  private minerJob: Job | undefined;
-  private haulerJob: Job | undefined;
-  private upgraderJob: Job | undefined;
+  private workerJob: CreepJob | undefined;
+  private minerJob: CreepJob | undefined;
+  private haulerJob: CreepJob | undefined;
+  private upgraderJob: CreepJob | undefined;
 
   private actionsDirty = true;
 
@@ -125,67 +129,67 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
     this.registeredActions = new MemoryGroupedCollection<BaseAction<any, any>>("registeredActions", "id", ["actionType"], undefined, false);
 
     addColony(this);
-    this.setupJobs();
+    // this.setupJobs();
   }
   setupJobs() {
     let sourceActions: any[] = [];
-    let spawnsActions: Dropoff[] = [];
+    let spawnsActions: BaseDropoff[] = [];
     let upgradeActions: any[] = [];
-    let pickupActions: Pickup[] = [];
-    let controllerDropOff: Dropoff[] = [];
-    let controllerPickup: Pickup[] = [];
-    let upgraderDropoffs: Dropoff[] = [];
-    let haulerPickups: Pickup[] = [];
-    let haulerDropoffs: Dropoff[] = [];
-    let minerPickups: Pickup[] = [];
+    let pickupActions: BasePickup[] = [];
+    let controllerDropOff: BaseDropoff[] = [];
+    let controllerPickup: BasePickup[] = [];
+    let upgraderDropoffs: BaseDropoff[] = [];
+    let haulerPickups: BasePickup[] = [];
+    let haulerDropoffs: BaseDropoff[] = [];
+    let minerPickups: BasePickup[] = [];
 
     // Create jobs if they don't exist
     if (!this.workerJob) {
-      this.workerJob = new Job(this.id + "_worker", this, {
+      this.workerJob = new CreepJob(this.id + "_worker", this, {
         name: "worker",
         fatness: 1,
-        priority: priority.TOP,
+        priority: Priority.TOP,
         primaryPart: WORK,
         secondaryPart: CARRY,
         secondaryPerPrimary: 1,
         maxLevel: 1,
       });
       this.workerJob.maxAssignedObjects = 1;
-      this.workerJob.priority = priority.NORMAL;
+      this.workerJob.priority = Priority.NORMAL;
     }
     if (!this.minerJob) {
-      this.minerJob = new Job(this.id + "_miner", this, {
+      this.minerJob = new CreepJob(this.id + "_miner", this, {
         name: "miner",
         fatness: 100,
-        priority: priority.NORMAL,
+        priority: Priority.NORMAL,
         primaryPart: WORK,
         secondaryPart: CARRY,
         secondaryPerPrimary: 0.01,
       });
-      // this.minerJob.maxAssignedObjects = 2;
-      this.minerJob.priority = priority.TOP;
+      // this.minerJob.maxAssignedObjects = 1;
+      this.minerJob.priority = Priority.TOP;
     }
     if (!this.haulerJob) {
-      this.haulerJob = new Job(this.id + "_hauler", this, {
+      this.haulerJob = new CreepJob(this.id + "_hauler", this, {
         name: "hauler",
         fatness: 1,
-        priority: priority.NORMAL,
+        priority: Priority.NORMAL,
         maxLevel: 1
       });
-      this.haulerJob.maxAssignedObjects = 8;
-      this.haulerJob.priority = priority.LOW;
+      // this.haulerJob.maxAssignedObjects = 1;
+      this.haulerJob.priority = Priority.LOW;
     }
     if (!this.upgraderJob) {
-      this.upgraderJob = new Job(this.id + "_upgrader", this, {
+      this.upgraderJob = new CreepJob(this.id + "_upgrader", this, {
         name: "upgrader",
         fatness: 100,
-        priority: priority.NORMAL,
+        priority: Priority.NORMAL,
         primaryPart: WORK,
         secondaryPart: CARRY,
         secondaryPerPrimary: 0.01,
       });
-      // this.upgraderJob.maxAssignedObjects = 5;
-      this.upgraderJob.priority = priority.NORMAL;
+      // this.upgraderJob.maxAssignedObjects = 1;
+      this.upgraderJob.priority = Priority.NORMAL;
     }
 
 
@@ -196,31 +200,30 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
       logger.log("setupJobs for room", room.id, intel.roomName, intel.sources.size, intel.buildings[PlayerStatus.MINE].size);
 
       // Collect actions from each room
-      sourceActions.push(...intel.sources.map(source => source.harvestAction));
+      sourceActions.push(...intel.sources.map(source => source.getActionHarvest()));
       spawnsActions.push(...intel.buildings[PlayerStatus.MINE].getGroupWithValueGetObjects<SpawnWrapper>("wrapperType", "SpawnWrapper")
-        .map(spawn => spawn.actionDropoff)
-        .filter(action => action !== false) as Dropoff[]);
+        .map(spawn => spawn.getActionDropoffAny()));
 
       if (intel.controller) {
-        upgradeActions.push(intel.controller.upgradeAction);
-        if (intel.controller.dumpEnergyAction) controllerDropOff.push(intel.controller.dumpEnergyAction);
-        if (intel.controller.useEnergyAction) controllerPickup.push(intel.controller.useEnergyAction);
+        upgradeActions.push(intel.controller.getActionUpgrade());
+        controllerDropOff.push(intel.controller.getActionDumpEnergy());
+        controllerPickup.push(intel.controller.getActionUseEnergy());
       }
 
-      pickupActions.push(...intel.droppedResources.map(resource => resource.actionPickup));
-      minerPickups.push(...intel.creeps[PlayerStatus.MINE].getAll().filter(creep => creep && creep.actionPickup && creep.assignedJob && creep.assignedJob.id.includes("miner")).map(creep => creep.actionPickup as Pickup));
-      haulerPickups.push(...intel.creeps[PlayerStatus.MINE].getAll().filter(creep => creep && creep.actionPickup && creep.assignedJob && creep.assignedJob.id.includes("hauler")).map(creep => creep.actionPickup as Pickup));
-      haulerDropoffs.push(...intel.creeps[PlayerStatus.MINE].getAll().filter(creep => creep && creep.actionDropoff && creep.assignedJob && creep.assignedJob.id.includes("hauler")).map(creep => creep.actionDropoff as Dropoff));
-      upgraderDropoffs.push(...intel.creeps[PlayerStatus.MINE].getAll().filter(creep => creep && creep.actionDropoff && creep.assignedJob && creep.assignedJob.id.includes("upgrader")).map(creep => creep.actionDropoff as Dropoff));
+      pickupActions.push(...intel.droppedResources.getAll().filter(resource=>!resource.nearController).map(resource => resource.getActionPickup()));
+      minerPickups.push(...intel.creeps[PlayerStatus.MINE].getAll().filter(creep => creep && creep.assignedJob && creep.assignedJob.id.includes("miner")).map(creep => creep.getActionPickupAny() as BasePickup));
+      haulerPickups.push(...intel.creeps[PlayerStatus.MINE].getAll().filter(creep => creep && creep.assignedJob && creep.assignedJob.id.includes("hauler")).map(creep => creep.getActionPickupAny() as BasePickup));
+      haulerDropoffs.push(...intel.creeps[PlayerStatus.MINE].getAll().filter(creep => creep && creep.assignedJob && creep.assignedJob.id.includes("hauler")).map(creep => creep.getActionDropoffAllowed() as BaseDropoff));
+      upgraderDropoffs.push(...intel.creeps[PlayerStatus.MINE].getAll().filter(creep => creep && creep.assignedJob && creep.assignedJob.id.includes("upgrader")).map(creep => creep.getActionDropoffAllowed() as BaseDropoff));
 
     }
 
-
+    logger.log("syncing actions", sourceActions.length, pickupActions.length, controllerPickup.length, upgradeActions.length);
 
     // Sync actions for each job
     this.minerJob.syncActions(sourceActions);
     this.workerJob.syncActions(sourceActions, [...spawnsActions, ...upgradeActions]);
-    this.haulerJob.syncActions(pickupActions, [...spawnsActions, ...controllerDropOff]);
+    this.haulerJob.syncActions(pickupActions, [...spawnsActions, ...controllerDropOff, ...upgraderDropoffs]);
     this.upgraderJob.syncActions(controllerPickup, [...upgradeActions]);
 
     this.jobs = [
@@ -239,7 +242,7 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
       //add base node at controller drop off point
       let controllerWrapper = roomIntel.buildings[PlayerStatus.MINE].getGroupWithValueGetObjects("wrapperType", "ControllerWrapper")[0] as unknown as ControllerWrapper;
       if(controllerWrapper) {
-        let basePos = controllerWrapper.dumpEnergyAction.wpos;
+        let basePos = controllerWrapper.getActionDumpEnergy().wpos;
         if (nodeNetwork.hasNode(basePos)) {
           this.baseNode = nodeNetwork.getNode(basePos) as Node;
         } else {
@@ -312,36 +315,13 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
     return this.jobs.find(job=>job.id === jobId);
   }
 
-  registerAction(action: BaseAction<any, any>) {
-    // logger.log(action.id, "registering action");
-    this.registeredActions.add(action);
-    this.actionsDirty = true;
-  }
-  unregisterAction(action: BaseAction<any, any>) {
-    this.registeredActions.removeById(action.id);
-    this.actionsDirty = true;
-  }
-  hasAction(actionId: string) {
-    return this.registeredActions.hasId(actionId);
-  }
-  getAction(actionId: string) {
-    return this.registeredActions.getById(actionId);
-  }
-  getActionsByType(actionType: string) {
-    let actionIds = this.registeredActions.getGroupWithValue("actionType", actionType);
-    if(!actionIds) {
-      return [];
-    }
-    return actionIds.map(id=>this.registeredActions.getById(id));
-  }
-
   init() {
-    if (this.actionsDirty) {
+    if (this.actionsDirty || Game.time % 10 == 0) {
       // logger.log("actions dirty during init!!! setting up jobs");
       this.setupJobs();
     }
     if (Game.time % 1000 === 0) {
-      this.connectNetworkNodes();
+      // this.connectNetworkNodes();
     }
 
 
@@ -400,10 +380,10 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
       // logger.log("Trying to spawn creep in spawn", spawn.id, spawn.maxSpawnableLevel(creepRequest));
       let ret =  spawn.spawnCreep(creepRequest);
       if (ret) {
-        return ret.then(creepName => {
+        return ret.then((creepName: string | false) => {
           // logger.log("Spawned creep", creepName);
           return creepName;
-        }).catch(err => {
+        }).catch((err: any) => {
           logger.error("Error spawning creep", err);
           return false;
         });
@@ -418,12 +398,12 @@ export class Colony extends baseStorable implements StorableClass<Colony, typeof
     }
   }
 
-  findSuitableJobForCreep(creep: CreepWrapper): Job | undefined {
+  findSuitableJobForCreep(creep: CreepWrapper): CreepJob | undefined {
     // Implement logic to find a suitable job based on creep's capabilities
     for(const job of this.jobs) {
       //@ts-ignore
       // logger.log(creep.name, "checking job", job.id, job.needsObject(creep, true), job.assignedObjects.size);
-      if(job.needsObject(creep, true)) {
+      if(job instanceof CreepJob && job.needsObject(creep, true)) {
         return job;
       }
     }
@@ -451,3 +431,4 @@ export function getOrMakeColony(mainRoomName: string): Colony {
 //     }
 //   }
 // }
+

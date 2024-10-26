@@ -1,15 +1,13 @@
 import { KillableWrapper, KillableWrapperData } from "./base/KillableWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
 
 interface StructureKeeperLairWrapperData extends KillableWrapperData {
-  ticksToSpawn: number | null;
+  ticksToSpawn: number | undefined;
 }
 
 export class StructureKeeperLairWrapper extends KillableWrapper<StructureKeeperLair> implements StorableCreatableClass<StructureKeeperLairWrapper, typeof StructureKeeperLairWrapper, StructureKeeperLairWrapperData> {
-  ticksToSpawn: number | null;
+  ticksToSpawn: number | undefined;
 
   static fromJSON(json: StructureKeeperLairWrapperData): StructureKeeperLairWrapper {
     const wrapper = new StructureKeeperLairWrapper(json.id as Id<StructureKeeperLair>);
@@ -26,14 +24,14 @@ export class StructureKeeperLairWrapper extends KillableWrapper<StructureKeeperL
 
   constructor(id: string) {
     super(id as Id<StructureKeeperLair>);
-    this.ticksToSpawn = null;
+    this.ticksToSpawn = undefined;
   }
 
   update() {
     super.update();
     const keeperLair = this.getObject();
     if (keeperLair) {
-      this.ticksToSpawn = keeperLair.ticksToSpawn || null;
+      this.ticksToSpawn = keeperLair.ticksToSpawn;
     }
   }
 }

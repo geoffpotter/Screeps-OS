@@ -1,7 +1,5 @@
 import { KillableWrapper, KillableWrapperData } from "./base/KillableWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
 
 interface StructureExtractorWrapperData extends KillableWrapperData {
@@ -16,6 +14,7 @@ export class StructureExtractorWrapper extends KillableWrapper<StructureExtracto
     wrapper.cooldown = json.cooldown;
     return wrapper;
   }
+
   toJSON(): StructureExtractorWrapperData {
     return {
       ...super.toJSON(),
@@ -35,7 +34,6 @@ export class StructureExtractorWrapper extends KillableWrapper<StructureExtracto
       this.cooldown = extractor.cooldown;
     }
   }
-
 }
 
 registerObjectWrapper(StructureExtractor, StructureExtractorWrapper);

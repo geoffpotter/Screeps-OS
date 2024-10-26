@@ -1,11 +1,12 @@
-import { KillBuilding, KillBuildingMemory } from "../../actions/military/KillBuilding";
+import { KillBuilding } from "../../actions/military/KillBuilding";
 import { GameObject, GameObjectWrapper, GameObjectWrapperData } from "./GameObjectWrapper";
 import queues from "../../queues";
 import { setInterval } from "shared/polyfills";
 import { StorableClass } from "shared/utils/memory";
-import { KillCreep, KillCreepMemory } from "world_new/actions/military/KillCreep";
+import { KillCreep } from "world_new/actions/military/KillCreep";
 import Logger from "shared/utils/logger";
 import empire from "world_new/Empire";
+import { CreepWrapper } from "..";
 
 const logger = new Logger("KillableWrapper");
 logger.color = COLOR_RED
@@ -19,7 +20,6 @@ export interface killableGameObject extends GameObject {
 
 export interface KillableWrapperData extends GameObjectWrapperData {
   isCreep: boolean;
-  actionKill: KillBuildingMemory | KillCreepMemory | false;
   _hits: number;
   _hitsMax: number;
 }
@@ -33,32 +33,27 @@ export class KillableWrapper<T extends killableGameObject> extends GameObjectWra
     wrapper.isCreep = json.isCreep;
     wrapper._hits = json._hits;
     wrapper._hitsMax = json._hitsMax;
-    if (json.isCreep) {
-      wrapper.actionKill = KillCreep.fromJSON(json.actionKill as KillCreepMemory);
-    } else {
-      wrapper.actionKill = KillBuilding.fromJSON(json.actionKill as KillBuildingMemory);
-    }
     return wrapper;
   }
   toJSON(): KillableWrapperData {
     return {
       ...super.toJSON(),
       isCreep: this.isCreep,
-      actionKill: this.actionKill ? (this.actionKill as unknown as KillBuildingMemory | KillCreepMemory) : false,
       _hits: this._hits,
       _hitsMax: this._hitsMax,
     };
   }
 
-  registerActions() {
-    logger.log(this.id, "registering actions");
-    super.registerActions();
-    if(this.colony && this.actionKill) {
-      this.colony.registerAction(this.actionKill);
+  private _actionKill?: KillBuilding | KillCreep;
+
+  getActionKill(): KillBuilding | KillCreep {
+    if (!this._actionKill) {
+      this._actionKill = this.isCreep ? new KillCreep(this as unknown as CreepWrapper) : new KillBuilding(this);
     }
+    return this._actionKill;
   }
 
-  actionKill: KillBuilding | KillCreep | false = false;
+  actionKill: KillBuilding | KillCreep | undefined = undefined;
   private _hits: number = 0;
   private _hitsMax: number = 0;
   protected isCreep: boolean = false;
@@ -75,17 +70,13 @@ export class KillableWrapper<T extends killableGameObject> extends GameObjectWra
 
   delete() {
     super.delete();
-    if(this.actionKill) {
-      this.actionKill.unassignAll();
-      empire.unregisterAction(this.actionKill);
+    if(this._actionKill) {
+      this._actionKill.unassignAll();
     }
-
   }
 
   update() {
-    // console.log("Killable update", this.id, this.my);
-    if (this.enemy)
-      this.updateKill();
+    super.update();
 
     let obj = this.getObject();
     if (obj) {
@@ -93,22 +84,4 @@ export class KillableWrapper<T extends killableGameObject> extends GameObjectWra
       this._hitsMax = obj.hitsMax;
     }
   }
-
-  updateKill() {
-    if (!this.actionKill) {
-      this.actionKill = new KillBuilding(this);
-    }
-    if (this.actionKill) {
-      this.actionKill.display();
-
-      this.actionKill.requiredParts.setAmount(ATTACK, 1)
-      this.actionKill.requiredParts.setAmount(RANGED_ATTACK, 1)
-
-      //calculate demand from required parts
-    }
-
-
-
-  }
-
 }

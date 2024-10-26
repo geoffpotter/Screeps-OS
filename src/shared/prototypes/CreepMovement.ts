@@ -1,5 +1,5 @@
 import visual from "shared/utils/visual";
-import { movementManager } from "shared/subsystems/NodeNetwork/MovementManager";
+import moveManager from "shared/subsystems/MoveManager/MoveManager";
 import { NodeNetwork } from "shared/subsystems/NodeNetwork/nodeNetwork";
 import WorldPosition, { deserializeWPath, serializeWPath, toWorldPosition } from "shared/utils/map/WorldPosition";
 import { deserializePath, serializePath } from "./roomPosition";
@@ -248,15 +248,15 @@ Creep.prototype.moveByPath = function(path: WorldPosition[] | string, opts: Cust
 
 
     // Move to the next position
-    movementManager.registerMovement({
-        creep: this,
-        currentPathPos: currentPos,
-        nextPathPos: nextPos,
-        goalPos: lookaheadPos,
-        goalRange: opts.range || 0,
-        priority: opts.priority || 1, // Use the provided priority or default to 1
-        pathRange: Math.min(opts.maxPathDistance || 1, deserializedPath.length - startIndex),
-    });
+    // moveManager.registerMovement({
+    //     creep: this,
+    //     currentPathPos: currentPos,
+    //     nextPathPos: nextPos,
+    //     goalPos: lookaheadPos,
+    //     goalRange: opts.range || 0,
+    //     priority: opts.priority || 1, // Use the provided priority or default to 1
+    //     pathRange: Math.min(opts.maxPathDistance || 1, deserializedPath.length - startIndex),
+    // });
     return OK;
 };
 
@@ -269,15 +269,15 @@ Creep.prototype.move = function(direction: DirectionConstant | Creep, opts: Cust
     const currentPos = toWorldPosition(this.pos);
     const targetPos = currentPos.moveInDir(direction);
 
-    movementManager.registerMovement({
-        creep: this,
-        currentPathPos: currentPos,
-        nextPathPos: targetPos,
-        goalPos: opts.goalPos || targetPos,
-        goalRange: opts.range || 0,
-        priority: opts.priority || 1, // Use the provided priority or default to 1
-        pathRange: opts.maxPathDistance || 1,
-    });
+    // moveManager.registerMovement({
+    //     creep: this,
+    //     currentPathPos: currentPos,
+    //     nextPathPos: targetPos,
+    //     goalPos: opts.goalPos || targetPos,
+    //     goalRange: opts.range || 0,
+    //     priority: opts.priority || 1, // Use the provided priority or default to 1
+    //     pathRange: opts.maxPathDistance || 1,
+    // });
 
     return OK;
 };

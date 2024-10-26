@@ -2,7 +2,10 @@ export * from "./WorldPosition";
 export * from "./CostMatrix";
 
 import Logger from "shared/utils/logger";
-import WorldPosition, { toWorldPosition } from "./WorldPosition";
+import WorldPosition from "./WorldPosition";
+import { StructureWrapper } from "world_new/wrappers/base/HasStorageWrapper";
+import type { GameObjectWrapper } from "world_new/wrappers/base/GameObjectWrapper";
+import { WorldPositionData, RoomPositionData } from './types';
 
 let logger = new Logger("map/index.ts");
 
@@ -90,3 +93,75 @@ export function findPathPositions(creepPos: WorldPosition, path: WorldPosition[]
 
     return { currentPos, nextPos, lookaheadPos, currentIndex: closestIndex };
 }
+
+const blockingStructures: StructureConstant[] = [
+    STRUCTURE_WALL,
+    STRUCTURE_RAMPART,
+    STRUCTURE_SPAWN,
+    STRUCTURE_EXTENSION,
+    STRUCTURE_LINK,
+    STRUCTURE_STORAGE,
+    STRUCTURE_TOWER,
+    STRUCTURE_OBSERVER,
+    STRUCTURE_POWER_SPAWN,
+    STRUCTURE_LAB,
+    STRUCTURE_TERMINAL,
+    STRUCTURE_NUKER,
+    STRUCTURE_FACTORY
+];
+
+const destructibleStructures: StructureConstant[] = [
+    STRUCTURE_WALL,
+    STRUCTURE_RAMPART,
+    STRUCTURE_SPAWN,
+    STRUCTURE_EXTENSION,
+    STRUCTURE_LINK,
+    STRUCTURE_STORAGE,
+    STRUCTURE_TOWER,
+    STRUCTURE_OBSERVER,
+    STRUCTURE_POWER_SPAWN,
+    STRUCTURE_LAB,
+    STRUCTURE_TERMINAL,
+    STRUCTURE_NUKER,
+    STRUCTURE_FACTORY
+];
+
+export function StuctureIsBlocking(structure: Structure | GameObjectWrapper<any>): boolean {
+    //@ts-ignore
+    if (structure.objectType) {
+        //@ts-ignore
+        return blockingStructures.includes(structure.objectType as StructureConstant);
+    }
+    //@ts-ignore
+    return blockingStructures.includes(structure.structureType);
+}
+
+export function StructureIsDestructible(structure: Structure | GameObjectWrapper<any>): boolean {
+    //@ts-ignore
+    if (structure.objectType) {
+        //@ts-ignore
+        return destructibleStructures.includes(structure.objectType as StructureConstant);
+    }
+    //@ts-ignore
+    return destructibleStructures.includes(structure.structureType);
+}
+
+// Export basic position utilities that don't depend on other systems
+export function serializePos(pos: RoomPosition): string {
+    return `${pos.x},${pos.y},${pos.roomName}`;
+}
+
+export function deserializePos(serialized: string): RoomPositionData {
+    const [x, y, roomName] = serialized.split(',');
+    return { x: parseInt(x), y: parseInt(y), roomName };
+}
+
+export function toWorldPosition(target: RoomPosition | { pos: RoomPosition } | WorldPosition): WorldPosition {
+    if (target instanceof WorldPosition) return target;
+    const pos = 'pos' in target ? target.pos : target;
+    return WorldPosition.fromRoomPosition(pos);
+}
+
+// Export types
+export type { WorldPositionData, RoomPositionData };
+export { WorldPosition };

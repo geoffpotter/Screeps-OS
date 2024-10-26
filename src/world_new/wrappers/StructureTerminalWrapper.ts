@@ -1,7 +1,5 @@
 import { HasStorageWrapper, HasStorageWrapperData } from "./base/HasStorageWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
 
 interface StructureTerminalWrapperData extends HasStorageWrapperData {
@@ -16,6 +14,7 @@ export class StructureTerminalWrapper extends HasStorageWrapper<StructureTermina
     wrapper.cooldown = json.cooldown;
     return wrapper;
   }
+
   toJSON(): StructureTerminalWrapperData {
     return {
       ...super.toJSON(),
@@ -35,7 +34,6 @@ export class StructureTerminalWrapper extends HasStorageWrapper<StructureTermina
       this.cooldown = terminal.cooldown;
     }
   }
-
 }
 
 registerObjectWrapper(StructureTerminal, StructureTerminalWrapper);

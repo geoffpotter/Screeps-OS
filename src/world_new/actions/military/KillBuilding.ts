@@ -1,29 +1,16 @@
 import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
 import { AnyKillableWrapper } from "world_new/wrappers/base/KillableWrapper";
 import CreepWrapper from "world_new/wrappers/creep/CreepWrapper";
-import { BodyPartInfoCollection } from "shared/utils/Collections/BodyInfoCollection";
-import { BasePartAction, BasePartActionMemory } from "../base/BasePartAction";
-import { StorableClass } from "shared/utils/memory/MemoryManager";
-import { ActionDemand } from "../base/ActionHelpers";
+import { BaseCreepAction } from "../base/BaseCreepAction";
+import { ActionDemand } from "../base/ActionDemand";
 
 
-export interface KillBuildingMemory extends BasePartActionMemory {
 
-}
-
-export class KillBuilding extends BasePartAction<AnyKillableWrapper> implements StorableClass<KillBuilding, typeof KillBuilding, KillBuildingMemory> {
-  static fromJSON(json: KillBuildingMemory, action?: KillBuilding): KillBuilding {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as AnyKillableWrapper;
-      action = new KillBuilding(target);
-    }
-    BasePartAction.fromJSON(json, action);
-    return action;
-  }
+export class KillBuilding extends BaseCreepAction<AnyKillableWrapper> {
 
   static actionType = "🧨";
-  constructor(target:AnyKillableWrapper) {
-    super(KillBuilding.actionType, target, []);
+  constructor(target:AnyKillableWrapper, priority: number = 0) {
+    super(KillBuilding.actionType, target, priority);
   }
   canDo(object: CreepWrapper): boolean {
     if(!super.canDo(object)) return false;
@@ -36,13 +23,13 @@ export class KillBuilding extends BasePartAction<AnyKillableWrapper> implements 
     return false;
   }
 
-  calculateDemand(): ActionDemand {
+  calculateDemand(): ActionDemand<BodyPartConstant> {
     const target = this.target.getObject();
-    if (!target) return {};
-    return {
-      [ATTACK]: Math.ceil(target.hits / ATTACK_POWER),
-      // [RANGED_ATTACK]: Math.ceil(target.hits / RANGED_ATTACK_POWER),
-    };
+    let ret = new ActionDemand<BodyPartConstant>();
+    if (!target) return ret;
+    // ret.set(ATTACK, Math.ceil(target.hits / ATTACK_POWER));
+    ret.set(RANGED_ATTACK, Math.ceil(target.hits / RANGED_ATTACK_POWER));
+    return ret;
   }
 
   // predictedDoneTick(object: GameObjectWrapper<Creep>): number {
@@ -60,7 +47,8 @@ export class KillBuilding extends BasePartAction<AnyKillableWrapper> implements 
     }
 
     let creepClassification = object.getBodyClassification();
-    if(creepClassification.hasAttackActive && assignment.distanceToTarget <= 1) {
+    let distanceToTarget = object.wpos.getRangeTo(this.target.wpos);
+    if(creepClassification.hasAttackActive && distanceToTarget <= 1) {
       //@ts-ignore
       let ret = object.get().attack(this.target.get());
       if(!ret) {
@@ -68,7 +56,7 @@ export class KillBuilding extends BasePartAction<AnyKillableWrapper> implements 
         return true;
       }
     }
-    if(creepClassification.hasRangedActive && assignment.distanceToTarget <= 3) {
+    if(creepClassification.hasRangedActive && distanceToTarget <= 3) {
       //@ts-ignore
       let ret = object.get().rangedAttack(this.target.get());
       if(!ret) {

@@ -1,8 +1,5 @@
 import { idType, setInterval, clearInterval } from "shared/polyfills";
-import { CachedValue } from "shared/utils/caching/CachedValue";
-import { BaseAction, findClosestAction } from "../../actions/base/BaseAction";
-import { BasePartAction } from "../../actions/base/BasePartAction";
-import { BaseResourceAction } from "../../actions/base/BaseResourceAction";
+import { BaseAction } from "../../actions/base/BaseAction";
 import { registerObjectWrapper } from "../base/AllGameObjects";
 import type { GameObjectWrapper } from "../base/GameObjectWrapper";
 import { HasStorageWrapper, HasStorageWrapperData } from "../base/HasStorageWrapper";
@@ -10,7 +7,7 @@ import { KillableWrapper, KillableWrapperData } from "../base/KillableWrapper";
 import queues from "../../queues";
 import { StorableCreatableClass } from "shared/utils/memory";
 import { CreepBody, CreepClass } from "./CreepBody";
-import { canHazJob, Job } from "world_new/jobs/Job";
+import { canHazJob, BaseJob } from "world_new/jobs/BaseJob";
 import { CreepRequestOptions } from './CreepRequest';
 import Logger from "shared/utils/logger";
 import Empire from "world_new/Empire";
@@ -79,8 +76,8 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
           wrapper.assignedJob = assignedJob;
         }
       }
-      if (creepMemory.actionId) {
-        let assignedAction = colony.getAction(creepMemory.actionId);
+      if (creepMemory.actionId && wrapper.assignedJob) {
+        let assignedAction = wrapper.assignedJob.getAction(creepMemory.actionId);
         if(assignedAction) {
           wrapper.currentAction = assignedAction;
         }
@@ -123,7 +120,7 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
   }
 
   name: string | false = false;
-  assignedJob: Job | false = false;
+  assignedJob: BaseJob | false = false;
   currentAction: BaseAction<GameObjectWrapper<Creep>, CreepWrapper, any> | false = false;
 
 
@@ -184,6 +181,12 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
     super.update();
     //if(this.body.getBodyClassification())
     if(!this.my) return;
+    let creep = this.getObject();
+    if (!creep) {
+      //creep died?
+      this.delete();
+      return;
+    }
     this.ensureAction();
     // logger.log(this.name, "update", this.currentAction ? this.currentAction.id : "no action", this.assignedJob ? this.assignedJob.id : "no job");
   }
@@ -196,7 +199,7 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
       // if (this.colony && !this.assignedJob)
       if (this.colony && !this.assignedJob) {
         this.getObject()?.say("no job")
-        logger.log(this.name, "has no job, finding a new one", this.getObject);
+        logger.log(this.name, "has no job, finding a new one");
         let newJob = this.colony.findSuitableJobForCreep(this);
         if (newJob) {
           newJob.assignObject(this);
@@ -219,7 +222,8 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
           logger.log(this.name, "assigned action", newAction.id);
         }
       }
-      if (!this.currentAction) {
+      if (!this.currentAction && this.store.maxTotal > 0 && this.store.totalFree == 0
+      ) {
         logger.log(this.name, "has no action, dropping all");
         this.dropAll();
       }
@@ -238,12 +242,12 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
       return;
     }
 
-    let rangeToAction = this.wpos.getRangeTo(action.target.wpos);
+    let rangeToAction = this.wpos.getRangeTo(action.wpos);
     logger.log(this.name, "range to action", rangeToAction, "max range", action.maxRange)
     if(rangeToAction <= action.maxRange) {
       let actionDone = action.doAction(this);
       logger.log(this.name, "did action", actionDone, action.id, action.assignments.size, action.maxAssignments);
-      if(actionDone==true) {
+      if(actionDone) {
         logger.log(this.name, "finished action", action.id)
         this.currentAction && this.currentAction.unassign(this);
         this.currentAction = false;
@@ -276,7 +280,7 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
       creep.say("🛌")
       return;
     }
-    creep.moveTo(action.target.wpos.toRoomPosition(), {
+    creep.moveTo(action.wpos.toRoomPosition(), {
       range: action.maxRange,
       reusePath: 1,
       // priority: 0,
@@ -285,7 +289,7 @@ export default class CreepWrapper extends HasStorageWrapper<Creep>  implements S
         stroke: '#ff0000'
       }
     });
-    // nodeNetwork.moveTo(creep, {pos: action.target.wpos, range: action.maxRange});
+    // nodeNetwork.moveTo(creep, {pos: action.wpos, range: action.maxRange});
   }
 
 

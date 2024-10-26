@@ -1,8 +1,9 @@
 import { HasStorageWrapper, HasStorageWrapperData } from "./base/HasStorageWrapper";
 import { StorableCreatableClass } from "shared/utils/memory";
-import { BaseAction } from "../actions/base/BaseAction";
-import CreepWrapper from "./creep/CreepWrapper";
 import { registerObjectWrapper } from "./base/AllGameObjects";
+import Logger from "shared/utils/logger";
+
+const logger = new Logger("StructureLinkWrapper");
 
 interface StructureLinkWrapperData extends HasStorageWrapperData {
   cooldown: number;
@@ -13,6 +14,7 @@ export class StructureLinkWrapper extends HasStorageWrapper<StructureLink> imple
 
   static fromJSON(json: StructureLinkWrapperData): StructureLinkWrapper {
     const wrapper = new StructureLinkWrapper(json.id as Id<StructureLink>);
+    HasStorageWrapper.fromJSON(json, wrapper);
     wrapper.cooldown = json.cooldown;
     return wrapper;
   }

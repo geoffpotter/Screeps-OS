@@ -1,38 +1,14 @@
-import { BaseAction, BaseActionMemory } from "../base/BaseAction";
+import { BaseCreepAction } from "../base/BaseCreepAction";
 import { KillableWrapper } from "../../wrappers/base/KillableWrapper";
 import CreepWrapper from "../../wrappers/creep/CreepWrapper";
-import { StorableClass, baseStorable } from "shared/utils/memory/MemoryManager";
-import { getGameObjectWrapperById } from "world_new/wrappers/base/AllGameObjects";
-import { ActionDemand } from "../base/ActionHelpers";
+import { ActionDemand } from "../base/ActionDemand";
 
-export interface DismantleMemory extends BaseActionMemory {
-}
-
-export class Dismantle extends BaseAction<KillableWrapper<Structure>, CreepWrapper>
-  implements StorableClass<Dismantle, typeof Dismantle, DismantleMemory> {
-
-  static fromJSON(json: DismantleMemory, action?: Dismantle): Dismantle {
-    if (!action) {
-      const target = getGameObjectWrapperById(json.targetId) as KillableWrapper<Structure>;
-      action = new Dismantle(target);
-    }
-    BaseAction.fromJSON(json, action);
-    return action;
-  }
-
+export class Dismantle extends BaseCreepAction<KillableWrapper<Structure>> {
   static actionType = "🔨";
 
   constructor(target: KillableWrapper<Structure>) {
     super(Dismantle.actionType, target);
     this.maxRange = 1;
-  }
-
-  calculateDemand(): ActionDemand {
-    const structure = this.target.getObject();
-    if (!structure) return {};
-    return {
-      [WORK]: Math.ceil(structure.hits / DISMANTLE_POWER),
-    };
   }
 
   canDo(object: CreepWrapper): boolean {
@@ -49,5 +25,13 @@ export class Dismantle extends BaseAction<KillableWrapper<Structure>, CreepWrapp
       }
     }
     return false;
+  }
+
+  calculateDemand(): ActionDemand<BodyPartConstant> {
+    const structure = this.target.getObject();
+    if (!structure) return new ActionDemand<BodyPartConstant>();
+    let demand = new ActionDemand<BodyPartConstant>();
+    demand.set(WORK, Math.ceil(structure.hits / DISMANTLE_POWER));
+    return demand;
   }
 }

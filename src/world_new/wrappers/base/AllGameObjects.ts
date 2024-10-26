@@ -26,7 +26,9 @@ export function addGameObjectWrapper(wrapper:GameObjectWrapper<any>) {
 export function hasGameObjectWrapper(id:string):boolean {
     return gameObjectWrappers.has(id);
 }
-
+export function getAllGameObjectWrappers():GameObjectWrapper<any>[] {
+    return Array.from(gameObjectWrappers.values());
+}
 
 //run all game objects every tick
 setInterval(() => {
